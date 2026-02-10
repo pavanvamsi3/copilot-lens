@@ -49,6 +49,7 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.classList.add("active");
     document.getElementById(btn.dataset.page + "Page").classList.add("active");
     if (btn.dataset.page === "analytics") loadAnalytics();
+    if (btn.dataset.page === "insights") loadInsights();
   });
 });
 
@@ -454,6 +455,9 @@ refreshBtn.addEventListener("click", () => {
   if (document.getElementById("analyticsPage").classList.contains("active")) {
     loadAnalytics();
   }
+  if (document.getElementById("insightsPage").classList.contains("active")) {
+    loadInsights();
+  }
   setTimeout(() => refreshBtn.classList.remove("spinning"), 600);
 });
 
@@ -475,6 +479,114 @@ themeToggle.addEventListener("click", () => {
     themeToggle.textContent = "🌙";
   }
 });
+
+// ============ Insights ============
+const repoSelector = document.getElementById("repoSelector");
+const insightsContent = document.getElementById("insightsContent");
+let insightsRepos = [];
+
+async function loadInsights() {
+  try {
+    const res = await fetch("/api/insights/repos");
+    insightsRepos = await res.json();
+    renderRepoSelector();
+    if (insightsRepos.length > 0) {
+      const selected = insightsRepos.find((r) => r.repo === repoSelector.value) || insightsRepos[0];
+      repoSelector.value = selected.repo;
+      renderInsightsScore(selected);
+    }
+  } catch (err) {
+    insightsContent.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load insights: ${err.message}</div>`;
+  }
+}
+
+function renderRepoSelector() {
+  if (insightsRepos.length === 0) {
+    repoSelector.innerHTML = '<option value="">No repos with enough data (need 3+ sessions)</option>';
+    insightsContent.innerHTML = '<div class="not-enough-data"><div class="nod-icon">📊</div><p>Need at least 3 sessions in a repository to generate a score.</p></div>';
+    return;
+  }
+  const current = repoSelector.value;
+  repoSelector.innerHTML = insightsRepos
+    .map((r) => `<option value="${r.repo}">${shortDir(r.repo)} — ${r.totalScore}/100</option>`)
+    .join("");
+  if (current && insightsRepos.find((r) => r.repo === current)) {
+    repoSelector.value = current;
+  }
+}
+
+repoSelector.addEventListener("change", () => {
+  const repo = insightsRepos.find((r) => r.repo === repoSelector.value);
+  if (repo) renderInsightsScore(repo);
+});
+
+function getScoreColor(score, max) {
+  const pct = score / max;
+  if (pct >= 0.7) return "var(--accent2)";
+  if (pct >= 0.4) return "var(--warning)";
+  return "var(--danger)";
+}
+
+function renderInsightsScore(data) {
+  const color = getScoreColor(data.totalScore, 100);
+  const circumference = 2 * Math.PI * 65;
+  const offset = circumference - (data.totalScore / 100) * circumference;
+
+  const catIcons = {
+    promptQuality: "💬",
+    toolUtilization: "🔧",
+    efficiency: "⚡",
+    mcpUtilization: "🔌",
+    engagement: "📈",
+  };
+
+  const categoryCards = Object.entries(data.categories)
+    .map(([key, cat]) => {
+      const pct = (cat.score / cat.maxScore) * 100;
+      const barColor = getScoreColor(cat.score, cat.maxScore);
+      return `
+        <div class="category-card">
+          <div class="cat-header">
+            <span class="cat-label">${catIcons[key] || "📊"} ${cat.label}</span>
+            <span class="cat-score" style="color:${barColor}">${cat.score}/${cat.maxScore}</span>
+          </div>
+          <div class="cat-bar"><div class="cat-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+          <div class="cat-detail">${escapeHtml(cat.detail)}</div>
+        </div>`;
+    })
+    .join("");
+
+  const tipItems = data.tips
+    .map((tip) => `<div class="tip-item"><span class="tip-icon">💡</span><span>${escapeHtml(tip)}</span></div>`)
+    .join("");
+
+  insightsContent.innerHTML = `
+    <div class="score-overview">
+      <div class="score-circle">
+        <svg viewBox="0 0 160 160">
+          <circle class="track" cx="80" cy="80" r="65"></circle>
+          <circle class="progress" cx="80" cy="80" r="65"
+            stroke="${color}"
+            stroke-dasharray="${circumference}"
+            stroke-dashoffset="${offset}"></circle>
+        </svg>
+        <div class="score-text">
+          <span class="score-number" style="color:${color}">${data.totalScore}</span>
+          <span class="score-max">/ 100</span>
+        </div>
+      </div>
+      <div class="score-summary">
+        <h2>Copilot Effectiveness Score</h2>
+        <div class="repo-name">${escapeHtml(data.repo)}</div>
+        <div class="session-info">${data.sessionCount} sessions analyzed</div>
+      </div>
+    </div>
+    <div class="category-grid">${categoryCards}</div>
+    <div class="tips-section">
+      <h3>💡 Tips to Improve</h3>
+      ${tipItems}
+    </div>`;
+}
 
 // Init
 loadSessions();

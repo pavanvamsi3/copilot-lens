@@ -13,6 +13,7 @@
     <nav>
       <button class="nav-btn active" data-page="sessions">Sessions</button>
       <button class="nav-btn" data-page="analytics">Analytics</button>
+      <button class="nav-btn" data-page="insights">Insights</button>
     </nav>
     <button class="refresh-btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
     <button class="refresh-btn" id="themeToggle" title="Toggle light/dark mode">☀️</button>
@@ -79,6 +80,18 @@
           <h3>MCP Servers Used</h3>
           <canvas id="mcpChart"></canvas>
         </div>
+      </div>
+    </section>
+
+    <!-- Insights Page -->
+    <section id="insightsPage" class="page">
+      <div class="insights-header">
+        <select id="repoSelector">
+          <option value="">Loading repos...</option>
+        </select>
+      </div>
+      <div id="insightsContent">
+        <div style="color:var(--text-dim);padding:40px;text-align:center">Select a repository to view its effectiveness score</div>
       </div>
     </section>
 
