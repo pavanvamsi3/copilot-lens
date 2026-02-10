@@ -76,6 +76,11 @@ Eight interactive charts powered by Chart.js, arranged in a 2-column grid:
 
 Doughnut chart legends are interactive — click a label to toggle that segment's visibility.
 
+#### Glimpse of Analytics Dashboard
+
+<img width="1184" height="1011" alt="image" src="https://github.com/user-attachments/assets/136205ca-f206-4fb1-88a7-71640314a9b5" />
+
+
 ### 🎨 UI Features
 
 - **Dark & Light mode** — toggle with one click, preference is saved
@@ -135,3 +140,4 @@ If you'd like a prettier URL like `http://copilot.lens:3000`, add this to your h
 - **macOS/Linux**: `echo "127.0.0.1 copilot.lens" | sudo tee -a /etc/hosts`
 
 Then run: `copilot-lens --host copilot.lens`
+
