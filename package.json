@@ -1,0 +1,35 @@
+{
+  "name": "copilot-lens",
+  "version": "1.0.0",
+  "description": "A local dashboard to visualize and analyze your GitHub Copilot CLI sessions",
+  "main": "dist/server.js",
+  "bin": {
+    "copilot-lens": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["copilot", "github", "cli", "dashboard", "sessions", "analytics"],
+  "author": "pavanvamsi3",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pavanvamsi3/copilot-lens"
+  },
+  "files": ["dist/", "public/", "README.md"],
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

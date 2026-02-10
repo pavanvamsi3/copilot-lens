@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copilot Lens</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="logo">👓 Copilot Lens</div>
+    <nav>
+      <button class="nav-btn active" data-page="sessions">Sessions</button>
+      <button class="nav-btn" data-page="analytics">Analytics</button>
+    </nav>
+    <button class="refresh-btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
+  </header>
+
+  <main>
+    <!-- Sessions Page -->
+    <section id="sessionsPage" class="page active">
+      <div class="controls">
+        <input type="text" id="searchInput" placeholder="Search sessions (ID, branch)..." />
+        <select id="timeFilter">
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+        <select id="statusFilter">
+          <option value="all">All Status</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="error">Error</option>
+        </select>
+        <select id="dirFilter">
+          <option value="all">All Directories</option>
+        </select>
+      </div>
+      <div id="sessionCount" class="session-count"></div>
+      <div id="sessionList" class="session-list"></div>
+    </section>
+
+    <!-- Analytics Page -->
+    <section id="analyticsPage" class="page">
+      <div class="stats-cards" id="statsCards"></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Sessions Per Day</h3>
+          <canvas id="sessionsPerDayChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Tool Usage</h3>
+          <canvas id="toolUsageChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Top Working Directories</h3>
+          <canvas id="topDirsChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Branch Activity</h3>
+          <canvas id="branchChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Session Detail Modal -->
+    <div id="detailModal" class="modal hidden">
+      <div class="modal-content">
+        <button class="modal-close" id="modalClose">✕</button>
+        <div id="detailContent"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
