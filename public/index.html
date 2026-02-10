@@ -15,6 +15,7 @@
       <button class="nav-btn" data-page="analytics">Analytics</button>
     </nav>
     <button class="refresh-btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
+    <button class="refresh-btn" id="themeToggle" title="Toggle light/dark mode">☀️</button>
   </header>
 
   <main>
@@ -46,21 +47,37 @@
     <section id="analyticsPage" class="page">
       <div class="stats-cards" id="statsCards"></div>
       <div class="charts-grid">
-        <div class="chart-card">
+        <div class="chart-card compact">
           <h3>Sessions Per Day</h3>
           <canvas id="sessionsPerDayChart"></canvas>
+        </div>
+        <div class="chart-card compact">
+          <h3>Activity by Hour of Day</h3>
+          <canvas id="hourChart"></canvas>
         </div>
         <div class="chart-card">
           <h3>Tool Usage</h3>
           <canvas id="toolUsageChart"></canvas>
         </div>
         <div class="chart-card">
+          <h3>Model Usage</h3>
+          <canvas id="modelChart"></canvas>
+        </div>
+        <div class="chart-card full-width">
           <h3>Top Working Directories</h3>
           <canvas id="topDirsChart"></canvas>
         </div>
         <div class="chart-card">
-          <h3>Branch Activity</h3>
+          <h3>Time Per Branch</h3>
           <canvas id="branchChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Time Per Repo</h3>
+          <canvas id="repoTimeChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>MCP Servers Used</h3>
+          <canvas id="mcpChart"></canvas>
         </div>
       </div>
     </section>

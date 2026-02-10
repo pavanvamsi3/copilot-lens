@@ -39,6 +39,7 @@ const detailModal = document.getElementById("detailModal");
 const detailContent = document.getElementById("detailContent");
 const modalClose = document.getElementById("modalClose");
 const refreshBtn = document.getElementById("refreshBtn");
+const statsCards = document.getElementById("statsCards");
 
 // Navigation
 document.querySelectorAll(".nav-btn").forEach((btn) => {
@@ -181,7 +182,7 @@ function renderDetail(s) {
 
   // Interleave conversation messages in order
   const conversation = s.events
-    .filter((e) => e.type === "user.message" || e.type === "assistant.message")
+    .filter((e) => (e.type === "user.message" || e.type === "assistant.message") && (e.data?.content || "").trim())
     .map((e) => {
       const isUser = e.type === "user.message";
       const content = e.data?.content || "";
@@ -222,7 +223,9 @@ function renderDetail(s) {
     </div>
 
     <div class="detail-panel active" id="panel-conversation">
+      <div class="conversation-list">
       ${conversation || '<div style="color:var(--text-dim)">No messages in this session</div>'}
+      </div>
     </div>
 
     <div class="detail-panel" id="panel-tools">
@@ -299,6 +302,9 @@ function renderCharts() {
   charts = {};
 
   const chartColors = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#bc8cff", "#f0883e", "#56d4dd", "#db61a2"];
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const tickColor = isLight ? "#656d76" : "#8b949e";
+  const legendColor = isLight ? "#1f2328" : "#e6edf3";
 
   // Sessions per day
   const days = Object.keys(analytics.sessionsPerDay).sort();
@@ -308,7 +314,7 @@ function renderCharts() {
       labels: days.map((d) => d.slice(5)), // MM-DD
       datasets: [{ label: "Sessions", data: days.map((d) => analytics.sessionsPerDay[d]), backgroundColor: "#58a6ff88", borderColor: "#58a6ff", borderWidth: 1 }],
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: "#8b949e" } }, x: { ticks: { color: "#8b949e" } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: tickColor } }, x: { ticks: { color: tickColor } } } },
   });
 
   // Tool usage (top 10)
@@ -322,7 +328,7 @@ function renderCharts() {
         labels: tools.map((t) => t[0]),
         datasets: [{ data: tools.map((t) => t[1]), backgroundColor: chartColors }],
       },
-      options: { responsive: true, plugins: { legend: { position: "right", labels: { color: "#e6edf3", font: { size: 11 } } } } },
+      options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
     });
   }
 
@@ -337,12 +343,12 @@ function renderCharts() {
         labels: dirs.map((d) => shortDir(d[0])),
         datasets: [{ label: "Sessions", data: dirs.map((d) => d[1]), backgroundColor: "#3fb95088", borderColor: "#3fb950", borderWidth: 1 }],
       },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: "#8b949e" } }, y: { ticks: { color: "#8b949e", font: { size: 11 } } } } },
+      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: tickColor } }, y: { ticks: { color: tickColor, font: { size: 12 } } } } },
     });
   }
 
-  // Branch activity (top 8)
-  const branches = Object.entries(analytics.branchActivity)
+  // Branch time (top 8)
+  const branches = Object.entries(analytics.branchTime || {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
   if (branches.length) {
@@ -350,11 +356,68 @@ function renderCharts() {
       type: "bar",
       data: {
         labels: branches.map((b) => b[0]),
-        datasets: [{ label: "Sessions", data: branches.map((b) => b[1]), backgroundColor: "#d2992288", borderColor: "#d29922", borderWidth: 1 }],
+        datasets: [{ label: "Time", data: branches.map((b) => Math.round(b[1] / 60000)), backgroundColor: "#d2992288", borderColor: "#d29922", borderWidth: 1 }],
       },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: "#8b949e" } }, y: { ticks: { color: "#8b949e", font: { size: 11 } } } } },
+      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => formatDuration(ctx.raw * 60000) } } }, scales: { x: { beginAtZero: true, title: { display: true, text: "minutes", color: tickColor }, ticks: { color: tickColor } }, y: { ticks: { color: tickColor, font: { size: 12 } } } } },
     });
   }
+
+  // Time per repo (top 8)
+  const repos = Object.entries(analytics.repoTime || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+  if (repos.length) {
+    charts.repoTime = new Chart(document.getElementById("repoTimeChart"), {
+      type: "bar",
+      data: {
+        labels: repos.map((r) => shortDir(r[0])),
+        datasets: [{ label: "Time", data: repos.map((r) => Math.round(r[1] / 60000)), backgroundColor: "#3fb95088", borderColor: "#3fb950", borderWidth: 1 }],
+      },
+      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => formatDuration(ctx.raw * 60000) } } }, scales: { x: { beginAtZero: true, title: { display: true, text: "minutes", color: tickColor }, ticks: { color: tickColor } }, y: { ticks: { color: tickColor, font: { size: 12 } } } } },
+    });
+  }
+
+  // MCP Servers
+  const mcpEntries = Object.entries(analytics.mcpServers || {}).sort((a, b) => b[1] - a[1]);
+  if (mcpEntries.length) {
+    charts.mcp = new Chart(document.getElementById("mcpChart"), {
+      type: "doughnut",
+      data: {
+        labels: mcpEntries.map((m) => m[0]),
+        datasets: [{ data: mcpEntries.map((m) => m[1]), backgroundColor: chartColors }],
+      },
+      options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
+    });
+  } else {
+    document.getElementById("mcpChart").parentElement.innerHTML = '<h3>MCP Servers Used</h3><div style="color:var(--text-dim);padding:40px;text-align:center">No MCP servers detected</div>';
+  }
+
+  // Model Usage
+  const models = Object.entries(analytics.modelUsage || {}).sort((a, b) => b[1] - a[1]);
+  if (models.length) {
+    charts.model = new Chart(document.getElementById("modelChart"), {
+      type: "doughnut",
+      data: {
+        labels: models.map((m) => m[0]),
+        datasets: [{ data: models.map((m) => m[1]), backgroundColor: chartColors }],
+      },
+      options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
+    });
+  } else {
+    document.getElementById("modelChart").parentElement.innerHTML = '<h3>Model Usage</h3><div style="color:var(--text-dim);padding:40px;text-align:center">No model data detected</div>';
+  }
+
+  // Activity by Hour of Day
+  const hours = analytics.hourOfDay || {};
+  const allHours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0") + ":00");
+  charts.hour = new Chart(document.getElementById("hourChart"), {
+    type: "bar",
+    data: {
+      labels: allHours.map((h) => h.slice(0, 2)),
+      datasets: [{ label: "Sessions", data: allHours.map((h) => hours[h] || 0), backgroundColor: "#56d4dd88", borderColor: "#56d4dd", borderWidth: 1 }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: tickColor } }, x: { ticks: { color: tickColor } } } },
+  });
 }
 
 // Data loading
@@ -392,6 +455,25 @@ refreshBtn.addEventListener("click", () => {
     loadAnalytics();
   }
   setTimeout(() => refreshBtn.classList.remove("spinning"), 600);
+});
+
+// Theme toggle
+const themeToggle = document.getElementById("themeToggle");
+const savedTheme = localStorage.getItem("copilot-lens-theme");
+if (savedTheme === "light") document.documentElement.setAttribute("data-theme", "light");
+themeToggle.textContent = document.documentElement.getAttribute("data-theme") === "light" ? "🌙" : "☀️";
+
+themeToggle.addEventListener("click", () => {
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  if (isLight) {
+    document.documentElement.removeAttribute("data-theme");
+    localStorage.setItem("copilot-lens-theme", "dark");
+    themeToggle.textContent = "☀️";
+  } else {
+    document.documentElement.setAttribute("data-theme", "light");
+    localStorage.setItem("copilot-lens-theme", "light");
+    themeToggle.textContent = "🌙";
+  }
 });
 
 // Init
