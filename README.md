@@ -78,8 +78,7 @@ Doughnut chart legends are interactive — click a label to toggle that segment'
 
 #### Glimpse of Analytics Dashboard
 
-<img width="1184" height="1011" alt="image" src="https://github.com/user-attachments/assets/136205ca-f206-4fb1-88a7-71640314a9b5" />
-
+![copilot-lens demo](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-demo.png)
 
 ### 🎨 UI Features
 
