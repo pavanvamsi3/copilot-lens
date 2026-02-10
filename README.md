@@ -52,12 +52,16 @@ npx copilot-lens --open
 - **Three filter dimensions** — filter by time range, status, and directory
 - Click any session to view full details
 
+![copilot-lens sessions list](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png)
+
 ### 💬 Conversation View
 
 - Chat-style layout with your prompts on the right and Copilot responses on the left
 - View tool calls made during the session
 - See any errors that occurred
 - Read session plans (if created)
+
+![copilot-lens session view](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-session-view.png)
 
 ### 📊 Analytics Dashboard
 
