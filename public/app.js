@@ -53,9 +53,14 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
 });
 
 // Modal
-modalClose.addEventListener("click", () => detailModal.classList.add("hidden"));
+modalClose.addEventListener("click", () => { detailModal.classList.add("hidden"); document.body.style.overflow = ""; });
 detailModal.addEventListener("click", (e) => {
-  if (e.target === detailModal) detailModal.classList.add("hidden");
+  if (e.target === detailModal) { detailModal.classList.add("hidden"); document.body.style.overflow = ""; }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !detailModal.classList.contains("hidden")) {
+    detailModal.classList.add("hidden"); document.body.style.overflow = "";
+  }
 });
 
 // Format helpers
@@ -164,6 +169,7 @@ function renderSessions() {
 async function openDetail(id) {
   detailContent.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">Loading...</div>';
   detailModal.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
 
   try {
     const res = await fetch(`/api/sessions/${id}`);
@@ -180,17 +186,38 @@ function renderDetail(s) {
   const toolCalls = s.events.filter((e) => e.type === "tool.execution_start");
   const errors = s.events.filter((e) => e.type === "session.error");
 
+  // Track model changes for conversation display
+  let currentModel = "";
+  const startEvent = s.events.find((e) => e.type === "session.start");
+  if (startEvent?.data?.model) currentModel = startEvent.data.model;
+
+  // Build a map of model at each event index
+  const modelAtIndex = {};
+  for (let i = 0; i < s.events.length; i++) {
+    const e = s.events[i];
+    if (e.type === "session.model_change" && e.data?.newModel) {
+      currentModel = e.data.newModel;
+    }
+    if (e.type === "session.info" && e.data?.infoType === "model") {
+      const match = (e.data.message || "").match(/Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i);
+      if (match) currentModel = match[1];
+    }
+    modelAtIndex[i] = currentModel;
+  }
+
   // Interleave conversation messages in order
   const conversation = s.events
-    .filter((e) => (e.type === "user.message" || e.type === "assistant.message") && (e.data?.content || "").trim())
-    .map((e) => {
+    .map((e, i) => ({ e, i }))
+    .filter(({ e }) => (e.type === "user.message" || e.type === "assistant.message") && (e.data?.content || "").trim())
+    .map(({ e, i }) => {
       const isUser = e.type === "user.message";
       const content = e.data?.content || "";
-      // Truncate long messages
-      const display = content.length > 2000 ? content.slice(0, 2000) + "\n...(truncated)" : content;
+      const display = content.length > 800 ? content.slice(0, 800) + "\n...(truncated)" : content;
+      const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+      const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${modelAtIndex[i]}</span>` : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
-        <div class="message-label">${isUser ? "👤 You" : "🤖 Copilot"}</div>
-        ${escapeHtml(display)}
+        <div class="message-label">${isUser ? "👤 You" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
+        <div class="message-body">${escapeHtml(display)}</div>
       </div>`;
     })
     .join("");

@@ -332,18 +332,24 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .conversation-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
   padding: 8px 0;
 }
 
 .message {
-  max-width: 75%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  line-height: 1.6;
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+
+.message-body {
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: break-word;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .message-user {
@@ -359,12 +365,33 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px; }
 }
 
 .message-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--text-dim);
+}
+
+.message-time {
+  font-weight: 400;
+  font-size: 0.68rem;
+  opacity: 0.7;
+}
+
+.message-model {
+  font-weight: 500;
+  font-size: 0.65rem;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent2) 15%, var(--surface));
+  color: var(--accent2);
+  margin-left: 6px;
 }
 
 /* Tool calls */
