@@ -91,6 +91,20 @@ Doughnut chart legends are interactive — click a label to toggle that segment'
 - **Responsive layout** — works on any screen size
 - **2-column grid layout** — compact charts with no wasted space
 
+### 🏆 Copilot Effectiveness Score
+
+Per-repo scoring (0-100) that measures how effectively you use Copilot CLI, with actionable improvement tips.
+
+| Category | What It Measures |
+|----------|-----------------|
+| **Prompt Quality** | Average prompt length, how often Copilot needs clarification |
+| **Tool Utilization** | Diversity of tools used (grep, glob, edit, task, etc.) |
+| **Efficiency** | Tool success rate and turns per session |
+| **MCP Utilization** | Configured MCP servers vs actually used (reads repo's `mcp.json`) |
+| **Engagement** | Session duration sweet spot and usage consistency |
+
+![copilot-lens effectiveness score](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-score.png)
+
 ## How It Works
 
 Copilot Lens reads session data from `~/.copilot/session-state/`, where GitHub Copilot CLI stores:
