@@ -309,14 +309,14 @@ export function getAnalytics(): AnalyticsData {
             }
 
             // Model usage
+            if (event.type === "session.model_change" && event.data?.newModel) {
+              const model = event.data.newModel;
+              modelUsage[model] = (modelUsage[model] || 0) + 1;
+            }
             if (event.type === "session.info" && event.data?.infoType === "model") {
               const msg = event.data?.message || "";
               const match = msg.match(/Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i);
               if (match) modelUsage[match[1]] = (modelUsage[match[1]] || 0) + 1;
-            }
-            if (event.type === "session.start" && event.data?.model) {
-              const model = event.data.model;
-              modelUsage[model] = (modelUsage[model] || 0) + 1;
             }
 
             // Turn counting
