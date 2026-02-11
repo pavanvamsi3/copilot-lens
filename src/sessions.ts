@@ -372,3 +372,363 @@ export function getAnalytics(): AnalyticsData {
     errorTypes,
   };
 }
+
+// ============ Insights / Scoring ============
+
+export interface RepoScore {
+  repo: string;
+  totalScore: number;
+  sessionCount: number;
+  categories: {
+    promptQuality: CategoryScore;
+    toolUtilization: CategoryScore;
+    efficiency: CategoryScore;
+    mcpUtilization: CategoryScore;
+    engagement: CategoryScore;
+  };
+  tips: string[];
+}
+
+export interface CategoryScore {
+  score: number;
+  maxScore: number;
+  label: string;
+  detail: string;
+}
+
+function scanMcpConfig(repoPath: string): string[] {
+  const configPaths = [
+    path.join(repoPath, ".vscode", "mcp.json"),
+    path.join(repoPath, ".github", "copilot", "mcp.json"),
+  ];
+  for (const configPath of configPaths) {
+    try {
+      if (fs.existsSync(configPath)) {
+        let raw = fs.readFileSync(configPath, "utf-8");
+        // Strip trailing commas (JSONC / VS Code style)
+        raw = raw.replace(/,\s*([\]}])/g, "$1");
+        const config = JSON.parse(raw);
+        const servers = config.servers || config.mcpServers || {};
+        return Object.keys(servers);
+      }
+    } catch {}
+  }
+  return [];
+}
+
+interface RepoSessionData {
+  msgLengths: number[];
+  askUserCount: number;
+  totalUserMsgs: number;
+  toolsUsed: Set<string>;
+  toolSuccess: number;
+  toolTotal: number;
+  turns: number[];
+  durations: number[];
+  mcpServersUsed: Set<string>;
+  sessionDays: Set<string>;
+  sessionCount: number;
+}
+
+function collectRepoData(repoPath: string): RepoSessionData {
+  const sessions = listSessions();
+  const repoSessions = sessions.filter(
+    (s) => (s.gitRoot || s.cwd) === repoPath
+  );
+
+  const data: RepoSessionData = {
+    msgLengths: [],
+    askUserCount: 0,
+    totalUserMsgs: 0,
+    toolsUsed: new Set(),
+    toolSuccess: 0,
+    toolTotal: 0,
+    turns: [],
+    durations: [],
+    mcpServersUsed: new Set(),
+    sessionDays: new Set(),
+    sessionCount: repoSessions.length,
+  };
+
+  const sessionDir = getSessionDir();
+
+  for (const s of repoSessions) {
+    const day = s.createdAt.slice(0, 10);
+    if (day) data.sessionDays.add(day);
+
+    try {
+      const eventsPath = path.join(sessionDir, s.id, "events.jsonl");
+      if (!fs.existsSync(eventsPath)) continue;
+      const content = fs.readFileSync(eventsPath, "utf-8");
+      let turnCount = 0;
+      const timestamps: number[] = [];
+
+      for (const line of content.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+          if (event.timestamp) {
+            const t = new Date(event.timestamp).getTime();
+            if (t > 0) timestamps.push(t);
+          }
+
+          if (event.type === "user.message") {
+            const msg = event.data?.content || event.data?.transformedContent || "";
+            data.msgLengths.push(msg.length);
+            data.totalUserMsgs++;
+          }
+
+          if (event.type === "tool.execution_start") {
+            const tool = event.data?.tool || event.data?.toolName || "";
+            if (tool) data.toolsUsed.add(tool);
+            if (tool === "ask_user") data.askUserCount++;
+          }
+
+          if (event.type === "tool.execution_complete") {
+            data.toolTotal++;
+            if (event.data?.success) data.toolSuccess++;
+          }
+
+          if (event.type === "assistant.turn_start") turnCount++;
+
+          if (event.type === "session.info" && event.data?.infoType === "mcp") {
+            const msg = event.data?.message || "";
+            const match = msg.match(/Configured MCP servers?:\s*(.+)/i);
+            if (match) {
+              for (const server of match[1].split(",").map((s: string) => s.trim())) {
+                if (server) data.mcpServersUsed.add(server);
+              }
+            }
+          }
+        } catch {}
+      }
+
+      if (turnCount > 0) data.turns.push(turnCount);
+
+      if (timestamps.length >= 2) {
+        timestamps.sort((a, b) => a - b);
+        let dur = 0;
+        for (let i = 1; i < timestamps.length; i++) {
+          dur += Math.min(timestamps[i] - timestamps[i - 1], 300_000);
+        }
+        if (dur > 0) data.durations.push(dur);
+      }
+    } catch {}
+  }
+
+  return data;
+}
+
+function scorePromptQuality(data: RepoSessionData): CategoryScore {
+  const avgLen = data.msgLengths.length
+    ? data.msgLengths.reduce((a, b) => a + b, 0) / data.msgLengths.length
+    : 0;
+  const askRatio = data.totalUserMsgs > 0 ? data.askUserCount / data.totalUserMsgs : 0;
+
+  let score = 0;
+  let detail = "";
+
+  if (avgLen >= 100) { score = 20; detail = `Avg prompt length: ${Math.round(avgLen)} chars (excellent)`; }
+  else if (avgLen >= 50) { score = 15; detail = `Avg prompt length: ${Math.round(avgLen)} chars (good)`; }
+  else if (avgLen >= 20) { score = 10; detail = `Avg prompt length: ${Math.round(avgLen)} chars (fair)`; }
+  else { score = 5; detail = `Avg prompt length: ${Math.round(avgLen)} chars (short)`; }
+
+  // Penalty for high ask_user ratio (copilot needing clarification)
+  const penalty = Math.floor(askRatio * 30);
+  score = Math.max(0, score - penalty);
+  if (penalty > 0) detail += ` | ${Math.round(askRatio * 100)}% needed clarification`;
+
+  return { score, maxScore: 20, label: "Prompt Quality", detail };
+}
+
+function scoreToolUtilization(data: RepoSessionData): CategoryScore {
+  const count = data.toolsUsed.size;
+  let score = 0;
+  let detail = `${count} distinct tools used`;
+
+  if (count >= 7) { score = 20; detail += " (excellent diversity)"; }
+  else if (count >= 5) { score = 15; detail += " (good diversity)"; }
+  else if (count >= 3) { score = 10; detail += " (moderate)"; }
+  else { score = 5; detail += " (limited)"; }
+
+  return { score, maxScore: 20, label: "Tool Utilization", detail };
+}
+
+function scoreEfficiency(data: RepoSessionData): CategoryScore {
+  const successRate = data.toolTotal > 0 ? data.toolSuccess / data.toolTotal : 1;
+  const avgTurns = data.turns.length
+    ? data.turns.reduce((a, b) => a + b, 0) / data.turns.length
+    : 0;
+
+  let score = 0;
+  let detail = "";
+
+  if (successRate >= 0.9) { score = 15; detail = `${Math.round(successRate * 100)}% tool success rate`; }
+  else if (successRate >= 0.8) { score = 10; detail = `${Math.round(successRate * 100)}% tool success rate`; }
+  else if (successRate >= 0.7) { score = 7; detail = `${Math.round(successRate * 100)}% tool success rate`; }
+  else { score = 4; detail = `${Math.round(successRate * 100)}% tool success rate`; }
+
+  // Bonus for concise sessions
+  if (avgTurns > 0 && avgTurns < 15) {
+    score = Math.min(20, score + 5);
+    detail += ` | Avg ${Math.round(avgTurns)} turns/session (concise)`;
+  } else if (avgTurns >= 15) {
+    detail += ` | Avg ${Math.round(avgTurns)} turns/session`;
+  }
+
+  return { score, maxScore: 20, label: "Efficiency", detail };
+}
+
+function scoreMcpUtilization(data: RepoSessionData, configuredServers: string[]): CategoryScore {
+  let score = 0;
+  let detail = "";
+
+  if (configuredServers.length === 0) {
+    score = 10;
+    detail = "No MCP servers configured (neutral)";
+  } else {
+    // Fuzzy match: config name "bluebird-mcp" matches usage "bluebird" or tool "bluebird-engineering_copilot"
+    const usedServers = [...data.mcpServersUsed, ...data.toolsUsed];
+    const used = configuredServers.filter((configured) => {
+      const cfgLower = configured.toLowerCase().replace(/[-_\s]/g, "");
+      return usedServers.some((u) => {
+        const uLower = u.toLowerCase().replace(/[-_\s]/g, "");
+        return uLower.includes(cfgLower) || cfgLower.includes(uLower);
+      });
+    });
+    const ratio = used.length / configuredServers.length;
+    if (ratio >= 0.8) { score = 20; detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`; }
+    else if (ratio >= 0.5) { score = 15; detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`; }
+    else if (ratio > 0) { score = 10; detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`; }
+    else { score = 5; detail = `${configuredServers.length} MCP servers configured but none used`; }
+  }
+
+  return { score, maxScore: 20, label: "MCP Utilization", detail };
+}
+
+function scoreEngagement(data: RepoSessionData): CategoryScore {
+  const avgDur = data.durations.length
+    ? data.durations.reduce((a, b) => a + b, 0) / data.durations.length
+    : 0;
+  const avgMin = avgDur / 60000;
+
+  let score = 0;
+  let detail = "";
+
+  if (avgMin >= 5 && avgMin <= 30) { score = 15; detail = `Avg session: ${Math.round(avgMin)}min (ideal)`; }
+  else if (avgMin > 30) { score = 10; detail = `Avg session: ${Math.round(avgMin)}min (long)`; }
+  else if (avgMin > 0) { score = 7; detail = `Avg session: ${Math.round(avgMin)}min (brief)`; }
+  else { score = 3; detail = "No session duration data"; }
+
+  // Bonus for consistency
+  const days = data.sessionDays.size;
+  if (days >= 7) {
+    score = Math.min(20, score + 5);
+    detail += ` | Active on ${days} days (consistent)`;
+  } else if (days >= 3) {
+    score = Math.min(20, score + 3);
+    detail += ` | Active on ${days} days`;
+  } else {
+    detail += ` | Active on ${days} day(s)`;
+  }
+
+  return { score, maxScore: 20, label: "Engagement", detail };
+}
+
+function generateTips(categories: RepoScore["categories"], data: RepoSessionData, configuredServers: string[]): string[] {
+  const tips: string[] = [];
+
+  if (categories.promptQuality.score < 15) {
+    const avgLen = data.msgLengths.length
+      ? Math.round(data.msgLengths.reduce((a, b) => a + b, 0) / data.msgLengths.length)
+      : 0;
+    tips.push(`Your prompts average ${avgLen} chars — try adding more context, expected behavior, and constraints to reduce back-and-forth.`);
+  }
+
+  if (categories.toolUtilization.score < 15) {
+    const used = [...data.toolsUsed];
+    const suggestions = ["grep", "glob", "edit", "task", "view"].filter((t) => !used.includes(t));
+    if (suggestions.length > 0) {
+      tips.push(`Try using ${suggestions.slice(0, 3).join(", ")} — these tools can speed up your workflow.`);
+    }
+  }
+
+  if (categories.efficiency.score < 15) {
+    const successRate = data.toolTotal > 0 ? Math.round((data.toolSuccess / data.toolTotal) * 100) : 100;
+    if (successRate < 85) {
+      tips.push(`Your tool success rate is ${successRate}% — review failing commands and provide clearer instructions.`);
+    }
+  }
+
+  if (categories.mcpUtilization.score < 15 && configuredServers.length > 0) {
+    const usedServers = [...data.mcpServersUsed, ...data.toolsUsed];
+    const unused = configuredServers.filter((configured) => {
+      const cfgLower = configured.toLowerCase().replace(/[-_\s]/g, "");
+      return !usedServers.some((u) => {
+        const uLower = u.toLowerCase().replace(/[-_\s]/g, "");
+        return uLower.includes(cfgLower) || cfgLower.includes(uLower);
+      });
+    });
+    if (unused.length > 0) {
+      tips.push(`You have unused MCP servers: ${unused.join(", ")}. Try leveraging them in your prompts.`);
+    }
+  } else if (configuredServers.length === 0) {
+    tips.push("Consider adding MCP servers to your project for enhanced capabilities (e.g., database access, API integrations).");
+  }
+
+  if (categories.engagement.score < 15) {
+    const avgDur = data.durations.length
+      ? data.durations.reduce((a, b) => a + b, 0) / data.durations.length / 60000
+      : 0;
+    if (avgDur < 5) {
+      tips.push("Your sessions are very brief — try tackling larger tasks with Copilot for more impactful results.");
+    }
+    if (data.sessionDays.size < 3) {
+      tips.push("Use Copilot more regularly to build momentum and improve your workflow.");
+    }
+  }
+
+  if (tips.length === 0) {
+    tips.push("Great job! You're using Copilot CLI effectively. Keep it up! 🎉");
+  }
+
+  return tips;
+}
+
+export function getRepoScore(repoPath: string): RepoScore {
+  const data = collectRepoData(repoPath);
+  const configuredServers = scanMcpConfig(repoPath);
+
+  const categories = {
+    promptQuality: scorePromptQuality(data),
+    toolUtilization: scoreToolUtilization(data),
+    efficiency: scoreEfficiency(data),
+    mcpUtilization: scoreMcpUtilization(data, configuredServers),
+    engagement: scoreEngagement(data),
+  };
+
+  const totalScore = Object.values(categories).reduce((sum, c) => sum + c.score, 0);
+  const tips = generateTips(categories, data, configuredServers);
+
+  return {
+    repo: repoPath,
+    totalScore,
+    sessionCount: data.sessionCount,
+    categories,
+    tips,
+  };
+}
+
+export function listReposWithScores(): RepoScore[] {
+  const sessions = listSessions();
+  const repos = new Set<string>();
+  for (const s of sessions) {
+    const repo = s.gitRoot || s.cwd;
+    if (repo) repos.add(repo);
+  }
+
+  return [...repos]
+    .map((repo) => getRepoScore(repo))
+    .filter((r) => r.sessionCount >= 3) // minimum 3 sessions
+    .sort((a, b) => b.totalScore - a.totalScore);
+}

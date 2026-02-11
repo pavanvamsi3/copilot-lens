@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { listSessions, getSession, getAnalytics } from "./sessions";
+import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore } from "./sessions";
 
 export function createApp() {
   const app = express();
@@ -39,6 +39,31 @@ export function createApp() {
     try {
       const analytics = getAnalytics();
       res.json(analytics);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: List repos with scores
+  app.get("/api/insights/repos", (_req, res) => {
+    try {
+      const repos = listReposWithScores();
+      res.json(repos);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: Get score for specific repo
+  app.get("/api/insights/score", (req, res) => {
+    try {
+      const repo = req.query.repo as string;
+      if (!repo) {
+        res.status(400).json({ error: "repo query parameter required" });
+        return;
+      }
+      const score = getRepoScore(repo);
+      res.json(score);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
