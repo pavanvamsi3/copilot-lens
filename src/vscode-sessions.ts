@@ -277,9 +277,6 @@ export function getVSCodeSession(sessionId: string): SessionDetail | null {
       }
     }
 
-    // Extract model from first request or selectedModel
-    const modelId = requests[0]?.modelId || content.selectedModel?.metadata?.name;
-
     // Derive status from index
     const entries = readSessionIndex(dataDir);
     const indexEntry = entries.find((e) => e.sessionId === sessionId);
