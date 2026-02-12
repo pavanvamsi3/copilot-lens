@@ -2,8 +2,10 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { parse as parseYaml } from "yaml";
+import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics } from "./vscode-sessions";
 
 export type SessionStatus = "running" | "completed" | "error";
+export type SessionSource = "cli" | "vscode";
 
 export interface SessionMeta {
   id: string;
@@ -14,6 +16,8 @@ export interface SessionMeta {
   updatedAt: string;
   summaryCount?: number;
   status: SessionStatus;
+  source: SessionSource;
+  title?: string;
 }
 
 export interface SessionEvent {
@@ -31,6 +35,8 @@ export interface SessionDetail extends SessionMeta {
   eventCounts: Record<string, number>;
   duration: number; // milliseconds
   status: SessionStatus;
+  source: SessionSource;
+  title?: string;
 }
 
 export interface AnalyticsData {
@@ -102,7 +108,7 @@ function detectStatus(sessionDir: string, _updatedAt: string): SessionStatus {
   return "completed";
 }
 
-export function listSessions(): SessionMeta[] {
+function listCliSessions(): SessionMeta[] {
   const dir = getSessionDir();
   if (!fs.existsSync(dir)) return [];
 
@@ -128,12 +134,26 @@ export function listSessions(): SessionMeta[] {
         updatedAt,
         summaryCount: ws.summary_count,
         status: detectStatus(sessionPath, updatedAt),
+        source: "cli",
       });
     } catch {
       // skip corrupted files
     }
   }
 
+  return sessions;
+}
+
+export function listSessions(): SessionMeta[] {
+  const cli = listCliSessions();
+  let vscode: SessionMeta[] = [];
+  try {
+    vscode = listVSCodeSessions();
+  } catch {
+    // VS Code data may not exist
+  }
+
+  const sessions = [...cli, ...vscode];
   sessions.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -141,6 +161,13 @@ export function listSessions(): SessionMeta[] {
 }
 
 export function getSession(sessionId: string): SessionDetail | null {
+  // Check VS Code sessions first (avoids filesystem miss for CLI)
+  try {
+    if (isVSCodeSession(sessionId)) {
+      return getVSCodeSession(sessionId);
+    }
+  } catch {}
+
   const dir = path.join(getSessionDir(), sessionId);
   if (!fs.existsSync(dir)) return null;
 
@@ -224,6 +251,7 @@ export function getSession(sessionId: string): SessionDetail | null {
     eventCounts,
     duration,
     status: detectStatus(dir, ws.updated_at || ""),
+    source: "cli",
   };
 }
 
@@ -254,10 +282,6 @@ export function getAnalytics(): AnalyticsData {
       hourOfDay[hour] = (hourOfDay[hour] || 0) + 1;
     } catch {}
 
-    // Duration — calculated from actual event activity, not updated_at - created_at
-    // (sessions can be resumed days later, inflating the duration)
-    // Computed below after scanning events.jsonl
-
     // Top directories
     const dirName = s.cwd || "unknown";
     topDirectories[dirName] = (topDirectories[dirName] || 0) + 1;
@@ -265,7 +289,10 @@ export function getAnalytics(): AnalyticsData {
     // Branch activity
     const branch = s.branch || "unknown";
 
-    // Scan events.jsonl for all metrics
+    // Skip VS Code sessions here — handled separately below
+    if (s.source === "vscode") continue;
+
+    // Scan events.jsonl for all metrics (CLI only)
     try {
       const eventsPath = path.join(sessionDir, s.id, "events.jsonl");
       if (fs.existsSync(eventsPath)) {
@@ -350,6 +377,25 @@ export function getAnalytics(): AnalyticsData {
       }
     } catch {}
   }
+
+  // Integrate VS Code session analytics
+  try {
+    const vscodeEntries = getVSCodeAnalytics();
+    for (const entry of vscodeEntries) {
+      // Tool usage
+      for (const [tool, count] of Object.entries(entry.toolUsage)) {
+        toolUsage[tool] = (toolUsage[tool] || 0) + count;
+      }
+      // Model usage
+      for (const [model, count] of Object.entries(entry.modelUsage)) {
+        modelUsage[model] = (modelUsage[model] || 0) + count;
+      }
+      // Turns
+      if (entry.turnCount > 0) turnsPerSession.push(entry.turnCount);
+      // Duration
+      if (entry.duration > 0) durations.push(entry.duration);
+    }
+  } catch {}
 
   const totalDuration = durations.reduce((a, b) => a + b, 0);
 
