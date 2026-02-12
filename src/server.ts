@@ -1,7 +1,8 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore } from "./sessions";
+import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore } from "./sessions";
+import { clearCache } from "./cache";
 
 export function createApp() {
   const app = express();
@@ -62,11 +63,18 @@ export function createApp() {
         res.status(400).json({ error: "repo query parameter required" });
         return;
       }
-      const score = getRepoScore(repo);
+      // Route "VS Code" to the global VS Code score
+      const score = repo === "VS Code" ? getVSCodeScore() : getRepoScore(repo);
       res.json(score);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // API: Clear cache (for manual refresh)
+  app.post("/api/cache/clear", (_req, res) => {
+    clearCache();
+    res.json({ ok: true });
   });
 
   // SPA fallback — only for non-API routes

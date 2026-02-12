@@ -2,8 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { parse as parseYaml } from "yaml";
+import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName, scanVSCodeMcpConfig } from "./vscode-sessions";
+import { cachedCall } from "./cache";
 
 export type SessionStatus = "running" | "completed" | "error";
+export type SessionSource = "cli" | "vscode";
 
 export interface SessionMeta {
   id: string;
@@ -14,6 +17,8 @@ export interface SessionMeta {
   updatedAt: string;
   summaryCount?: number;
   status: SessionStatus;
+  source: SessionSource;
+  title?: string;
 }
 
 export interface SessionEvent {
@@ -31,6 +36,8 @@ export interface SessionDetail extends SessionMeta {
   eventCounts: Record<string, number>;
   duration: number; // milliseconds
   status: SessionStatus;
+  source: SessionSource;
+  title?: string;
 }
 
 export interface AnalyticsData {
@@ -102,7 +109,7 @@ function detectStatus(sessionDir: string, _updatedAt: string): SessionStatus {
   return "completed";
 }
 
-export function listSessions(): SessionMeta[] {
+function listCliSessions(): SessionMeta[] {
   const dir = getSessionDir();
   if (!fs.existsSync(dir)) return [];
 
@@ -128,19 +135,44 @@ export function listSessions(): SessionMeta[] {
         updatedAt,
         summaryCount: ws.summary_count,
         status: detectStatus(sessionPath, updatedAt),
+        source: "cli",
       });
     } catch {
       // skip corrupted files
     }
   }
 
-  sessions.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
   return sessions;
 }
 
+const CACHE_TTL = 30_000; // 30 seconds
+
+export function listSessions(): SessionMeta[] {
+  return cachedCall("listSessions", CACHE_TTL, () => {
+    const cli = listCliSessions();
+    let vscode: SessionMeta[] = [];
+    try {
+      vscode = listVSCodeSessions();
+    } catch {
+      // VS Code data may not exist
+    }
+
+    const sessions = [...cli, ...vscode];
+    sessions.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return sessions;
+  });
+}
+
 export function getSession(sessionId: string): SessionDetail | null {
+  // Check VS Code sessions first (avoids filesystem miss for CLI)
+  try {
+    if (isVSCodeSession(sessionId)) {
+      return getVSCodeSession(sessionId);
+    }
+  } catch {}
+
   const dir = path.join(getSessionDir(), sessionId);
   if (!fs.existsSync(dir)) return null;
 
@@ -224,10 +256,15 @@ export function getSession(sessionId: string): SessionDetail | null {
     eventCounts,
     duration,
     status: detectStatus(dir, ws.updated_at || ""),
+    source: "cli",
   };
 }
 
 export function getAnalytics(): AnalyticsData {
+  return cachedCall("getAnalytics", CACHE_TTL, _computeAnalytics);
+}
+
+function _computeAnalytics(): AnalyticsData {
   const sessions = listSessions();
   const sessionsPerDay: Record<string, number> = {};
   const toolUsage: Record<string, number> = {};
@@ -254,18 +291,17 @@ export function getAnalytics(): AnalyticsData {
       hourOfDay[hour] = (hourOfDay[hour] || 0) + 1;
     } catch {}
 
-    // Duration — calculated from actual event activity, not updated_at - created_at
-    // (sessions can be resumed days later, inflating the duration)
-    // Computed below after scanning events.jsonl
-
     // Top directories
-    const dirName = s.cwd || "unknown";
+    const dirName = s.source === "vscode" ? "VS Code" : (s.cwd || "unknown");
     topDirectories[dirName] = (topDirectories[dirName] || 0) + 1;
 
     // Branch activity
     const branch = s.branch || "unknown";
 
-    // Scan events.jsonl for all metrics
+    // Skip VS Code sessions here — handled separately below
+    if (s.source === "vscode") continue;
+
+    // Scan events.jsonl for all metrics (CLI only)
     try {
       const eventsPath = path.join(sessionDir, s.id, "events.jsonl");
       if (fs.existsSync(eventsPath)) {
@@ -351,6 +387,25 @@ export function getAnalytics(): AnalyticsData {
     } catch {}
   }
 
+  // Integrate VS Code session analytics
+  try {
+    const vscodeEntries = getVSCodeAnalytics();
+    for (const entry of vscodeEntries) {
+      // Tool usage
+      for (const [tool, count] of Object.entries(entry.toolUsage)) {
+        toolUsage[tool] = (toolUsage[tool] || 0) + count;
+      }
+      // Model usage
+      for (const [model, count] of Object.entries(entry.modelUsage)) {
+        modelUsage[model] = (modelUsage[model] || 0) + count;
+      }
+      // Turns
+      if (entry.turnCount > 0) turnsPerSession.push(entry.turnCount);
+      // Duration
+      if (entry.duration > 0) durations.push(entry.duration);
+    }
+  } catch {}
+
   const totalDuration = durations.reduce((a, b) => a + b, 0);
 
   return {
@@ -430,8 +485,8 @@ interface RepoSessionData {
   sessionCount: number;
 }
 
-function collectRepoData(repoPath: string): RepoSessionData {
-  const sessions = listSessions();
+function collectRepoData(repoPath: string, allSessions?: SessionMeta[]): RepoSessionData {
+  const sessions = allSessions || listSessions();
   const repoSessions = sessions.filter(
     (s) => (s.gitRoot || s.cwd) === repoPath
   );
@@ -695,8 +750,8 @@ function generateTips(categories: RepoScore["categories"], data: RepoSessionData
   return tips;
 }
 
-export function getRepoScore(repoPath: string): RepoScore {
-  const data = collectRepoData(repoPath);
+export function getRepoScore(repoPath: string, allSessions?: SessionMeta[]): RepoScore {
+  const data = collectRepoData(repoPath, allSessions);
   const configuredServers = scanMcpConfig(repoPath);
 
   const categories = {
@@ -727,8 +782,92 @@ export function listReposWithScores(): RepoScore[] {
     if (repo) repos.add(repo);
   }
 
-  return [...repos]
-    .map((repo) => getRepoScore(repo))
+  const results = [...repos]
+    .map((repo) => getRepoScore(repo, sessions))
     .filter((r) => r.sessionCount >= 3) // minimum 3 sessions
     .sort((a, b) => b.totalScore - a.totalScore);
+
+  // Append VS Code global score if there are enough sessions
+  try {
+    const vsScore = getVSCodeScore();
+    if (vsScore.sessionCount >= 2) {
+      results.push(vsScore);
+      results.sort((a, b) => b.totalScore - a.totalScore);
+    }
+  } catch {}
+
+  return results;
+}
+
+// ============ VS Code Global Scoring ============
+
+function collectVSCodeData(): RepoSessionData {
+  const analytics = getVSCodeAnalytics();
+
+  const data: RepoSessionData = {
+    msgLengths: [],
+    askUserCount: 0,
+    totalUserMsgs: 0,
+    toolsUsed: new Set(),
+    toolSuccess: 0,
+    toolTotal: 0,
+    turns: [],
+    durations: [],
+    mcpServersUsed: new Set(),
+    sessionDays: new Set(),
+    sessionCount: analytics.length,
+  };
+
+  for (const entry of analytics) {
+    // Session days
+    const day = entry.createdAt.slice(0, 10);
+    if (day) data.sessionDays.add(day);
+
+    // Turns
+    if (entry.turnCount > 0) data.turns.push(entry.turnCount);
+
+    // Duration
+    if (entry.duration > 0) data.durations.push(entry.duration);
+
+    // Tool usage — normalize names and extract MCP servers
+    for (const [rawTool, count] of Object.entries(entry.toolUsage)) {
+      const { tool, mcpServer } = normalizeVSCodeToolName(rawTool);
+      data.toolsUsed.add(tool);
+      data.toolTotal += count;
+      data.toolSuccess += count; // VS Code doesn't track tool failures; assume success
+      if (mcpServer) data.mcpServersUsed.add(mcpServer);
+    }
+
+    // Message lengths (collected during analytics parse)
+    for (const len of entry.msgLengths) {
+      data.msgLengths.push(len);
+      data.totalUserMsgs++;
+    }
+  }
+
+  return data;
+}
+
+export function getVSCodeScore(): RepoScore {
+  const data = collectVSCodeData();
+  const configuredServers = scanVSCodeMcpConfig();
+
+  const categories = {
+    promptQuality: scorePromptQuality(data),
+    toolUtilization: scoreToolUtilization(data),
+    efficiency: scoreEfficiency(data),
+    mcpUtilization: scoreMcpUtilization(data, configuredServers),
+    engagement: scoreEngagement(data),
+  };
+
+  const totalScore = Object.values(categories).reduce((sum, c) => sum + c.score, 0);
+  const tips = generateTips(categories, data, configuredServers);
+
+  return {
+    repo: "VS Code",
+    totalScore,
+    sessionCount: data.sessionCount,
+    categories,
+    tips,
+  };
 }

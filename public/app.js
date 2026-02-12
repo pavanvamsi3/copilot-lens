@@ -105,7 +105,8 @@ function getFilteredSessions() {
       (s) =>
         s.id.toLowerCase().includes(query) ||
         (s.cwd || "").toLowerCase().includes(query) ||
-        (s.branch || "").toLowerCase().includes(query)
+        (s.branch || "").toLowerCase().includes(query) ||
+        (s.title || "").toLowerCase().includes(query)
     );
   }
 
@@ -143,11 +144,17 @@ function renderSessions() {
     .map(
       (s) => {
         const c = getDirColor(s.cwd);
+        const sourceClass = s.source === "vscode" ? "badge-vscode" : "badge-cli";
+        const sourceLabel = s.source === "vscode" ? "VS Code" : "CLI";
+        const displayName = s.title || shortId(s.id);
         return `
-    <div class="session-card" data-id="${s.id}" style="border-left: 3px solid ${c.border}">
+    <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 3px solid ${c.border}">
       <div class="top-row">
-        <span class="session-id">${shortId(s.id)}</span>
-        <span class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</span>
+        <span class="session-id">${escapeHtml(displayName)}</span>
+        <span class="top-badges">
+          <span class="badge ${sourceClass}">${sourceLabel}</span>
+          <span class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</span>
+        </span>
       </div>
       <div class="session-dir">${s.cwd || "—"}</div>
       <div class="session-meta">
@@ -162,12 +169,12 @@ function renderSessions() {
 
   // Click handlers
   sessionList.querySelectorAll(".session-card").forEach((card) => {
-    card.addEventListener("click", () => openDetail(card.dataset.id));
+    card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
   });
 }
 
 // Open session detail
-async function openDetail(id) {
+async function openDetail(id, source) {
   detailContent.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">Loading...</div>';
   detailModal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -225,13 +232,14 @@ function renderDetail(s) {
 
   detailContent.innerHTML = `
     <div class="detail-header">
-      <h2>Session ${s.id}</h2>
+      <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
       <div class="detail-meta">
+        <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : "CLI"}</strong></div>
         <div><span>Directory:</span> <strong>${s.cwd || "—"}</strong></div>
         <div><span>Branch:</span> <strong>${s.branch || "—"}</strong></div>
         <div><span>Created:</span> <strong>${new Date(s.createdAt).toLocaleString()}</strong></div>
         <div><span>Duration:</span> <strong>${formatDuration(s.duration)}</strong></div>
-        <div><span>Version:</span> <strong>${s.copilotVersion || "—"}</strong></div>
+        ${s.source !== "vscode" ? `<div><span>Version:</span> <strong>${s.copilotVersion || "—"}</strong></div>` : ""}
         <div><span>Status:</span> <strong class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</strong></div>
       </div>
     </div>
@@ -476,8 +484,10 @@ function updateDirFilter() {
 }
 
 // Refresh button
-refreshBtn.addEventListener("click", () => {
+refreshBtn.addEventListener("click", async () => {
   refreshBtn.classList.add("spinning");
+  // Clear server-side cache before reloading
+  try { await fetch("/api/cache/clear", { method: "POST" }); } catch {}
   loadSessions();
   if (document.getElementById("analyticsPage").classList.contains("active")) {
     loadAnalytics();
@@ -535,7 +545,10 @@ function renderRepoSelector() {
   }
   const current = repoSelector.value;
   repoSelector.innerHTML = insightsRepos
-    .map((r) => `<option value="${r.repo}">${shortDir(r.repo)} — ${r.totalScore}/100</option>`)
+    .map((r) => {
+      const label = r.repo === "VS Code" ? "🟣 VS Code (all sessions)" : shortDir(r.repo);
+      return `<option value="${r.repo}">${label} — ${r.totalScore}/100</option>`;
+    })
     .join("");
   if (current && insightsRepos.find((r) => r.repo === current)) {
     repoSelector.value = current;
@@ -604,7 +617,7 @@ function renderInsightsScore(data) {
       </div>
       <div class="score-summary">
         <h2>Copilot Effectiveness Score</h2>
-        <div class="repo-name">${escapeHtml(data.repo)}</div>
+        <div class="repo-name">${data.repo === "VS Code" ? "🟣 VS Code Copilot Chat" : escapeHtml(data.repo)}</div>
         <div class="session-info">${data.sessionCount} sessions analyzed</div>
       </div>
     </div>

@@ -170,6 +170,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .badge-running { background: color-mix(in srgb, var(--accent2) 15%, var(--surface)); color: var(--accent2); }
 .badge-completed { background: var(--surface2); color: var(--text-dim); }
 .badge-error { background: color-mix(in srgb, var(--danger) 15%, var(--surface)); color: var(--danger); }
+.badge-cli { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); color: var(--accent); }
+.badge-vscode { background: color-mix(in srgb, #bc8cff 15%, var(--surface)); color: #bc8cff; }
+
+.top-badges { display: flex; gap: 6px; align-items: center; }
 
 /* Stats Cards */
 .stats-cards {

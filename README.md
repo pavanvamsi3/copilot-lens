@@ -1,12 +1,13 @@
 # Copilot Lens 👓
 
-A local web dashboard to visualize, explore, and analyze your **GitHub Copilot CLI** terminal sessions. See your full conversation history, tool usage patterns, and usage analytics — all without leaving your machine.
+A local web dashboard to visualize, explore, and analyze your **GitHub Copilot** sessions — both **CLI terminal** and **VS Code Copilot Chat**. See your full conversation history, tool usage patterns, and usage analytics — all without leaving your machine.
 
 ## Why Copilot Lens?
 
-GitHub Copilot CLI stores session data locally, but there's no built-in way to browse or analyze it. Copilot Lens gives you a clean, interactive dashboard to:
+GitHub Copilot stores session data locally, but there's no built-in way to browse or analyze it. Copilot Lens gives you a clean, interactive dashboard to:
 
 - **Review past sessions** — What did you ask? What did Copilot do?
+- **Unified view** — See CLI and VS Code Copilot Chat sessions side-by-side
 - **Understand your usage patterns** — Which repos, branches, and tools do you use most?
 - **Track your productivity** — How much active time are you spending with Copilot?
 
@@ -46,7 +47,9 @@ npx copilot-lens --open
 
 ### 📋 Session Browser
 
-- Browse all your Copilot CLI sessions in a searchable, filterable list
+- Browse all your Copilot sessions in a searchable, filterable list
+- **Source badges** — instantly see whether a session is from CLI or VS Code
+- **Session titles** — VS Code sessions show their chat title for easy identification
 - **Color-coded by directory** — each project gets a unique accent color
 - **Status detection** — see which sessions are Running, Completed, or Error
 - **Three filter dimensions** — filter by time range, status, and directory
@@ -93,27 +96,37 @@ Doughnut chart legends are interactive — click a label to toggle that segment'
 
 ### 🏆 Copilot Effectiveness Score
 
-Per-repo scoring (0-100) that measures how effectively you use Copilot CLI, with actionable improvement tips.
+Scoring (0-100) that measures how effectively you use Copilot, with actionable improvement tips. Scores are generated **per-repo** for CLI sessions and as a **global aggregate** for VS Code Copilot Chat sessions.
 
 | Category | What It Measures |
 |----------|-----------------|
 | **Prompt Quality** | Average prompt length, how often Copilot needs clarification |
 | **Tool Utilization** | Diversity of tools used (grep, glob, edit, task, etc.) |
 | **Efficiency** | Tool success rate and turns per session |
-| **MCP Utilization** | Configured MCP servers vs actually used (reads repo's `mcp.json`) |
+| **MCP Utilization** | Configured MCP servers vs actually used (reads repo/VS Code `mcp.json`) |
 | **Engagement** | Session duration sweet spot and usage consistency |
 
 ![copilot-lens effectiveness score](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-score.png)
 
 ## How It Works
 
-Copilot Lens reads session data from `~/.copilot/session-state/`, where GitHub Copilot CLI stores:
+Copilot Lens reads session data from two sources:
 
+### Copilot CLI Sessions
+- **Location**: `~/.copilot/session-state/`
 - **`workspace.yaml`** — Session metadata (directory, git branch, timestamps)
 - **`events.jsonl`** — Full event log (messages, tool calls, errors)
 - **`plan.md`** — Session plans (if created)
 
+### VS Code Copilot Chat Sessions
+- **Index**: VS Code's `state.vscdb` SQLite database (session list with titles and timing)
+- **Content**: `emptyWindowChatSessions/{id}.json` (full conversation with requests and responses)
+- **Platforms**: macOS (`~/Library/Application Support/Code/`), Windows (`%APPDATA%/Code/`), Linux (`~/.config/Code/`)
+- **VS Code Insiders** is also supported
+
 A local Express server parses these files and serves a static frontend dashboard.
+
+> **Note on large VS Code sessions**: Sessions with pasted images can be very large (100MB+). Copilot Lens automatically strips image data and truncates oversized text during parsing. Files over 200MB are skipped entirely.
 
 ### Duration Calculation
 
@@ -132,7 +145,7 @@ Session durations are calculated from **actual event activity**, not wall-clock 
 - **Backend**: Node.js + Express + TypeScript
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **Charts**: Chart.js
-- **Data**: YAML + JSONL parsing (no database required)
+- **Data**: YAML + JSONL parsing, SQLite (`better-sqlite3`) for VS Code session index
 
 ## Development
 
@@ -142,6 +155,7 @@ cd copilot-lens
 npm install
 npm run dev        # Start with tsx (no build needed)
 npm run build      # Compile TypeScript
+npm test           # Run tests
 npm start          # Run compiled version
 ```
 
