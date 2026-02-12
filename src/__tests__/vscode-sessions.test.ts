@@ -423,22 +423,43 @@ describe("normalizeVSCodeToolName", () => {
 describe("scanVSCodeMcpConfig", () => {
   let tmpDir: string;
   let origHome: string;
+  let origAppData: string | undefined;
+
+  // Helper to create platform-appropriate VS Code data directory
+  function getVSCodeTestDir(baseDir: string): string {
+    if (process.platform === "darwin") {
+      return path.join(baseDir, "Library", "Application Support", "Code", "User");
+    } else if (process.platform === "win32") {
+      return path.join(baseDir, "AppData", "Roaming", "Code", "User");
+    } else {
+      return path.join(baseDir, ".config", "Code", "User");
+    }
+  }
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-lens-mcp-test-"));
     origHome = process.env.HOME || "";
-    // Override HOME so scanVSCodeMcpConfig looks in our temp dir
+    origAppData = process.env.APPDATA;
+    // Override HOME and APPDATA so scanVSCodeMcpConfig looks in our temp dir
     process.env.HOME = tmpDir;
+    if (process.platform === "win32") {
+      process.env.APPDATA = path.join(tmpDir, "AppData", "Roaming");
+    }
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     process.env.HOME = origHome;
+    if (origAppData !== undefined) {
+      process.env.APPDATA = origAppData;
+    } else {
+      delete process.env.APPDATA;
+    }
   });
 
   it("reads server names from mcp.json with trailing commas", () => {
     // Create fake VS Code data dir structure
-    const codeDir = path.join(tmpDir, "Library", "Application Support", "Code", "User");
+    const codeDir = getVSCodeTestDir(tmpDir);
     fs.mkdirSync(codeDir, { recursive: true });
     const mcpJson = `{
       "servers": {
@@ -453,7 +474,7 @@ describe("scanVSCodeMcpConfig", () => {
   });
 
   it("supports mcpServers key as fallback", () => {
-    const codeDir = path.join(tmpDir, "Library", "Application Support", "Code", "User");
+    const codeDir = getVSCodeTestDir(tmpDir);
     fs.mkdirSync(codeDir, { recursive: true });
     fs.writeFileSync(
       path.join(codeDir, "mcp.json"),
