@@ -10,7 +10,7 @@ vi.mock("better-sqlite3", () => {
   };
 });
 
-import { _testing, listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName } from "../vscode-sessions";
+import { _testing, normalizeVSCodeToolName } from "../vscode-sessions";
 const { requestsToEvents, deriveStatus, msToIso, readSessionContent, scanVSCodeMcpConfig } = _testing;
 
 describe("msToIso", () => {
@@ -422,30 +422,50 @@ describe("normalizeVSCodeToolName", () => {
 
 describe("scanVSCodeMcpConfig", () => {
   let tmpDir: string;
+  let origHome: string;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-lens-mcp-test-"));
+    origHome = process.env.HOME || "";
+    // Override HOME so scanVSCodeMcpConfig looks in our temp dir
+    process.env.HOME = tmpDir;
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    process.env.HOME = origHome;
   });
 
-  it("parses JSONC mcp.json with trailing commas", () => {
+  it("reads server names from mcp.json with trailing commas", () => {
+    // Create fake VS Code data dir structure
+    const codeDir = path.join(tmpDir, "Library", "Application Support", "Code", "User");
+    fs.mkdirSync(codeDir, { recursive: true });
     const mcpJson = `{
       "servers": {
         "my-server": { "type": "stdio", "command": "node" },
         "other-mcp": { "url": "http://localhost:3000", "type": "http", },
       },
     }`;
-    const filePath = path.join(tmpDir, "mcp.json");
-    fs.writeFileSync(filePath, mcpJson);
+    fs.writeFileSync(path.join(codeDir, "mcp.json"), mcpJson);
 
-    // Test the JSONC stripping logic directly
-    let raw = fs.readFileSync(filePath, "utf-8");
-    raw = raw.replace(/,\s*([\]}])/g, "$1");
-    const config = JSON.parse(raw);
-    const servers = config.servers || {};
-    expect(Object.keys(servers)).toEqual(["my-server", "other-mcp"]);
+    const result = scanVSCodeMcpConfig();
+    expect(result).toEqual(["my-server", "other-mcp"]);
+  });
+
+  it("supports mcpServers key as fallback", () => {
+    const codeDir = path.join(tmpDir, "Library", "Application Support", "Code", "User");
+    fs.mkdirSync(codeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(codeDir, "mcp.json"),
+      JSON.stringify({ mcpServers: { "server-a": {} } })
+    );
+
+    const result = scanVSCodeMcpConfig();
+    expect(result).toEqual(["server-a"]);
+  });
+
+  it("returns empty array when no config exists", () => {
+    const result = scanVSCodeMcpConfig();
+    expect(result).toEqual([]);
   });
 });
