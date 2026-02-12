@@ -364,10 +364,17 @@ export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
         }
       }
 
-      // Duration
+      // Duration — gap-capped from request timestamps (raw endTime-startTime is misleading for multi-day sessions)
       let duration = 0;
-      if (entry.timing?.startTime && entry.timing?.endTime) {
-        duration = entry.timing.endTime - entry.timing.startTime;
+      const timestamps = content.requests
+        .map((r: any) => r.timestamp)
+        .filter((t: any) => typeof t === "number" && t > 0)
+        .sort((a: number, b: number) => a - b);
+      if (timestamps.length >= 2) {
+        const MAX_GAP = 300_000; // 5 min
+        for (let i = 1; i < timestamps.length; i++) {
+          duration += Math.min(timestamps[i] - timestamps[i - 1], MAX_GAP);
+        }
       }
 
       results.push({
