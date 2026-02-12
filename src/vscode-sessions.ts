@@ -42,11 +42,13 @@ function readSessionIndex(dataDir: string): VSCodeSessionIndex[] {
 
   try {
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get("chat.ChatSessionStore.index") as { value: string } | undefined;
+    const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get("chat.ChatSessionStore.index") as { value: unknown } | undefined;
     db.close();
 
     if (!row) return [];
-    const data = JSON.parse(row.value);
+    const rawValue = row.value;
+    const valueStr = Buffer.isBuffer(rawValue) ? rawValue.toString("utf8") : (rawValue as string);
+    const data = JSON.parse(valueStr);
     const entries: Record<string, VSCodeSessionIndex> = data.entries || {};
     return Object.values(entries);
   } catch {
