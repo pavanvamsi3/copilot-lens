@@ -484,8 +484,10 @@ function updateDirFilter() {
 }
 
 // Refresh button
-refreshBtn.addEventListener("click", () => {
+refreshBtn.addEventListener("click", async () => {
   refreshBtn.classList.add("spinning");
+  // Clear server-side cache before reloading
+  try { await fetch("/api/cache/clear", { method: "POST" }); } catch {}
   loadSessions();
   if (document.getElementById("analyticsPage").classList.contains("active")) {
     loadAnalytics();
