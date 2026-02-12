@@ -283,7 +283,7 @@ export function getAnalytics(): AnalyticsData {
     } catch {}
 
     // Top directories
-    const dirName = s.cwd || "unknown";
+    const dirName = s.source === "vscode" ? "VS Code" : (s.cwd || "unknown");
     topDirectories[dirName] = (topDirectories[dirName] || 0) + 1;
 
     // Branch activity
