@@ -3,6 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import { parse as parseYaml } from "yaml";
 import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName, scanVSCodeMcpConfig } from "./vscode-sessions";
+import { cachedCall } from "./cache";
 
 export type SessionStatus = "running" | "completed" | "error";
 export type SessionSource = "cli" | "vscode";
@@ -144,20 +145,24 @@ function listCliSessions(): SessionMeta[] {
   return sessions;
 }
 
-export function listSessions(): SessionMeta[] {
-  const cli = listCliSessions();
-  let vscode: SessionMeta[] = [];
-  try {
-    vscode = listVSCodeSessions();
-  } catch {
-    // VS Code data may not exist
-  }
+const CACHE_TTL = 30_000; // 30 seconds
 
-  const sessions = [...cli, ...vscode];
-  sessions.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-  return sessions;
+export function listSessions(): SessionMeta[] {
+  return cachedCall("listSessions", CACHE_TTL, () => {
+    const cli = listCliSessions();
+    let vscode: SessionMeta[] = [];
+    try {
+      vscode = listVSCodeSessions();
+    } catch {
+      // VS Code data may not exist
+    }
+
+    const sessions = [...cli, ...vscode];
+    sessions.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return sessions;
+  });
 }
 
 export function getSession(sessionId: string): SessionDetail | null {
@@ -256,6 +261,10 @@ export function getSession(sessionId: string): SessionDetail | null {
 }
 
 export function getAnalytics(): AnalyticsData {
+  return cachedCall("getAnalytics", CACHE_TTL, _computeAnalytics);
+}
+
+function _computeAnalytics(): AnalyticsData {
   const sessions = listSessions();
   const sessionsPerDay: Record<string, number> = {};
   const toolUsage: Record<string, number> = {};
@@ -476,8 +485,8 @@ interface RepoSessionData {
   sessionCount: number;
 }
 
-function collectRepoData(repoPath: string): RepoSessionData {
-  const sessions = listSessions();
+function collectRepoData(repoPath: string, allSessions?: SessionMeta[]): RepoSessionData {
+  const sessions = allSessions || listSessions();
   const repoSessions = sessions.filter(
     (s) => (s.gitRoot || s.cwd) === repoPath
   );
@@ -741,8 +750,8 @@ function generateTips(categories: RepoScore["categories"], data: RepoSessionData
   return tips;
 }
 
-export function getRepoScore(repoPath: string): RepoScore {
-  const data = collectRepoData(repoPath);
+export function getRepoScore(repoPath: string, allSessions?: SessionMeta[]): RepoScore {
+  const data = collectRepoData(repoPath, allSessions);
   const configuredServers = scanMcpConfig(repoPath);
 
   const categories = {
@@ -774,7 +783,7 @@ export function listReposWithScores(): RepoScore[] {
   }
 
   const results = [...repos]
-    .map((repo) => getRepoScore(repo))
+    .map((repo) => getRepoScore(repo, sessions))
     .filter((r) => r.sessionCount >= 3) // minimum 3 sessions
     .sort((a, b) => b.totalScore - a.totalScore);
 
