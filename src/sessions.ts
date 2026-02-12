@@ -783,6 +783,7 @@ export function listReposWithScores(): RepoScore[] {
     const vsScore = getVSCodeScore();
     if (vsScore.sessionCount >= 2) {
       results.push(vsScore);
+      results.sort((a, b) => b.totalScore - a.totalScore);
     }
   } catch {}
 
