@@ -1,6 +1,6 @@
 # Copilot Lens — Architecture
 
-> A local web dashboard for analyzing GitHub Copilot sessions from both CLI and VS Code.
+A local web dashboard for analyzing GitHub Copilot sessions from both CLI and VS Code.
 
 ## Overview
 
