@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { parse as parseYaml } from "yaml";
-import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics } from "./vscode-sessions";
+import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName, scanVSCodeMcpConfig } from "./vscode-sessions";
 
 export type SessionStatus = "running" | "completed" | "error";
 export type SessionSource = "cli" | "vscode";
@@ -773,8 +773,106 @@ export function listReposWithScores(): RepoScore[] {
     if (repo) repos.add(repo);
   }
 
-  return [...repos]
+  const results = [...repos]
     .map((repo) => getRepoScore(repo))
     .filter((r) => r.sessionCount >= 3) // minimum 3 sessions
     .sort((a, b) => b.totalScore - a.totalScore);
+
+  // Append VS Code global score if there are enough sessions
+  try {
+    const vsScore = getVSCodeScore();
+    if (vsScore.sessionCount >= 2) {
+      results.push(vsScore);
+    }
+  } catch {}
+
+  return results;
+}
+
+// ============ VS Code Global Scoring ============
+
+function collectVSCodeData(): RepoSessionData {
+  const analytics = getVSCodeAnalytics();
+
+  const data: RepoSessionData = {
+    msgLengths: [],
+    askUserCount: 0,
+    totalUserMsgs: 0,
+    toolsUsed: new Set(),
+    toolSuccess: 0,
+    toolTotal: 0,
+    turns: [],
+    durations: [],
+    mcpServersUsed: new Set(),
+    sessionDays: new Set(),
+    sessionCount: analytics.length,
+  };
+
+  for (const entry of analytics) {
+    // Session days
+    const day = entry.createdAt.slice(0, 10);
+    if (day) data.sessionDays.add(day);
+
+    // Turns
+    if (entry.turnCount > 0) data.turns.push(entry.turnCount);
+
+    // Duration
+    if (entry.duration > 0) data.durations.push(entry.duration);
+
+    // Tool usage — normalize names and extract MCP servers
+    for (const [rawTool, count] of Object.entries(entry.toolUsage)) {
+      const { tool, mcpServer } = normalizeVSCodeToolName(rawTool);
+      data.toolsUsed.add(tool);
+      data.toolTotal += count;
+      data.toolSuccess += count; // VS Code doesn't track tool failures; assume success
+      if (mcpServer) data.mcpServersUsed.add(mcpServer);
+    }
+  }
+
+  // Collect message lengths by reading session content
+  // (analytics already parsed the files — re-read from analytics entries' request data)
+  // Instead, do a separate lightweight pass using getVSCodeAnalytics data
+  // We need the actual message text, which analytics doesn't store.
+  // Reuse the session reading infrastructure:
+  for (const entry of analytics) {
+    try {
+      const session = getVSCodeSession(entry.sessionId);
+      if (!session) continue;
+      for (const event of session.events) {
+        if (event.type === "user.message") {
+          const msg = event.data?.content || "";
+          if (msg) {
+            data.msgLengths.push(msg.length);
+            data.totalUserMsgs++;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  return data;
+}
+
+export function getVSCodeScore(): RepoScore {
+  const data = collectVSCodeData();
+  const configuredServers = scanVSCodeMcpConfig();
+
+  const categories = {
+    promptQuality: scorePromptQuality(data),
+    toolUtilization: scoreToolUtilization(data),
+    efficiency: scoreEfficiency(data),
+    mcpUtilization: scoreMcpUtilization(data, configuredServers),
+    engagement: scoreEngagement(data),
+  };
+
+  const totalScore = Object.values(categories).reduce((sum, c) => sum + c.score, 0);
+  const tips = generateTips(categories, data, configuredServers);
+
+  return {
+    repo: "VS Code",
+    totalScore,
+    sessionCount: data.sessionCount,
+    categories,
+    tips,
+  };
 }

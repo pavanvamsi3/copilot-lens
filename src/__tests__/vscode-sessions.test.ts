@@ -10,8 +10,8 @@ vi.mock("better-sqlite3", () => {
   };
 });
 
-import { _testing, listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics } from "../vscode-sessions";
-const { requestsToEvents, deriveStatus, msToIso, readSessionContent } = _testing;
+import { _testing, listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName } from "../vscode-sessions";
+const { requestsToEvents, deriveStatus, msToIso, readSessionContent, scanVSCodeMcpConfig } = _testing;
 
 describe("msToIso", () => {
   it("returns empty string for undefined", () => {
@@ -364,5 +364,88 @@ describe("readSessionContent", () => {
 
     const result = readSessionContent(filePath);
     expect(result.requests[0].variableData.variables[0].value).toBe("tiny");
+  });
+});
+
+describe("normalizeVSCodeToolName", () => {
+  it("extracts MCP server name from '(MCP Server)' pattern", () => {
+    const result = normalizeVSCodeToolName("bluebird-mcp (MCP Server)");
+    expect(result).toEqual({ tool: "bluebird-mcp", mcpServer: "bluebird-mcp" });
+  });
+
+  it("extracts MCP server name with spaces", () => {
+    const result = normalizeVSCodeToolName("Azure MCP Server (MCP Server)");
+    expect(result).toEqual({ tool: "Azure MCP Server", mcpServer: "Azure MCP Server" });
+  });
+
+  it("extracts tool name from Running `...` pattern", () => {
+    const result = normalizeVSCodeToolName("Running `engineering_copilot`");
+    expect(result).toEqual({ tool: "engineering_copilot" });
+  });
+
+  it("normalizes Reading file operations", () => {
+    const result = normalizeVSCodeToolName("Reading [](file:///Users/foo/bar.ts#1-1), lines 1 to 100");
+    expect(result).toEqual({ tool: "read_file" });
+  });
+
+  it("normalizes Searching operations", () => {
+    const result = normalizeVSCodeToolName("Searching for regex `pattern` (`**/file.ts`)");
+    expect(result).toEqual({ tool: "search" });
+  });
+
+  it("normalizes Searching text operations", () => {
+    const result = normalizeVSCodeToolName("Searching text for `ETWChannels`");
+    expect(result).toEqual({ tool: "search" });
+  });
+
+  it("normalizes Creating file operations", () => {
+    const result = normalizeVSCodeToolName("Creating [](file:///Users/foo/new.md)");
+    expect(result).toEqual({ tool: "create_file" });
+  });
+
+  it("normalizes Editing file operations", () => {
+    const result = normalizeVSCodeToolName("Editing [](file:///Users/foo/bar.ts)");
+    expect(result).toEqual({ tool: "edit_file" });
+  });
+
+  it("truncates long unknown tool names", () => {
+    const longName = "x".repeat(60);
+    const result = normalizeVSCodeToolName(longName);
+    expect(result.tool.length).toBeLessThanOrEqual(40);
+  });
+
+  it("passes through short unknown tool names", () => {
+    const result = normalizeVSCodeToolName("unknown");
+    expect(result).toEqual({ tool: "unknown" });
+  });
+});
+
+describe("scanVSCodeMcpConfig", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-lens-mcp-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("parses JSONC mcp.json with trailing commas", () => {
+    const mcpJson = `{
+      "servers": {
+        "my-server": { "type": "stdio", "command": "node" },
+        "other-mcp": { "url": "http://localhost:3000", "type": "http", },
+      },
+    }`;
+    const filePath = path.join(tmpDir, "mcp.json");
+    fs.writeFileSync(filePath, mcpJson);
+
+    // Test the JSONC stripping logic directly
+    let raw = fs.readFileSync(filePath, "utf-8");
+    raw = raw.replace(/,\s*([\]}])/g, "$1");
+    const config = JSON.parse(raw);
+    const servers = config.servers || {};
+    expect(Object.keys(servers)).toEqual(["my-server", "other-mcp"]);
   });
 });

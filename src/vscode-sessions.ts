@@ -386,6 +386,80 @@ export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
   return results;
 }
 
+// ============ Tool name normalization ============
+
+/**
+ * Normalize verbose VS Code tool names into canonical short names.
+ * "bluebird-mcp (MCP Server)" → "bluebird-mcp"
+ * "Running `engineering_copilot`" → "engineering_copilot"
+ * "Reading [](file:///...)" → "read_file"
+ * "Searching for regex ..." → "search"
+ * "Creating [](file:///...)" → "create_file"
+ */
+export function normalizeVSCodeToolName(raw: string): { tool: string; mcpServer?: string } {
+  // MCP server pattern: "xxx (MCP Server)"
+  const mcpMatch = raw.match(/^(.+?)\s*\(MCP Server\)$/);
+  if (mcpMatch) {
+    return { tool: mcpMatch[1].trim(), mcpServer: mcpMatch[1].trim() };
+  }
+
+  // Running `tool_name` — MCP tool invocation
+  const runMatch = raw.match(/^Running `(.+?)`$/);
+  if (runMatch) {
+    return { tool: runMatch[1] };
+  }
+
+  // Reading file
+  if (/^Reading\s+\[/.test(raw)) {
+    return { tool: "read_file" };
+  }
+
+  // Searching
+  if (/^Searching\s+(for|text)\b/.test(raw)) {
+    return { tool: "search" };
+  }
+
+  // Creating file
+  if (/^Creating\s+\[/.test(raw)) {
+    return { tool: "create_file" };
+  }
+
+  // Editing file
+  if (/^Editing\s+\[/.test(raw)) {
+    return { tool: "edit_file" };
+  }
+
+  // Fallback
+  return { tool: raw.length > 40 ? raw.slice(0, 40) : raw };
+}
+
+// ============ VS Code MCP config scanning ============
+
+export function scanVSCodeMcpConfig(): string[] {
+  const configPaths: string[] = [];
+  const home = os.homedir();
+
+  for (const dataDir of getVSCodeDataDirs()) {
+    configPaths.push(path.join(dataDir, "User", "mcp.json"));
+  }
+  // Also check ~/.vscode/mcp.json
+  configPaths.push(path.join(home, ".vscode", "mcp.json"));
+
+  for (const configPath of configPaths) {
+    try {
+      if (!fs.existsSync(configPath)) continue;
+      let raw = fs.readFileSync(configPath, "utf-8");
+      // Strip trailing commas (JSONC)
+      raw = raw.replace(/,\s*([\]}])/g, "$1");
+      const config = JSON.parse(raw);
+      const servers = config.servers || config.mcpServers || {};
+      const names = Object.keys(servers);
+      if (names.length > 0) return names;
+    } catch {}
+  }
+  return [];
+}
+
 // Exported for testing
 export const _testing = {
   getVSCodeDataDirs,
@@ -395,4 +469,6 @@ export const _testing = {
   deriveStatus,
   msToIso,
   findSessionFile,
+  normalizeVSCodeToolName,
+  scanVSCodeMcpConfig,
 };

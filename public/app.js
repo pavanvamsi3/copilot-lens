@@ -543,7 +543,10 @@ function renderRepoSelector() {
   }
   const current = repoSelector.value;
   repoSelector.innerHTML = insightsRepos
-    .map((r) => `<option value="${r.repo}">${shortDir(r.repo)} — ${r.totalScore}/100</option>`)
+    .map((r) => {
+      const label = r.repo === "VS Code" ? "🟣 VS Code (all sessions)" : shortDir(r.repo);
+      return `<option value="${r.repo}">${label} — ${r.totalScore}/100</option>`;
+    })
     .join("");
   if (current && insightsRepos.find((r) => r.repo === current)) {
     repoSelector.value = current;
@@ -612,7 +615,7 @@ function renderInsightsScore(data) {
       </div>
       <div class="score-summary">
         <h2>Copilot Effectiveness Score</h2>
-        <div class="repo-name">${escapeHtml(data.repo)}</div>
+        <div class="repo-name">${data.repo === "VS Code" ? "🟣 VS Code Copilot Chat" : escapeHtml(data.repo)}</div>
         <div class="session-info">${data.sessionCount} sessions analyzed</div>
       </div>
     </div>
