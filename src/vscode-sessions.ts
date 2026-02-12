@@ -385,3 +385,14 @@ export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
 
   return results;
 }
+
+// Exported for testing
+export const _testing = {
+  getVSCodeDataDirs,
+  readSessionIndex,
+  readSessionContent,
+  requestsToEvents,
+  deriveStatus,
+  msToIso,
+  findSessionFile,
+};
