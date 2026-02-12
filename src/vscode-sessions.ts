@@ -3,6 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import Database from "better-sqlite3";
 import type { SessionMeta, SessionDetail, SessionEvent, SessionStatus } from "./sessions";
+import { cachedCall } from "./cache";
 
 // ============ Platform paths ============
 
@@ -324,7 +325,13 @@ export interface VSCodeAnalyticsEntry {
   msgLengths: number[];
 }
 
+const CACHE_TTL = 30_000;
+
 export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
+  return cachedCall("getVSCodeAnalytics", CACHE_TTL, _computeVSCodeAnalytics);
+}
+
+function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
   const results: VSCodeAnalyticsEntry[] = [];
 
   for (const dataDir of getVSCodeDataDirs()) {
