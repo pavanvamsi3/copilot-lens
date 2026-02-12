@@ -62,10 +62,11 @@ copilot-lens/
 │   ├── app.js                  # Frontend logic (fetch, render, charts)
 │   └── style.css               # Dark/light theme styles
 ├── package.json
+├── vitest.config.ts
 └── tsconfig.json
 ```
 
-**Total**: ~3,700 lines across 11 source files (56 tests).
+**Total**: ~3,700 lines across 12 source files (56 tests).
 
 ---
 

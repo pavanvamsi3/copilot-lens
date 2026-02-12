@@ -146,6 +146,7 @@ Session durations are calculated from **actual event activity**, not wall-clock 
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **Charts**: Chart.js
 - **Data**: YAML + JSONL parsing, SQLite (`better-sqlite3`) for VS Code session index
+- **Testing**: Vitest (56 tests)
 
 ## Development
 
