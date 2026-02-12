@@ -828,27 +828,12 @@ function collectVSCodeData(): RepoSessionData {
       data.toolSuccess += count; // VS Code doesn't track tool failures; assume success
       if (mcpServer) data.mcpServersUsed.add(mcpServer);
     }
-  }
 
-  // Collect message lengths by reading session content
-  // (analytics already parsed the files — re-read from analytics entries' request data)
-  // Instead, do a separate lightweight pass using getVSCodeAnalytics data
-  // We need the actual message text, which analytics doesn't store.
-  // Reuse the session reading infrastructure:
-  for (const entry of analytics) {
-    try {
-      const session = getVSCodeSession(entry.sessionId);
-      if (!session) continue;
-      for (const event of session.events) {
-        if (event.type === "user.message") {
-          const msg = event.data?.content || "";
-          if (msg) {
-            data.msgLengths.push(msg.length);
-            data.totalUserMsgs++;
-          }
-        }
-      }
-    } catch {}
+    // Message lengths (collected during analytics parse)
+    for (const len of entry.msgLengths) {
+      data.msgLengths.push(len);
+      data.totalUserMsgs++;
+    }
   }
 
   return data;

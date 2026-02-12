@@ -321,6 +321,7 @@ export interface VSCodeAnalyticsEntry {
   modelUsage: Record<string, number>;
   turnCount: number;
   requestCount: number;
+  msgLengths: number[];
 }
 
 export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
@@ -340,10 +341,15 @@ export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
 
       const toolUsage: Record<string, number> = {};
       const modelUsage: Record<string, number> = {};
+      const msgLengths: number[] = [];
       let turnCount = 0;
 
       for (const req of content.requests) {
         turnCount++;
+
+        // Message lengths
+        const msgText = req.message?.text || "";
+        if (msgText) msgLengths.push(msgText.length);
 
         // Model usage
         const model = req.modelId || "";
@@ -385,6 +391,7 @@ export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
         modelUsage,
         turnCount,
         requestCount: content.requests.length,
+        msgLengths,
       });
     }
   }
