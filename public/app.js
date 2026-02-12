@@ -150,7 +150,7 @@ function renderSessions() {
         return `
     <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 3px solid ${c.border}">
       <div class="top-row">
-        <span class="session-id">${displayName}</span>
+        <span class="session-id">${escapeHtml(displayName)}</span>
         <span class="top-badges">
           <span class="badge ${sourceClass}">${sourceLabel}</span>
           <span class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</span>
@@ -232,7 +232,7 @@ function renderDetail(s) {
 
   detailContent.innerHTML = `
     <div class="detail-header">
-      <h2>${s.title ? escapeHtml(s.title) : "Session " + s.id}</h2>
+      <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
       <div class="detail-meta">
         <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : "CLI"}</strong></div>
         <div><span>Directory:</span> <strong>${s.cwd || "—"}</strong></div>
