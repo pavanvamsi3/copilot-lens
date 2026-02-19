@@ -232,6 +232,7 @@ export function listVSCodeSessions(): SessionMeta[] {
     const entries = readSessionIndex(dataDir);
     for (const entry of entries) {
       if (entry.isEmpty) continue;
+      if (!entry.lastMessageDate) continue;
 
       sessions.push({
         id: entry.sessionId,
@@ -339,6 +340,7 @@ function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
 
     for (const entry of entries) {
       if (entry.isEmpty) continue;
+      if (!entry.lastMessageDate) continue;
 
       const filePath = findSessionFile(dataDir, entry.sessionId);
       if (!filePath) continue;

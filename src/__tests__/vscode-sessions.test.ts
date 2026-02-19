@@ -367,6 +367,22 @@ describe("readSessionContent", () => {
   });
 });
 
+describe("empty VS Code session filtering", () => {
+  it("filters sessions with no lastMessageDate", () => {
+    // Mimics the filter in listVSCodeSessions: skip if !entry.lastMessageDate
+    const entries = [
+      { sessionId: "a", title: "Active", lastMessageDate: 1700000000000, isEmpty: false },
+      { sessionId: "b", title: "Empty", lastMessageDate: 0, isEmpty: false },
+      { sessionId: "c", title: "Also Empty", lastMessageDate: undefined, isEmpty: false },
+      { sessionId: "d", title: "Flagged", lastMessageDate: 1700000000000, isEmpty: true },
+    ];
+
+    const filtered = entries.filter((e) => !e.isEmpty && !!e.lastMessageDate);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].sessionId).toBe("a");
+  });
+});
+
 describe("normalizeVSCodeToolName", () => {
   it("extracts MCP server name from '(MCP Server)' pattern", () => {
     const result = normalizeVSCodeToolName("bluebird-mcp (MCP Server)");

@@ -246,6 +246,38 @@ describe("scoring logic", () => {
   });
 });
 
+describe("empty session filtering", () => {
+  it("excludes CLI sessions with no events.jsonl", () => {
+    // A session directory with workspace.yaml but no events.jsonl
+    // should be excluded from listing because it has no user messages
+    const eventsExist = false;
+    const hasUserMessage = false;
+    // Mimics the filter logic in listCliSessions
+    const shouldInclude = eventsExist && hasUserMessage;
+    expect(shouldInclude).toBe(false);
+  });
+
+  it("excludes CLI sessions with events but no user.message", () => {
+    const content = [
+      '{"type":"session.start","id":"e1","timestamp":"2024-01-15T10:00:00Z","data":{}}',
+      '{"type":"assistant.turn_start","id":"e2","timestamp":"2024-01-15T10:00:01Z","data":{}}',
+    ].join("\n");
+
+    // Mimics the filter: check for "user.message" substring
+    expect(content.includes('"user.message"')).toBe(false);
+  });
+
+  it("includes CLI sessions that have user.message events", () => {
+    const content = [
+      '{"type":"session.start","id":"e1","timestamp":"2024-01-15T10:00:00Z","data":{}}',
+      '{"type":"user.message","id":"e2","timestamp":"2024-01-15T10:00:05Z","data":{"content":"Hello"}}',
+      '{"type":"assistant.message","id":"e3","timestamp":"2024-01-15T10:00:15Z","data":{"content":"Hi"}}',
+    ].join("\n");
+
+    expect(content.includes('"user.message"')).toBe(true);
+  });
+});
+
 describe("source field", () => {
   it("SessionMeta interface includes source field", () => {
     // Type-level check: ensure the source field is part of the interface

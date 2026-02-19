@@ -125,6 +125,17 @@ function listCliSessions(): SessionMeta[] {
       const raw = fs.readFileSync(wsPath, "utf-8");
       const ws = parseYaml(raw);
       const sessionPath = path.join(dir, entry.name);
+
+      // Skip sessions with no user messages
+      const eventsPath = path.join(sessionPath, "events.jsonl");
+      try {
+        if (!fs.existsSync(eventsPath)) continue;
+        const content = fs.readFileSync(eventsPath, "utf-8");
+        if (!content.includes('"user.message"')) continue;
+      } catch {
+        continue;
+      }
+
       const updatedAt = ws.updated_at || "";
       sessions.push({
         id: ws.id || entry.name,
