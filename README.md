@@ -1,17 +1,14 @@
 # Copilot Lens 👓
 
-A local web dashboard to visualize, explore, and analyze your **GitHub Copilot** sessions — both **CLI terminal** and **VS Code Copilot Chat**. See your full conversation history, tool usage patterns, and usage analytics — all without leaving your machine.
+**Your Copilot history has answers. Now you can actually find them.**
 
-## Why Copilot Lens?
+Copilot Lens is a local memory layer for GitHub Copilot — search and browse everything you've ever discussed with Copilot, across both CLI terminal sessions and VS Code Copilot Chat. All on your machine. No cloud. No sign-in.
 
-GitHub Copilot stores session data locally, but there's no built-in way to browse or analyze it. Copilot Lens gives you a clean, interactive dashboard to:
+## Why
 
-- **Review past sessions** — What did you ask? What did Copilot do?
-- **Unified view** — See CLI and VS Code Copilot Chat sessions side-by-side
-- **Understand your usage patterns** — Which repos, branches, and tools do you use most?
-- **Track your productivity** — How much active time are you spending with Copilot?
+Copilot sessions are ephemeral by default. You solve a problem, close the terminal, and it's gone. Days later you need that same approach, that regex, that architecture decision — and you have nothing to reference.
 
-Everything runs locally. No data leaves your machine. No cloud. No sign-in.
+Copilot stores all of this locally. Copilot Lens makes it accessible.
 
 ## Install
 
@@ -19,23 +16,18 @@ Everything runs locally. No data leaves your machine. No cloud. No sign-in.
 npm install -g copilot-lens
 ```
 
-## Usage
-
 ```bash
-# Start the dashboard
-copilot-lens
-
-# Auto-open in browser
-copilot-lens --open
-
-# Custom port
-copilot-lens --port 8080
-
-# Or use npx (no install needed)
+# Or without installing
 npx copilot-lens --open
 ```
 
-### CLI Options
+## Usage
+
+```bash
+copilot-lens          # Start the dashboard
+copilot-lens --open   # Start and open in browser
+copilot-lens --port 8080
+```
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -43,110 +35,116 @@ npx copilot-lens --open
 | `--host` | `localhost` | Host address |
 | `--open` | off | Auto-open browser |
 
+---
+
 ## Features
 
-### 📋 Session Browser
+### 🔍 Search — Find anything in your Copilot history
 
-- Browse all your Copilot sessions in a searchable, filterable list
-- **Source badges** — instantly see whether a session is from CLI or VS Code
-- **Session titles** — VS Code sessions show their chat title for easy identification
-- **Color-coded by directory** — each project gets a unique accent color
-- **Status detection** — see which sessions are Running, Completed, or Error
-- **Three filter dimensions** — filter by time range, status, and directory
-- Click any session to view full details
+Search across every conversation you've ever had with Copilot — CLI and VS Code — in one place.
+
+- Full-text search over all session content
+- Ranked results with inline highlights showing context around each match
+- Filter results by source (CLI vs VS Code), date range, or working directory
+- Results update as you type (debounced)
+- Works offline, entirely on your machine
+
+> **Example**: Search `"redis connection pool"` and instantly find the session from three weeks ago where you worked through that implementation.
+
+### 📋 Session Browser — Review your conversations
+
+Browse the full history of your Copilot sessions in a searchable, filterable list.
+
+- **Unified view** — CLI terminal and VS Code Copilot Chat sessions side by side
+- **Source badges** — see at a glance whether a session came from CLI or VS Code
+- **Color-coded by directory** — each project gets a distinct accent color
+- **Status detection** — Running, Completed, or Error
+- **Filter by** time range, status, and working directory
+- Click any session to open the full conversation
+
+**Conversation view:**
+- Chat-style layout — your prompts on the right, Copilot responses on the left
+- Tool calls made during the session
+- Errors that occurred
+- Session plans (if created)
 
 ![copilot-lens sessions list](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png)
 
-### 💬 Conversation View
+### 📊 Analytics — Understand your usage patterns
 
-- Chat-style layout with your prompts on the right and Copilot responses on the left
-- View tool calls made during the session
-- See any errors that occurred
-- Read session plans (if created)
+Eight interactive charts that show how and when you use Copilot.
 
-![copilot-lens session view](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-session-view.png)
+| Chart | What It Shows |
+|-------|---------------|
+| Sessions Per Day | Daily activity over time |
+| Activity by Hour | When during the day you use Copilot most |
+| Tool Usage | Most-used tools (grep, edit, glob, etc.) |
+| Model Usage | Which AI models you've used |
+| Top Working Directories | Which projects you use Copilot in most |
+| Time Per Branch | Active Copilot time per git branch |
+| Time Per Repo | Active Copilot time per repository |
+| MCP Servers Used | Which MCP servers appear across sessions |
 
-### 📊 Analytics Dashboard
+Dark and light mode. Interactive chart legends. Manual refresh.
 
-Eight interactive charts powered by Chart.js, arranged in a 2-column grid:
+![copilot-lens analytics](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-demo.png)
 
-| Chart | Type | What It Shows |
-|-------|------|---------------|
-| **Sessions Per Day** | Bar (compact) | Daily session activity over time |
-| **Activity by Hour of Day** | Bar (compact) | When during the day you use Copilot most |
-| **Tool Usage** | Doughnut | Most-used tools (grep, edit, powershell, etc.) |
-| **Model Usage** | Doughnut | Which AI models you've used (Claude, GPT, etc.) |
-| **Top Working Directories** | Horizontal bar (full-width) | Which project folders you use Copilot in most |
-| **Time Per Branch** | Horizontal bar | Active Copilot time spent on each git branch |
-| **Time Per Repo** | Horizontal bar | Active Copilot time per repository |
-| **MCP Servers Used** | Doughnut | Which MCP servers are configured across sessions |
+### 🏆 Effectiveness Score — See how well you're using Copilot
 
-Doughnut chart legends are interactive — click a label to toggle that segment's visibility.
-
-#### Glimpse of Analytics Dashboard
-
-![copilot-lens demo](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-demo.png)
-
-### 🎨 UI Features
-
-- **Dark & Light mode** — toggle with one click, preference is saved
-- **Manual refresh** — refresh button to reload data on demand
-- **Responsive layout** — works on any screen size
-- **2-column grid layout** — compact charts with no wasted space
-
-### 🏆 Copilot Effectiveness Score
-
-Scoring (0-100) that measures how effectively you use Copilot, with actionable improvement tips. Scores are generated **per-repo** for CLI sessions and as a **global aggregate** for VS Code Copilot Chat sessions.
+A 0–100 score per repository (CLI) and globally (VS Code) with actionable improvement tips.
 
 | Category | What It Measures |
 |----------|-----------------|
-| **Prompt Quality** | Average prompt length, how often Copilot needs clarification |
-| **Tool Utilization** | Diversity of tools used (grep, glob, edit, task, etc.) |
-| **Efficiency** | Tool success rate and turns per session |
-| **MCP Utilization** | Configured MCP servers vs actually used (reads repo/VS Code `mcp.json`) |
-| **Engagement** | Session duration sweet spot and usage consistency |
+| Prompt Quality | Average prompt length, clarification rate |
+| Tool Utilization | Diversity of tools used across sessions |
+| Efficiency | Tool success rate, turns per session |
+| MCP Utilization | Configured vs. actually used MCP servers |
+| Engagement | Session duration and usage consistency |
 
-![copilot-lens effectiveness score](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-score.png)
+![copilot-lens score](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-score.png)
+
+---
 
 ## How It Works
 
-Copilot Lens reads session data from two sources:
+Copilot Lens reads session data from two local sources — no network requests, no external APIs.
 
-### Copilot CLI Sessions
+### GitHub Copilot CLI Sessions
 - **Location**: `~/.copilot/session-state/`
-- **`workspace.yaml`** — Session metadata (directory, git branch, timestamps)
-- **`events.jsonl`** — Full event log (messages, tool calls, errors)
-- **`plan.md`** — Session plans (if created)
+- `workspace.yaml` — session metadata (directory, git branch, timestamps)
+- `events.jsonl` — full event log (messages, tool calls, errors)
+- `plan.md` — session plans, if created
 
 ### VS Code Copilot Chat Sessions
-- **Index**: VS Code's `state.vscdb` SQLite database (session list with titles and timing)
-- **Content**: `emptyWindowChatSessions/{id}.json` (full conversation with requests and responses)
-- **Platforms**: macOS (`~/Library/Application Support/Code/`), Windows (`%APPDATA%/Code/`), Linux (`~/.config/Code/`)
-- **VS Code Insiders** is also supported
+- **Index**: `state.vscdb` (SQLite) — session list with titles and timing
+- **Content**: `emptyWindowChatSessions/{id}.json` — full conversation
 
-A local Express server parses these files and serves a static frontend dashboard.
+Supported platforms and paths:
+| Platform | Path |
+|----------|------|
+| macOS | `~/Library/Application Support/Code/` |
+| Windows | `%APPDATA%/Code/` |
+| Linux | `~/.config/Code/` |
 
-> **Note on large VS Code sessions**: Sessions with pasted images can be very large (100MB+). Copilot Lens automatically strips image data and truncates oversized text during parsing. Files over 200MB are skipped entirely.
+VS Code Insiders is also supported. Sessions with pasted images (which can exceed 100MB) are automatically stripped of image data. Files over 200MB are skipped.
 
 ### Duration Calculation
 
-Session durations are calculated from **actual event activity**, not wall-clock time. Gaps longer than 5 minutes between events are excluded, so resumed sessions don't show inflated durations.
+Durations are calculated from actual event activity, not wall-clock time. Gaps longer than 5 minutes between events are excluded — so a session you paused and resumed doesn't show an inflated duration.
 
-### Status Detection
-
-| Status | How It's Detected |
-|--------|-------------------|
-| **Running** | `session.db` exists and was modified within 10 min, or `events.jsonl` modified within 5 min |
-| **Completed** | Has an `abort` event with "user initiated" reason, or no recent activity |
-| **Error** | Has an `abort` event with a non-user-initiated reason |
+---
 
 ## Tech Stack
 
-- **Backend**: Node.js + Express + TypeScript
-- **Frontend**: Vanilla HTML/CSS/JavaScript
-- **Charts**: Chart.js
-- **Data**: YAML + JSONL parsing, SQLite (`better-sqlite3`) for VS Code session index
-- **Testing**: Vitest (56 tests)
+| Layer | Technology |
+|-------|-----------|
+| Backend | Node.js + Express + TypeScript |
+| Frontend | Vanilla HTML/CSS/JavaScript |
+| Charts | Chart.js |
+| Data | YAML, JSONL, SQLite (`better-sqlite3`) |
+| Testing | Vitest (56 tests) |
+
+---
 
 ## Development
 
@@ -154,22 +152,32 @@ Session durations are calculated from **actual event activity**, not wall-clock 
 git clone https://github.com/pavanvamsi3/copilot-lens.git
 cd copilot-lens
 npm install
-npm run dev        # Start with tsx (no build needed)
+npm run dev        # Start with tsx (no build step)
 npm run build      # Compile TypeScript
 npm test           # Run tests
 npm start          # Run compiled version
 ```
 
-## License
-
-MIT
+---
 
 ## Optional: Custom Local Hostname
 
-If you'd like a prettier URL like `http://copilot.lens:3000`, add this to your hosts file:
+For a cleaner URL like `http://copilot.lens:3000`:
 
-- **Windows** (run as Admin): `echo 127.0.0.1 copilot.lens >> C:\Windows\System32\drivers\etc\hosts`
-- **macOS/Linux**: `echo "127.0.0.1 copilot.lens" | sudo tee -a /etc/hosts`
+**macOS/Linux:**
+```bash
+echo "127.0.0.1 copilot.lens" | sudo tee -a /etc/hosts
+```
 
-Then run: `copilot-lens --host copilot.lens`
+**Windows (run as Admin):**
+```bash
+echo 127.0.0.1 copilot.lens >> C:\Windows\System32\drivers\etc\hosts
+```
 
+Then: `copilot-lens --host copilot.lens`
+
+---
+
+## License
+
+MIT
