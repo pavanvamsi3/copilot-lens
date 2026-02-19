@@ -627,3 +627,52 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px; }
 
 .not-enough-data .nod-icon { font-size: 3rem; margin-bottom: 16px; }
 .not-enough-data p { font-size: 1rem; }
+
+/* Search bar */
+.search-bar-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+#searchInput {
+  flex: 1;
+  padding: 10px 36px 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+#searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#searchClear {
+  cursor: pointer;
+  position: absolute;
+  right: 12px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.search-highlights {
+  margin-top: 6px;
+  font-size: 0.82em;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.highlight-snippet {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

@@ -7,19 +7,21 @@ A local web dashboard for analyzing GitHub Copilot sessions from both CLI and VS
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        Browser (SPA)                             │
-│  ┌──────────┐  ┌──────────────┐  ┌───────────────────────────┐  │
-│  │ Sessions  │  │  Analytics   │  │       Insights            │  │
-│  │  List     │  │  8 Charts    │  │  Effectiveness Score      │  │
-│  │  Detail   │  │  (Chart.js)  │  │  Per-repo + VS Code       │  │
-│  └──────────┘  └──────────────┘  └───────────────────────────┘  │
+│  ┌──────────────────┐  ┌────────────┐  ┌──────────────────────┐ │
+│  │     Sessions     │  │ Analytics  │  │      Insights        │ │
+│  │  Full-text Search│  │  8 Charts  │  │ Effectiveness Score  │ │
+│  │  Filters + List  │  │ (Chart.js) │  │ Per-repo + VS Code   │ │
+│  │  Detail Modal    │  │            │  │                      │ │
+│  └──────────────────┘  └────────────┘  └──────────────────────┘ │
 └────────────────────────┬─────────────────────────────────────────┘
                          │ HTTP (localhost)
 ┌────────────────────────┴─────────────────────────────────────────┐
 │                    Express Server (server.ts)                     │
 │                                                                   │
-│  GET /api/sessions          GET /api/analytics                    │
-│  GET /api/sessions/:id      GET /api/insights/repos               │
-│  POST /api/cache/clear      GET /api/insights/score?repo=...      │
+│  GET /api/search            GET /api/analytics                    │
+│  GET /api/sessions          GET /api/insights/repos               │
+│  GET /api/sessions/:id      GET /api/insights/score?repo=...      │
+│  POST /api/cache/clear                                            │
 └───────────┬──────────────────────────┬───────────────────────────┘
             │                          │
     ┌───────┴────────┐        ┌────────┴──────────┐
@@ -41,6 +43,15 @@ A local web dashboard for analyzing GitHub Copilot sessions from both CLI and VS
     │  │  .jsonl     │        │     ChatSessions/ │
     │  └─ plan.md    │        │     └─ {id}.json  │
     └────────────────┘        └───────────────────┘
+            │
+    ┌───────┴────────┐
+    │   search.ts    │
+    │                │
+    │  SearchIndex   │
+    │  Tokenize      │
+    │  Score+Rank    │
+    │  Highlights    │
+    └────────────────┘
 ```
 
 ## File Structure
@@ -53,20 +64,22 @@ copilot-lens/
 │   ├── sessions.ts             # Core: CLI sessions, analytics, scoring engine
 │   ├── vscode-sessions.ts      # VS Code session reading and normalization
 │   ├── cache.ts                # In-memory TTL cache utility
+│   ├── search.ts               # Full-text search index and ranking
 │   └── __tests__/
 │       ├── sessions.test.ts    # 13 tests
 │       ├── vscode-sessions.test.ts  # 36 tests
-│       └── cache.test.ts       # 7 tests
+│       ├── cache.test.ts       # 7 tests
+│       └── search.test.ts      # 10 tests
 ├── public/
 │   ├── index.html              # SPA shell (3 pages, nav, modal)
-│   ├── app.js                  # Frontend logic (fetch, render, charts)
+│   ├── app.js                  # Frontend logic (fetch, render, charts, search)
 │   └── style.css               # Dark/light theme styles
 ├── package.json
 ├── vitest.config.ts
 └── tsconfig.json
 ```
 
-**Total**: ~3,700 lines across 12 source files (56 tests).
+**Total**: ~4,350 lines across 14 source files (66 tests).
 
 ---
 
@@ -87,20 +100,23 @@ copilot-lens/
 
 ## Backend Modules
 
-### `server.ts` — API Layer (92 lines)
+### `server.ts` — API Layer (122 lines)
 
-Creates an Express app with CORS, static file serving, and 6 API endpoints:
+Creates an Express app with CORS, static file serving, and 7 API endpoints:
 
 | Endpoint | Method | Handler | Description |
 |----------|--------|---------|-------------|
+| `/api/search` | GET | `searchIndex.search()` | Full-text search across session content; params: `q`, `source`, `limit` |
 | `/api/sessions` | GET | `listSessions()` | All sessions (CLI + VS Code), sorted by date |
 | `/api/sessions/:id` | GET | `getSession(id)` | Full session detail with events |
 | `/api/analytics` | GET | `getAnalytics()` | Aggregated usage statistics |
 | `/api/insights/repos` | GET | `listReposWithScores()` | All repos with effectiveness scores |
 | `/api/insights/score?repo=` | GET | `getRepoScore(repo)` / `getVSCodeScore()` | Score for a specific repo (or "VS Code" for global) |
-| `/api/cache/clear` | POST | `clearCache()` | Invalidate all cached data |
+| `/api/cache/clear` | POST | `clearCache()` + `searchIndex.clear()` | Invalidate all cached data and search index |
 
 Also serves `public/` as static files and has an SPA fallback that serves `index.html` for non-API routes.
+
+A single `SearchIndex` instance is held for the lifetime of the server process. `buildIndex` is a no-op if entries are already populated, so the index is built once per cache cycle and invalidated together with the session cache when the user clicks Refresh.
 
 ---
 
@@ -189,6 +205,59 @@ Examines low-scoring categories and generates actionable advice:
 - Low success rate → suggest clearer instructions
 - Unused MCP servers → list which ones to leverage
 - Brief/infrequent sessions → suggest more engagement
+
+---
+
+### `search.ts` — Full-Text Search Engine (170 lines)
+
+Provides an in-process, dependency-free full-text search over all session content.
+
+#### Exported Types
+
+| Type | Fields | Purpose |
+|------|--------|---------|
+| `SearchEntry` | id, source, title, cwd, date, content[] | Indexed representation of one session |
+| `SearchResult` | entry, score, highlights[] | Ranked search hit with extracted snippets |
+| `SearchOptions` | limit (default 20), source ('cli'\|'vscode'\|'all') | Query parameters |
+
+#### `SearchIndex` class
+
+**`buildIndex(sessions: SessionMeta[]): void`**
+
+- Stores the sessions list for lazy rebuilds after `clear()`
+- No-op if entries are already populated (call `clear()` first to force rebuild)
+- For each session: calls `getSession(id)`, extracts text from `user.message` and `assistant.message` events, strips code blocks (triple-backtick fences) before indexing
+
+**`search(query: string, options?: SearchOptions): SearchResult[]`**
+
+1. Returns `[]` for empty/blank queries immediately
+2. Lazy-rebuilds from stored sessions if entries array is empty (supports the post-`clear()` pattern)
+3. Tokenises query: lowercase, split on non-alphanumeric chars, drop tokens < 2 chars
+4. For each entry, computes a relevance score:
+
+   | Signal | Weight |
+   |--------|--------|
+   | Token occurrence count in content | `count / total_word_count` |
+   | Token appears in `title` | +0.5 per token |
+   | Token appears in `cwd` | +0.2 per token |
+
+5. Filters to score > 0, applies `source` filter, sorts descending, slices to `limit`
+6. For each result, calls `extractHighlights()` to produce up to 3 contextual snippets
+
+**`extractHighlights(rawContent, tokens): string[]`**
+
+- Finds match positions in lowercased content
+- Extracts ±60 chars around each match start (max 120-char window)
+- Trims to nearest word boundary
+- Merges overlapping windows; returns up to 3 unique snippets
+
+**`clear(): void`**
+
+Resets the entries array. Stored sessions are kept so the next `search()` call can lazy-rebuild without requiring an explicit `buildIndex()` call first.
+
+#### `tokenize(query): string[]` (exported)
+
+Shared tokenizer: `query.toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 2)`
 
 ---
 
@@ -302,14 +371,18 @@ Simple in-memory cache using a `Map<string, { value, expiresAt }>`.
 
 ## Frontend
 
-### `index.html` — SPA Shell (109 lines)
+### `index.html` — SPA Shell (118 lines)
 
 Single HTML page with three mutually-exclusive sections:
 
 ```html
 <header>  Logo | [Sessions] [Analytics] [Insights] | 🔄 Refresh | 🌗 Theme </header>
 <main>
-  <section id="sessionsPage">    Search, Filters, Session List    </section>
+  <section id="sessionsPage">
+    <div class="search-bar-wrap">  Full-text search input + clear button  </div>
+    <div class="controls">         Time / Status / Directory filters       </div>
+    <div id="sessionList">         Session cards or search results         </div>
+  </section>
   <section id="analyticsPage">   Stats Cards, 8 Chart Canvases    </section>
   <section id="insightsPage">    Repo Selector, Score Display      </section>
 </main>
@@ -318,15 +391,18 @@ Single HTML page with three mutually-exclusive sections:
 
 External dependency: **Chart.js 4.x** via CDN.
 
-### `app.js` — Frontend Logic (632 lines)
+### `app.js` — Frontend Logic (695 lines)
 
 All rendering and interactivity in vanilla JavaScript (no framework).
 
 **Page: Sessions**
 - `loadSessions()` — Fetches `/api/sessions`, renders cards with source badges (CLI/VS Code), status indicators, color-coded directories
-- Search filters by session ID, directory, branch, and title
-- Three filter dropdowns: time range (24h/7d/30d/all), status, directory
-- Click card → `renderDetail(id)` fetches `/api/sessions/:id` → renders conversation view in modal
+- **Full-text search** (`#searchInput`): 300ms debounced input → `runSearch(q)` → `GET /api/search` → `renderSearchResults(results)`
+  - Shows up to 3 highlight snippets per card (`.search-highlights > .highlight-snippet`)
+  - Clear button (`#searchClear`) resets to normal list view via `clearSearch()`
+  - `isSearchActive` flag prevents filter-change events from overriding active search results
+- Three filter dropdowns: time range (24h/7d/30d/all), status, directory (only active when `isSearchActive = false`)
+- Click card → `openDetail(id)` fetches `/api/sessions/:id` → renders conversation view in modal
 
 **Page: Analytics**
 - `loadAnalytics()` — Fetches `/api/analytics`, renders 4 stat cards + 8 Chart.js charts
@@ -347,7 +423,7 @@ All rendering and interactivity in vanilla JavaScript (no framework).
 
 **Refresh Button:** Calls `POST /api/cache/clear` then reloads active page data.
 
-### `style.css` — Styling (629 lines)
+### `style.css` — Styling (678 lines)
 
 CSS custom properties for theming:
 
@@ -424,6 +500,33 @@ Browser                    Server                     Filesystem
    │◄── JSON [{scores}] ────┤                            │
 ```
 
+### Full-Text Search Query
+
+```
+Browser                    Server                     SearchIndex
+   │                         │                            │
+   │ (user types "typescript")│                           │
+   │ 300ms debounce           │                           │
+   ├─ GET /api/search?q=... ─►│                           │
+   │                         ├─ listSessions() (cached)   │
+   │                         ├─ searchIndex.buildIndex() ─►│ getSession(id) × N
+   │                         │                            │ extract user/assistant msg content
+   │                         │                            │ strip code blocks
+   │                         │                            │ build entries[]
+   │                         ├─ searchIndex.search(q) ───►│ tokenize("typescript") → ["typescript"]
+   │                         │                            │ score each entry:
+   │                         │                            │   content freq / word count
+   │                         │                            │   + 0.5 if in title
+   │                         │                            │   + 0.2 if in cwd
+   │                         │                            │ sort desc, slice to limit
+   │                         │                            │ extractHighlights (±60 chars)
+   │◄── JSON [{entry,score,highlights}] ◄────────────────┤
+   │                         │                            │
+   │ renderSearchResults()    │                            │
+   │  → session cards with    │                            │
+   │    .search-highlights    │                            │
+```
+
 ---
 
 ## Performance
@@ -462,8 +565,9 @@ VS Code session files can reach 450MB+ due to pasted images (base64 PNG in `vari
 | `cache.test.ts` | 7 | TTL expiry, cache hits, invalidation, separate keys, complex objects |
 | `sessions.test.ts` | 13 | YAML parsing, JSONL parsing, duration calc, analytics aggregation, scoring, MCP matching, source field |
 | `vscode-sessions.test.ts` | 36 | requestsToEvents (8), deriveStatus (4), msToIso (3), readSessionContent (7), normalizeVSCodeToolName (10), scanVSCodeMcpConfig (3), small image preservation (1) |
+| `search.test.ts` | 10 | tokenize (punctuation, lowercase, min-length), empty/blank query, title scoring bonus, cwd scoring bonus, highlight length (≤121 chars), source filter cli/vscode, clear() + lazy rebuild, limit option |
 
-**Total: 56 tests**
+**Total: 66 tests**
 
 Run with:
 ```bash

@@ -22,8 +22,16 @@
   <main>
     <!-- Sessions Page -->
     <section id="sessionsPage" class="page active">
+      <div class="search-bar-wrap">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search your Copilot history..."
+          autocomplete="off"
+        />
+        <span id="searchClear" style="display:none">✕</span>
+      </div>
       <div class="controls">
-        <input type="text" id="searchInput" placeholder="Search sessions (ID, branch)..." />
         <select id="timeFilter">
           <option value="all">All Time</option>
           <option value="today">Today</option>

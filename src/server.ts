@@ -3,13 +3,39 @@ import cors from "cors";
 import path from "path";
 import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore } from "./sessions";
 import { clearCache } from "./cache";
+import { SearchIndex } from "./search";
 
 export function createApp() {
   const app = express();
   app.use(cors());
 
+  const searchIndex = new SearchIndex();
+
   // Serve static frontend files
   app.use(express.static(path.join(__dirname, "..", "public")));
+
+  // API: Full-text search
+  app.get("/api/search", async (req, res) => {
+    try {
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      const source = typeof req.query.source === "string" ? req.query.source : "all";
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      if (!q) return res.json([]);
+
+      const sessions = listSessions();
+      searchIndex.buildIndex(sessions);
+
+      const results = searchIndex.search(q, {
+        limit,
+        source: source as "cli" | "vscode" | "all",
+      });
+
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // API: List all sessions
   app.get("/api/sessions", (_req, res) => {
@@ -74,6 +100,7 @@ export function createApp() {
   // API: Clear cache (for manual refresh)
   app.post("/api/cache/clear", (_req, res) => {
     clearCache();
+    searchIndex.clear();
     res.json({ ok: true });
   });
 
