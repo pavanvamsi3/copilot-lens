@@ -2,6 +2,8 @@
 let sessions = [];
 let analytics = null;
 let charts = {};
+let searchDebounce = null;
+let isSearchActive = false;
 
 // Directory color coding — sophisticated muted palette
 const DIR_COLORS = [
@@ -32,6 +34,7 @@ function getDirColor(dir) {
 const sessionList = document.getElementById("sessionList");
 const sessionCount = document.getElementById("sessionCount");
 const searchInput = document.getElementById("searchInput");
+const searchClear = document.getElementById("searchClear");
 const timeFilter = document.getElementById("timeFilter");
 const statusFilter = document.getElementById("statusFilter");
 const dirFilter = document.getElementById("dirFilter");
@@ -137,6 +140,7 @@ function getFilteredSessions() {
 
 // Render session list
 function renderSessions() {
+  if (isSearchActive) return;
   const filtered = getFilteredSessions();
   sessionCount.textContent = `${filtered.length} session${filtered.length !== 1 ? "s" : ""} found`;
 
@@ -468,8 +472,24 @@ async function loadSessions() {
   }
 }
 
-// Event listeners
-searchInput.addEventListener("input", renderSessions);
+// Search input (full-text search with debounce)
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchDebounce);
+  const q = searchInput.value.trim();
+  searchClear.style.display = q ? "inline" : "none";
+  searchDebounce = setTimeout(() => {
+    if (q) runSearch(q);
+    else clearSearch();
+  }, 300);
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  searchClear.style.display = "none";
+  clearSearch();
+});
+
+// Filter listeners
 timeFilter.addEventListener("change", renderSessions);
 statusFilter.addEventListener("change", renderSessions);
 dirFilter.addEventListener("change", renderSessions);
@@ -626,6 +646,66 @@ function renderInsightsScore(data) {
       <h3>💡 Tips to Improve</h3>
       ${tipItems}
     </div>`;
+}
+
+// Full-text search
+async function runSearch(q) {
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=all&limit=20`);
+    const results = await res.json();
+    isSearchActive = true;
+    renderSearchResults(results);
+  } catch (err) {
+    isSearchActive = true;
+    sessionList.innerHTML = `<div style="color:var(--danger);padding:20px">Search failed: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function clearSearch() {
+  isSearchActive = false;
+  renderSessions();
+}
+
+function renderSearchResults(results) {
+  if (!results || results.length === 0) {
+    sessionCount.textContent = "No results found";
+    sessionList.innerHTML = '<div style="color:var(--text-dim);padding:40px;text-align:center">No results found</div>';
+    return;
+  }
+
+  sessionCount.textContent = `${results.length} result${results.length !== 1 ? "s" : ""} found`;
+
+  sessionList.innerHTML = results
+    .map(({ entry, highlights }) => {
+      const s = entry;
+      const c = getDirColor(s.cwd);
+      const sourceClass = s.source === "vscode" ? "badge-vscode" : "badge-cli";
+      const sourceLabel = s.source === "vscode" ? "VS Code" : "CLI";
+      const displayName = s.title || shortId(s.id);
+      const highlightHtml = highlights && highlights.length
+        ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`
+        : "";
+      return `
+    <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 3px solid ${c.border}">
+      <div class="top-row">
+        <span class="session-id">${escapeHtml(displayName)}</span>
+        <span class="top-badges">
+          <span class="badge ${sourceClass}">${sourceLabel}</span>
+        </span>
+      </div>
+      <div class="session-dir">${escapeHtml(s.cwd || "—")}</div>
+      <div class="session-meta">
+        <span>${formatTime(s.date)}</span>
+      </div>
+      ${highlightHtml}
+    </div>
+  `;
+    })
+    .join("");
+
+  sessionList.querySelectorAll(".session-card").forEach((card) => {
+    card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
+  });
 }
 
 // Init
