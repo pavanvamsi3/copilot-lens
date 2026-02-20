@@ -1,6 +1,6 @@
 {
   "name": "copilot-lens",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "A local dashboard to visualize and analyze your GitHub Copilot CLI sessions",
   "main": "dist/server.js",
   "bin": {
