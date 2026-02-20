@@ -2,13 +2,13 @@
 
 **Your Copilot history has answers. Now you can actually find them.**
 
-Copilot Lens is a local memory layer for GitHub Copilot — search and browse everything you've ever discussed with Copilot, across both CLI terminal sessions and VS Code Copilot Chat. All on your machine. No cloud. No sign-in.
+Copilot Lens is a local memory layer for AI coding assistants — search and browse everything you've ever discussed with Copilot or Claude, across Copilot CLI terminal sessions, VS Code Copilot Chat, and Claude Code. All on your machine. No cloud. No sign-in.
 
 ## Why
 
-Copilot sessions are ephemeral by default. You solve a problem, close the terminal, and it's gone. Days later you need that same approach, that regex, that architecture decision — and you have nothing to reference.
+Copilot and Claude sessions are ephemeral by default. You solve a problem, close the terminal, and it's gone. Days later you need that same approach, that regex, that architecture decision — and you have nothing to reference.
 
-Copilot stores all of this locally. Copilot Lens makes it accessible.
+These tools store all of this locally. Copilot Lens makes it accessible.
 
 ## Install
 
@@ -45,7 +45,7 @@ Search across every conversation you've ever had with Copilot — CLI and VS Cod
 
 - Full-text search over all session content
 - Ranked results with inline highlights showing context around each match
-- Filter results by source (CLI vs VS Code), date range, or working directory
+- Filter results by source (Copilot CLI, VS Code, or Claude Code), date range, or working directory
 - Results update as you type (debounced)
 - Works offline, entirely on your machine
 
@@ -55,8 +55,8 @@ Search across every conversation you've ever had with Copilot — CLI and VS Cod
 
 Browse the full history of your Copilot sessions in a searchable, filterable list.
 
-- **Unified view** — CLI terminal and VS Code Copilot Chat sessions side by side
-- **Source badges** — see at a glance whether a session came from CLI or VS Code
+- **Unified view** — Copilot CLI, VS Code Copilot Chat, and Claude Code sessions side by side
+- **Source badges** — see at a glance whether a session came from Copilot CLI, VS Code, or Claude Code
 - **Color-coded by directory** — each project gets a distinct accent color
 - **Status detection** — Running, Completed, or Error
 - **Filter by** time range, status, and working directory
@@ -72,7 +72,7 @@ Browse the full history of your Copilot sessions in a searchable, filterable lis
 
 ### 📊 Analytics — Understand your usage patterns
 
-Eight interactive charts that show how and when you use Copilot.
+Eight interactive charts that show how and when you use Copilot and Claude. Filter by source (All / Copilot CLI / VS Code / Claude Code) to see per-tool breakdowns.
 
 | Chart | What It Shows |
 |-------|---------------|
@@ -107,9 +107,9 @@ A 0–100 score per repository (CLI) and globally (VS Code) with actionable impr
 
 ## How It Works
 
-Copilot Lens reads session data from two local sources — no network requests, no external APIs.
+Copilot Lens reads session data from three local sources — no network requests, no external APIs.
 
-### GitHub Copilot CLI Sessions
+### Copilot CLI Sessions
 - **Location**: `~/.copilot/session-state/`
 - `workspace.yaml` — session metadata (directory, git branch, timestamps)
 - `events.jsonl` — full event log (messages, tool calls, errors)
@@ -128,6 +128,13 @@ Supported platforms and paths:
 
 VS Code Insiders is also supported. Sessions with pasted images (which can exceed 100MB) are automatically stripped of image data. Files over 200MB are skipped.
 
+### Claude Code Sessions
+- **Location**: `~/.claude/projects/{sanitized-project-path}/{sessionId}.jsonl`
+- Each file is a JSONL stream of events with types `user`, `assistant`, `progress`, and others
+- `user` events contain the prompt; `assistant` events contain model responses and tool calls
+- Sidechain events (warmup/internal) are filtered out automatically
+- Session title comes from the `slug` field (e.g. `happy-seeking-whistle`)
+
 ### Duration Calculation
 
 Durations are calculated from actual event activity, not wall-clock time. Gaps longer than 5 minutes between events are excluded — so a session you paused and resumed doesn't show an inflated duration.
@@ -142,7 +149,7 @@ Durations are calculated from actual event activity, not wall-clock time. Gaps l
 | Frontend | Vanilla HTML/CSS/JavaScript |
 | Charts | Chart.js |
 | Data | YAML, JSONL, SQLite (`better-sqlite3`) |
-| Testing | Vitest (56 tests) |
+| Testing | Vitest (97 tests) |
 
 ---
 

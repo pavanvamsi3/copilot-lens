@@ -1,6 +1,6 @@
 # Copilot Lens — Architecture
 
-A local web dashboard for analyzing GitHub Copilot sessions from both CLI and VS Code.
+A local web dashboard for analyzing AI coding assistant sessions from Copilot CLI, VS Code Copilot Chat, and Claude Code.
 
 ## Overview
 
@@ -10,48 +10,49 @@ A local web dashboard for analyzing GitHub Copilot sessions from both CLI and VS
 │  ┌──────────────────┐  ┌────────────┐  ┌──────────────────────┐ │
 │  │     Sessions     │  │ Analytics  │  │      Insights        │ │
 │  │  Full-text Search│  │  8 Charts  │  │ Effectiveness Score  │ │
-│  │  Filters + List  │  │ (Chart.js) │  │ Per-repo + VS Code   │ │
-│  │  Detail Modal    │  │            │  │                      │ │
+│  │  Filters + List  │  │ Source     │  │ Per-repo + VS Code   │ │
+│  │  Detail Modal    │  │  Filter    │  │                      │ │
 │  └──────────────────┘  └────────────┘  └──────────────────────┘ │
 └────────────────────────┬─────────────────────────────────────────┘
                          │ HTTP (localhost)
 ┌────────────────────────┴─────────────────────────────────────────┐
 │                    Express Server (server.ts)                     │
 │                                                                   │
-│  GET /api/search            GET /api/analytics                    │
+│  GET /api/search            GET /api/analytics?source=           │
 │  GET /api/sessions          GET /api/insights/repos               │
 │  GET /api/sessions/:id      GET /api/insights/score?repo=...      │
 │  POST /api/cache/clear                                            │
-└───────────┬──────────────────────────┬───────────────────────────┘
-            │                          │
-    ┌───────┴────────┐        ┌────────┴──────────┐
-    │  sessions.ts   │        │ vscode-sessions.ts│
-    │                │        │                   │
-    │  CLI Sessions  │        │  VS Code Sessions │
-    │  Analytics     │        │  Analytics        │
-    │  Scoring       │        │  Tool Normalization│
-    └───────┬────────┘        └────────┬──────────┘
-            │                          │
-    ┌───────┴────────┐        ┌────────┴──────────┐
-    │  Filesystem    │        │  SQLite + JSON    │
-    │                │        │                   │
-    │ ~/.copilot/    │        │ ~/Library/App.../ │
-    │ session-state/ │        │ Code/User/        │
-    │  ├─ workspace  │        │ globalStorage/    │
-    │  │  .yaml      │        │  ├─ state.vscdb   │
-    │  ├─ events     │        │  └─ emptyWindow   │
-    │  │  .jsonl     │        │     ChatSessions/ │
-    │  └─ plan.md    │        │     └─ {id}.json  │
-    └────────────────┘        └───────────────────┘
-            │
-    ┌───────┴────────┐
-    │   search.ts    │
-    │                │
-    │  SearchIndex   │
-    │  Tokenize      │
-    │  Score+Rank    │
-    │  Highlights    │
-    └────────────────┘
+└──────┬────────────────────────────┬──────────────┬───────────────┘
+       │                            │              │
+┌──────┴───────┐  ┌─────────────────┴──┐  ┌───────┴──────────────┐
+│ sessions.ts  │  │ vscode-sessions.ts  │  │claude-code-sessions.ts│
+│              │  │                     │  │                       │
+│ CLI Sessions │  │ VS Code Sessions    │  │ Claude Code Sessions  │
+│ Analytics    │  │ Analytics           │  │ Analytics             │
+│ Scoring      │  │ Tool Normalization  │  │                       │
+└──────┬───────┘  └──────────┬──────────┘  └───────┬──────────────┘
+       │                     │                      │
+┌──────┴───────┐  ┌──────────┴──────────┐  ┌───────┴──────────────┐
+│  Filesystem  │  │   SQLite + JSON      │  │     Filesystem        │
+│              │  │                      │  │                       │
+│ ~/.copilot/  │  │ ~/Library/App.../    │  │ ~/.claude/projects/   │
+│ session-     │  │ Code/User/           │  │  {project}/           │
+│ state/       │  │ globalStorage/       │  │   {uuid}.jsonl        │
+│  ├─ workspace│  │  ├─ state.vscdb      │  │                       │
+│  │  .yaml    │  │  └─ emptyWindow      │  │ (JSONL event stream)  │
+│  ├─ events   │  │     ChatSessions/    │  │                       │
+│  │  .jsonl   │  │     └─ {id}.json     │  │                       │
+│  └─ plan.md  │  └─────────────────────┘  └───────────────────────┘
+└──────────────┘
+       │
+┌──────┴───────┐
+│  search.ts   │
+│              │
+│  SearchIndex │
+│  Tokenize    │
+│  Score+Rank  │
+│  Highlights  │
+└──────────────┘
 ```
 
 ## File Structure
@@ -59,17 +60,19 @@ A local web dashboard for analyzing GitHub Copilot sessions from both CLI and VS
 ```
 copilot-lens/
 ├── src/
-│   ├── cli.ts                  # Entry point — CLI arg parsing, server startup
-│   ├── server.ts               # Express app with API routes
-│   ├── sessions.ts             # Core: CLI sessions, analytics, scoring engine
-│   ├── vscode-sessions.ts      # VS Code session reading and normalization
-│   ├── cache.ts                # In-memory TTL cache utility
-│   ├── search.ts               # Full-text search index and ranking
+│   ├── cli.ts                       # Entry point — CLI arg parsing, server startup
+│   ├── server.ts                    # Express app with API routes
+│   ├── sessions.ts                  # Core: CLI sessions, analytics, scoring engine
+│   ├── vscode-sessions.ts           # VS Code session reading and normalization
+│   ├── claude-code-sessions.ts      # Claude Code session reading and analytics
+│   ├── cache.ts                     # In-memory TTL cache utility
+│   ├── search.ts                    # Full-text search index and ranking
 │   └── __tests__/
-│       ├── sessions.test.ts    # 13 tests
-│       ├── vscode-sessions.test.ts  # 36 tests
-│       ├── cache.test.ts       # 7 tests
-│       └── search.test.ts      # 10 tests
+│       ├── sessions.test.ts         # 16 tests
+│       ├── vscode-sessions.test.ts  # 37 tests
+│       ├── claude-code-sessions.test.ts  # 27 tests
+│       ├── cache.test.ts            # 7 tests
+│       └── search.test.ts          # 10 tests
 ├── public/
 │   ├── index.html              # SPA shell (3 pages, nav, modal)
 │   ├── app.js                  # Frontend logic (fetch, render, charts, search)
@@ -79,7 +82,7 @@ copilot-lens/
 └── tsconfig.json
 ```
 
-**Total**: ~4,350 lines across 14 source files (66 tests).
+**Total**: ~5,000 lines across 15 source files (97 tests).
 
 ---
 
@@ -107,9 +110,9 @@ Creates an Express app with CORS, static file serving, and 7 API endpoints:
 | Endpoint | Method | Handler | Description |
 |----------|--------|---------|-------------|
 | `/api/search` | GET | `searchIndex.search()` | Full-text search across session content; params: `q`, `source`, `limit` |
-| `/api/sessions` | GET | `listSessions()` | All sessions (CLI + VS Code), sorted by date |
+| `/api/sessions` | GET | `listSessions()` | All sessions (Copilot CLI + VS Code + Claude Code), sorted by date |
 | `/api/sessions/:id` | GET | `getSession(id)` | Full session detail with events |
-| `/api/analytics` | GET | `getAnalytics()` | Aggregated usage statistics |
+| `/api/analytics?source=` | GET | `getAnalytics(source)` | Aggregated usage statistics; `source`: `all`\|`cli`\|`vscode`\|`claude-code` |
 | `/api/insights/repos` | GET | `listReposWithScores()` | All repos with effectiveness scores |
 | `/api/insights/score?repo=` | GET | `getRepoScore(repo)` / `getVSCodeScore()` | Score for a specific repo (or "VS Code" for global) |
 | `/api/cache/clear` | POST | `clearCache()` + `searchIndex.clear()` | Invalidate all cached data and search index |
@@ -139,8 +142,8 @@ The largest module. Handles CLI session reading, unified session listing, analyt
 
 **Session Management:**
 
-- **`listSessions()`** — Merges `listCliSessions()` + `listVSCodeSessions()`, sorted by `createdAt` descending. Cached with 30s TTL.
-- **`getSession(id)`** — Routes to CLI or VS Code reader based on `isVSCodeSession()` check. CLI: reads `workspace.yaml` + `events.jsonl` + `plan.md`. VS Code: delegates to `getVSCodeSession()`.
+- **`listSessions()`** — Merges `listCliSessions()` + `listVSCodeSessions()` + `listClaudeCodeSessions()`, sorted by `createdAt` descending. Cached with 30s TTL.
+- **`getSession(id)`** — Routes to VS Code, Claude Code, or CLI reader in order. CLI: reads `workspace.yaml` + `events.jsonl` + `plan.md`. VS Code/Claude Code: delegates to respective module.
 - **`listCliSessions()`** — Scans `~/.copilot/session-state/` directories. For each: reads `workspace.yaml` (YAML metadata), reads last 2KB of `events.jsonl` (for latest timestamp), detects status.
 
 **Status Detection (CLI):**
@@ -151,9 +154,9 @@ The largest module. Handles CLI session reading, unified session listing, analyt
 | Error | Has `abort` event with non-user reason |
 | Completed | Everything else |
 
-**Analytics (`getAnalytics()`):**
+**Analytics (`getAnalytics(source)`):**
 
-Cached with 30s TTL. Scans all sessions and computes:
+Cached with 30s TTL, keyed by source filter. Accepts `source: "all" | "cli" | "vscode" | "claude-code"` to return per-source breakdowns. Computes:
 - Sessions per day (bar chart data)
 - Activity by hour of day
 - Tool usage counts (from `tool.execution_start` events)
@@ -163,7 +166,7 @@ Cached with 30s TTL. Scans all sessions and computes:
 - MCP servers used
 - Summary stats (total sessions, duration, longest, average, errors)
 
-For VS Code sessions, delegates to `getVSCodeAnalytics()` and merges results.
+CLI sessions are scanned from `events.jsonl`. VS Code and Claude Code sessions delegate to `getVSCodeAnalytics()` and `getClaudeCodeAnalytics()` respectively, then merge results.
 
 **Duration Calculation:**
 
@@ -208,6 +211,76 @@ Examines low-scoring categories and generates actionable advice:
 
 ---
 
+---
+
+### `claude-code-sessions.ts` — Claude Code Reader (310 lines)
+
+Reads Claude Code CLI sessions from `~/.claude/projects/`.
+
+#### Data Sources
+
+| Data | Location | Format |
+|------|----------|--------|
+| Sessions | `~/.claude/projects/{sanitized-path}/{uuid}.jsonl` | JSONL event stream |
+
+Each project directory corresponds to one working directory (path encoded as `-Users-name-project`). Each top-level `.jsonl` file is one session; files inside `subagents/` subdirectories are skipped.
+
+#### Event Types
+
+| JSONL `type` | Mapped to | Key Fields |
+|-------------|-----------|------------|
+| `user` | `user.message` | `message.content` (string or content blocks), `cwd`, `gitBranch`, `slug`, `timestamp` |
+| `assistant` | `assistant.message` + `tool.execution_start` (per tool_use block) | `message.content[]`, `message.model`, `timestamp` |
+| `file-history-snapshot`, `progress`, `queue-operation`, `system` | skipped | — |
+
+Events with `isSidechain: true` are filtered out (warmup/sidebar calls made by sub-agents).
+
+#### Key Functions
+
+- **`listClaudeCodeSessions()`** — Scans all project subdirectories for top-level `*.jsonl` files. Reads up to 5000 lines per file to extract metadata (`cwd`, `gitBranch`, `slug`, timestamps). Skips sessions with no non-sidechain `user` events. Returns `SessionMeta[]` with `source: "claude-code"` and `title: slug`.
+
+- **`getClaudeCodeSession(sessionId)`** — Finds and parses the full JSONL. Converts events to `SessionEvent[]`, skipping sidechains. Emits one `tool.execution_start` per `tool_use` block in assistant messages. Computes gap-capped duration. Status is `"running"` if last event < 5 min ago.
+
+- **`isClaudeCodeSession(id)`** — Scans projects dir for `{id}.jsonl`.
+
+- **`getClaudeCodeAnalytics()`** — Cached with 30s TTL. Aggregates tool usage (from `tool_use` blocks), model usage (from `message.model`), turn counts, and message lengths per session.
+
+#### Claude Code JSONL Structure
+
+```
+// user event
+{
+  type: "user",
+  uuid: "...",
+  sessionId: "uuid",
+  isSidechain: false,
+  cwd: "/Users/name/project",
+  gitBranch: "main",
+  slug: "happy-seeking-whistle",
+  timestamp: "2026-02-19T10:00:00Z",
+  message: { role: "user", content: "your prompt here" }
+}
+
+// assistant event
+{
+  type: "assistant",
+  uuid: "...",
+  sessionId: "uuid",
+  isSidechain: false,
+  timestamp: "2026-02-19T10:00:05Z",
+  message: {
+    model: "claude-sonnet-4-6",
+    content: [
+      { type: "thinking", thinking: "..." },
+      { type: "tool_use", id: "t1", name: "bash", input: { cmd: "ls" } },
+      { type: "text", text: "Here is the result..." }
+    ]
+  }
+}
+```
+
+---
+
 ### `search.ts` — Full-Text Search Engine (170 lines)
 
 Provides an in-process, dependency-free full-text search over all session content.
@@ -218,7 +291,7 @@ Provides an in-process, dependency-free full-text search over all session conten
 |------|--------|---------|
 | `SearchEntry` | id, source, title, cwd, date, content[] | Indexed representation of one session |
 | `SearchResult` | entry, score, highlights[] | Ranked search hit with extracted snippets |
-| `SearchOptions` | limit (default 20), source ('cli'\|'vscode'\|'all') | Query parameters |
+| `SearchOptions` | limit (default 20), source ('cli'\|'vscode'\|'claude-code'\|'all') | Query parameters |
 
 #### `SearchIndex` class
 
@@ -364,8 +437,12 @@ Simple in-memory cache using a `Map<string, { value, expiresAt }>`.
 | Cache Key | TTL | Typical Cold Time | Purpose |
 |-----------|-----|-------------------|---------|
 | `listSessions` | 30s | ~7ms | Directory scanning + YAML parsing |
-| `getAnalytics` | 30s | ~1.8s | Full analytics aggregation |
+| `getAnalytics:all` | 30s | ~1.8s | Full analytics aggregation (all sources) |
+| `getAnalytics:cli` | 30s | ~50ms | CLI-only analytics |
+| `getAnalytics:vscode` | 30s | ~1.8s | VS Code-only analytics |
+| `getAnalytics:claude-code` | 30s | ~100ms | Claude Code-only analytics |
 | `getVSCodeAnalytics` | 30s | ~1.8s | VS Code JSON file parsing |
+| `getClaudeCodeAnalytics` | 30s | ~100ms | Claude Code JSONL parsing |
 
 ---
 
@@ -405,9 +482,11 @@ All rendering and interactivity in vanilla JavaScript (no framework).
 - Click card → `openDetail(id)` fetches `/api/sessions/:id` → renders conversation view in modal
 
 **Page: Analytics**
-- `loadAnalytics()` — Fetches `/api/analytics`, renders 4 stat cards + 8 Chart.js charts
+- `loadAnalytics()` — Fetches `/api/analytics?source={analyticsSource}`, renders 4 stat cards + 8 Chart.js charts
+- Source filter toggle buttons (All / Copilot CLI / VS Code / Claude Code) re-fetch with matching `?source=` param
 - Chart types: bar (sessions/day, hourly), doughnut (tools, models, MCP), horizontal bar (directories, branches, repos)
 - Doughnut legends are interactive (click to toggle segments)
+- Empty-state handling hides canvas and shows message in-place (preserves canvas element for re-render)
 
 **Page: Insights**
 - `loadInsights()` → Fetches `/api/insights/repos` → renders repo selector dropdown
@@ -446,8 +525,9 @@ CSS custom properties for theming:
 
 Key component styles:
 - `.session-card` — Bordered cards with color-coded left border
-- `.badge-cli` / `.badge-vscode` — Source indicator badges (blue/purple)
+- `.badge-cli` / `.badge-vscode` / `.badge-claude` — Source indicator badges (blue/purple/orange)
 - `.badge-running` / `.badge-completed` / `.badge-error` — Status badges
+- `.source-filter-btns` / `.source-btn` — Analytics source toggle buttons
 - `.score-circle` — SVG-based circular progress indicator
 - `.category-card` — Score breakdown cards with progress bars
 - `.chart-container` — Responsive chart wrappers in 2-column grid
@@ -469,6 +549,9 @@ Browser                    Server                     Filesystem
    │                         │   │◄───────────────────────┤
    │                         │   ├─ listVSCodeSessions()─►│ SQLite: state.vscdb query
    │                         │   │◄───────────────────────┤
+   │                         │   ├─ listClaudeCodeSessions►│ readdir ~/.claude/projects/
+   │                         │   │                        │ scan top-level *.jsonl files
+   │                         │   │◄───────────────────────┤
    │                         │   └─ merge + sort          │
    │◄── JSON [{sessions}] ──┤                            │
    │                         │                            │
@@ -476,6 +559,9 @@ Browser                    Server                     Filesystem
    ├─ GET /api/sessions/id ─►│                            │
    │                         ├─ isVSCodeSession(id)?      │
    │                         │   ├─ YES: getVSCodeSession()►│ readFile {id}.json (with image stripping)
+   │                         │   └─ NO:                   │
+   │                         ├─ isClaudeCodeSession(id)?  │
+   │                         │   ├─ YES: getClaudeCodeSession()►│ readFile {id}.jsonl
    │                         │   └─ NO:  readFile events.jsonl, workspace.yaml, plan.md
    │◄── JSON {detail} ──────┤                            │
 ```
@@ -563,11 +649,12 @@ VS Code session files can reach 450MB+ due to pasted images (base64 PNG in `vari
 | Test File | Tests | What's Covered |
 |-----------|-------|----------------|
 | `cache.test.ts` | 7 | TTL expiry, cache hits, invalidation, separate keys, complex objects |
-| `sessions.test.ts` | 13 | YAML parsing, JSONL parsing, duration calc, analytics aggregation, scoring, MCP matching, source field |
-| `vscode-sessions.test.ts` | 36 | requestsToEvents (8), deriveStatus (4), msToIso (3), readSessionContent (7), normalizeVSCodeToolName (10), scanVSCodeMcpConfig (3), small image preservation (1) |
+| `sessions.test.ts` | 16 | YAML parsing, JSONL parsing, duration calc, analytics aggregation, scoring, MCP matching, source field |
+| `vscode-sessions.test.ts` | 37 | requestsToEvents (8), deriveStatus (4), msToIso (3), readSessionContent (7), normalizeVSCodeToolName (10), scanVSCodeMcpConfig (3), small image preservation (1) |
+| `claude-code-sessions.test.ts` | 27 | extractTextContent (5), extractToolUseBlocks (3), deriveStatus (4), listClaudeCodeSessions (6), isClaudeCodeSession (2), getClaudeCodeSession (6), getClaudeCodeAnalytics (2) |
 | `search.test.ts` | 10 | tokenize (punctuation, lowercase, min-length), empty/blank query, title scoring bonus, cwd scoring bonus, highlight length (≤121 chars), source filter cli/vscode, clear() + lazy rebuild, limit option |
 
-**Total: 66 tests**
+**Total: 97 tests**
 
 Run with:
 ```bash
