@@ -4,6 +4,7 @@ let analytics = null;
 let charts = {};
 let searchDebounce = null;
 let isSearchActive = false;
+let analyticsSource = "all";
 
 // Directory color coding — sophisticated muted palette
 const DIR_COLORS = [
@@ -148,8 +149,8 @@ function renderSessions() {
     .map(
       (s) => {
         const c = getDirColor(s.cwd);
-        const sourceClass = s.source === "vscode" ? "badge-vscode" : "badge-cli";
-        const sourceLabel = s.source === "vscode" ? "VS Code" : "CLI";
+        const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
+        const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
         const displayName = s.title || shortId(s.id);
         return `
     <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 3px solid ${c.border}">
@@ -238,7 +239,7 @@ function renderDetail(s) {
     <div class="detail-header">
       <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
       <div class="detail-meta">
-        <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : "CLI"}</strong></div>
+        <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI"}</strong></div>
         <div><span>Directory:</span> <strong>${s.cwd || "—"}</strong></div>
         <div><span>Branch:</span> <strong>${s.branch || "—"}</strong></div>
         <div><span>Created:</span> <strong>${new Date(s.createdAt).toLocaleString()}</strong></div>
@@ -314,7 +315,7 @@ function escapeHtml(str) {
 // Analytics
 async function loadAnalytics() {
   try {
-    const res = await fetch("/api/analytics");
+    const res = await fetch(`/api/analytics?source=${analyticsSource}`);
     analytics = await res.json();
     renderAnalytics();
   } catch (err) {
@@ -336,10 +337,33 @@ function renderAnalytics() {
   renderCharts();
 }
 
+function setChartEmpty(canvasId, message) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  canvas.style.display = "none";
+  let msg = canvas.parentElement.querySelector(".chart-empty-msg");
+  if (!msg) {
+    msg = document.createElement("div");
+    msg.className = "chart-empty-msg";
+    msg.style.cssText = "color:var(--text-dim);padding:40px;text-align:center";
+    canvas.parentElement.appendChild(msg);
+  }
+  msg.textContent = message;
+  msg.style.display = "";
+}
+
+function resetChartCanvases() {
+  document.querySelectorAll(".chart-empty-msg").forEach((el) => (el.style.display = "none"));
+  document.querySelectorAll(".charts-grid canvas").forEach((el) => (el.style.display = ""));
+}
+
 function renderCharts() {
   // Destroy existing charts
   Object.values(charts).forEach((c) => c.destroy());
   charts = {};
+
+  // Restore any canvases that were hidden by empty-state handlers
+  resetChartCanvases();
 
   const chartColors = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#bc8cff", "#f0883e", "#56d4dd", "#db61a2"];
   const isLight = document.documentElement.getAttribute("data-theme") === "light";
@@ -429,7 +453,7 @@ function renderCharts() {
       options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
     });
   } else {
-    document.getElementById("mcpChart").parentElement.innerHTML = '<h3>MCP Servers Used</h3><div style="color:var(--text-dim);padding:40px;text-align:center">No MCP servers detected</div>';
+    setChartEmpty("mcpChart", "No MCP servers detected");
   }
 
   // Model Usage
@@ -444,7 +468,7 @@ function renderCharts() {
       options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
     });
   } else {
-    document.getElementById("modelChart").parentElement.innerHTML = '<h3>Model Usage</h3><div style="color:var(--text-dim);padding:40px;text-align:center">No model data detected</div>';
+    setChartEmpty("modelChart", "No model data detected");
   }
 
   // Activity by Hour of Day
@@ -493,6 +517,16 @@ searchClear.addEventListener("click", () => {
 timeFilter.addEventListener("change", renderSessions);
 statusFilter.addEventListener("change", renderSessions);
 dirFilter.addEventListener("change", renderSessions);
+
+// Analytics source filter
+document.getElementById("analyticsSourceFilter").addEventListener("click", (e) => {
+  const btn = e.target.closest(".source-btn");
+  if (!btn) return;
+  analyticsSource = btn.dataset.source;
+  document.querySelectorAll("#analyticsSourceFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  loadAnalytics();
+});
 
 // Populate directory filter from session data
 function updateDirFilter() {
@@ -679,8 +713,8 @@ function renderSearchResults(results) {
     .map(({ entry, highlights }) => {
       const s = entry;
       const c = getDirColor(s.cwd);
-      const sourceClass = s.source === "vscode" ? "badge-vscode" : "badge-cli";
-      const sourceLabel = s.source === "vscode" ? "VS Code" : "CLI";
+      const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
+      const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
       const displayName = s.title || shortId(s.id);
       const highlightHtml = highlights && highlights.length
         ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`

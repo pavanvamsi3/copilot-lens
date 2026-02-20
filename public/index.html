@@ -54,6 +54,15 @@
 
     <!-- Analytics Page -->
     <section id="analyticsPage" class="page">
+      <div class="analytics-controls">
+        <span class="analytics-filter-label">Source:</span>
+        <div class="source-filter-btns" id="analyticsSourceFilter">
+          <button class="source-btn active" data-source="all">All</button>
+          <button class="source-btn" data-source="cli">Copilot CLI</button>
+          <button class="source-btn" data-source="vscode">VS Code</button>
+          <button class="source-btn" data-source="claude-code">Claude Code</button>
+        </div>
+      </div>
       <div class="stats-cards" id="statsCards"></div>
       <div class="charts-grid">
         <div class="chart-card compact">
