@@ -172,8 +172,47 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .badge-error { background: color-mix(in srgb, var(--danger) 15%, var(--surface)); color: var(--danger); }
 .badge-cli { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); color: var(--accent); }
 .badge-vscode { background: color-mix(in srgb, #bc8cff 15%, var(--surface)); color: #bc8cff; }
+.badge-claude { background: color-mix(in srgb, #f0883e 15%, var(--surface)); color: #f0883e; }
 
 .top-badges { display: flex; gap: 6px; align-items: center; }
+
+/* Analytics source filter */
+.analytics-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.analytics-filter-label {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.source-filter-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.source-btn {
+  padding: 6px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.source-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.source-btn.active {
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* Stats Cards */
 .stats-cards {

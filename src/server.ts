@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore } from "./sessions";
+import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, type AnalyticsSourceFilter } from "./sessions";
 import { clearCache } from "./cache";
 import { SearchIndex } from "./search";
 
@@ -62,9 +62,12 @@ export function createApp() {
   });
 
   // API: Analytics
-  app.get("/api/analytics", (_req, res) => {
+  app.get("/api/analytics", (req, res) => {
     try {
-      const analytics = getAnalytics();
+      const validSources: AnalyticsSourceFilter[] = ["all", "cli", "vscode", "claude-code"];
+      const raw = typeof req.query.source === "string" ? req.query.source : "all";
+      const source: AnalyticsSourceFilter = validSources.includes(raw as AnalyticsSourceFilter) ? (raw as AnalyticsSourceFilter) : "all";
+      const analytics = getAnalytics(source);
       res.json(analytics);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
