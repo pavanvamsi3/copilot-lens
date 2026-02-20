@@ -3,10 +3,11 @@ import * as path from "path";
 import * as os from "os";
 import { parse as parseYaml } from "yaml";
 import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName, scanVSCodeMcpConfig } from "./vscode-sessions";
+import { listClaudeCodeSessions, getClaudeCodeSession, isClaudeCodeSession, getClaudeCodeAnalytics, scanClaudeCodeMcpConfig, normalizeClaudeCodeToolName } from "./claude-code-sessions";
 import { cachedCall } from "./cache";
 
 export type SessionStatus = "running" | "completed" | "error";
-export type SessionSource = "cli" | "vscode";
+export type SessionSource = "cli" | "vscode" | "claude-code";
 
 export interface SessionMeta {
   id: string;
@@ -167,8 +168,14 @@ export function listSessions(): SessionMeta[] {
     } catch {
       // VS Code data may not exist
     }
+    let claudeCode: SessionMeta[] = [];
+    try {
+      claudeCode = listClaudeCodeSessions();
+    } catch {
+      // Claude Code data may not exist
+    }
 
-    const sessions = [...cli, ...vscode];
+    const sessions = [...cli, ...vscode, ...claudeCode];
     sessions.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -181,6 +188,13 @@ export function getSession(sessionId: string): SessionDetail | null {
   try {
     if (isVSCodeSession(sessionId)) {
       return getVSCodeSession(sessionId);
+    }
+  } catch {}
+
+  // Check Claude Code sessions
+  try {
+    if (isClaudeCodeSession(sessionId)) {
+      return getClaudeCodeSession(sessionId);
     }
   } catch {}
 
@@ -309,8 +323,8 @@ function _computeAnalytics(): AnalyticsData {
     // Branch activity
     const branch = s.branch || "unknown";
 
-    // Skip VS Code sessions here — handled separately below
-    if (s.source === "vscode") continue;
+    // Skip VS Code and Claude Code sessions here — handled separately below
+    if (s.source === "vscode" || s.source === "claude-code") continue;
 
     // Scan events.jsonl for all metrics (CLI only)
     try {
@@ -402,6 +416,25 @@ function _computeAnalytics(): AnalyticsData {
   try {
     const vscodeEntries = getVSCodeAnalytics();
     for (const entry of vscodeEntries) {
+      // Tool usage
+      for (const [tool, count] of Object.entries(entry.toolUsage)) {
+        toolUsage[tool] = (toolUsage[tool] || 0) + count;
+      }
+      // Model usage
+      for (const [model, count] of Object.entries(entry.modelUsage)) {
+        modelUsage[model] = (modelUsage[model] || 0) + count;
+      }
+      // Turns
+      if (entry.turnCount > 0) turnsPerSession.push(entry.turnCount);
+      // Duration
+      if (entry.duration > 0) durations.push(entry.duration);
+    }
+  } catch {}
+
+  // Integrate Claude Code session analytics
+  try {
+    const claudeCodeEntries = getClaudeCodeAnalytics();
+    for (const entry of claudeCodeEntries) {
       // Tool usage
       for (const [tool, count] of Object.entries(entry.toolUsage)) {
         toolUsage[tool] = (toolUsage[tool] || 0) + count;
@@ -807,6 +840,15 @@ export function listReposWithScores(): RepoScore[] {
     }
   } catch {}
 
+  // Append Claude Code global score if there are enough sessions
+  try {
+    const ccScore = getClaudeCodeScore();
+    if (ccScore.sessionCount >= 2) {
+      results.push(ccScore);
+      results.sort((a, b) => b.totalScore - a.totalScore);
+    }
+  } catch {}
+
   return results;
 }
 
@@ -876,6 +918,76 @@ export function getVSCodeScore(): RepoScore {
 
   return {
     repo: "VS Code",
+    totalScore,
+    sessionCount: data.sessionCount,
+    categories,
+    tips,
+  };
+}
+
+// ============ Claude Code Global Scoring ============
+
+function collectClaudeCodeData(): RepoSessionData {
+  const analytics = getClaudeCodeAnalytics();
+
+  const data: RepoSessionData = {
+    msgLengths: [],
+    askUserCount: 0,
+    totalUserMsgs: 0,
+    toolsUsed: new Set(),
+    toolSuccess: 0,
+    toolTotal: 0,
+    turns: [],
+    durations: [],
+    mcpServersUsed: new Set(),
+    sessionDays: new Set(),
+    sessionCount: analytics.length,
+  };
+
+  for (const entry of analytics) {
+    const day = entry.createdAt.slice(0, 10);
+    if (day) data.sessionDays.add(day);
+
+    if (entry.turnCount > 0) data.turns.push(entry.turnCount);
+    if (entry.duration > 0) data.durations.push(entry.duration);
+
+    for (const [tool, count] of Object.entries(entry.toolUsage)) {
+      // Check for MCP server prefix (e.g., "myserver.tool_name")
+      const dotIdx = tool.indexOf(".");
+      if (dotIdx > 0) {
+        data.mcpServersUsed.add(tool.slice(0, dotIdx));
+      }
+      data.toolsUsed.add(tool);
+      data.toolTotal += count;
+      data.toolSuccess += count; // Claude Code doesn't expose tool failures; assume success
+    }
+
+    for (const len of entry.msgLengths) {
+      data.msgLengths.push(len);
+      data.totalUserMsgs++;
+    }
+  }
+
+  return data;
+}
+
+export function getClaudeCodeScore(): RepoScore {
+  const data = collectClaudeCodeData();
+  const configuredServers = scanClaudeCodeMcpConfig();
+
+  const categories = {
+    promptQuality: scorePromptQuality(data),
+    toolUtilization: scoreToolUtilization(data),
+    efficiency: scoreEfficiency(data),
+    mcpUtilization: scoreMcpUtilization(data, configuredServers),
+    engagement: scoreEngagement(data),
+  };
+
+  const totalScore = Object.values(categories).reduce((sum, c) => sum + c.score, 0);
+  const tips = generateTips(categories, data, configuredServers);
+
+  return {
+    repo: "Claude Code",
     totalScore,
     sessionCount: data.sessionCount,
     categories,

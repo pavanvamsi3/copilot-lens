@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore } from "./sessions";
+import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, getClaudeCodeScore } from "./sessions";
 import { clearCache } from "./cache";
 import { SearchIndex } from "./search";
 
@@ -28,7 +28,7 @@ export function createApp() {
 
       const results = searchIndex.search(q, {
         limit,
-        source: source as "cli" | "vscode" | "all",
+        source: source as "cli" | "vscode" | "claude-code" | "all",
       });
 
       res.json(results);
@@ -89,8 +89,8 @@ export function createApp() {
         res.status(400).json({ error: "repo query parameter required" });
         return;
       }
-      // Route "VS Code" to the global VS Code score
-      const score = repo === "VS Code" ? getVSCodeScore() : getRepoScore(repo);
+      // Route "VS Code" to the global VS Code score, "Claude Code" to Claude Code score
+      const score = repo === "VS Code" ? getVSCodeScore() : repo === "Claude Code" ? getClaudeCodeScore() : getRepoScore(repo);
       res.json(score);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -2,7 +2,7 @@ import { SessionMeta, getSession } from "./sessions";
 
 export interface SearchEntry {
   id: string;
-  source: "cli" | "vscode";
+  source: "cli" | "vscode" | "claude-code";
   title: string;
   cwd: string;
   date: string;      // ISO string — updatedAt from SessionMeta
@@ -16,8 +16,8 @@ export interface SearchResult {
 }
 
 export interface SearchOptions {
-  limit?: number;                        // default 20
-  source?: "cli" | "vscode" | "all";    // default 'all'
+  limit?: number;                                        // default 20
+  source?: "cli" | "vscode" | "claude-code" | "all";   // default 'all'
 }
 
 function stripCodeBlocks(text: string): string {

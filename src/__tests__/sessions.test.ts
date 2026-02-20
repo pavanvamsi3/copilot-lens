@@ -293,5 +293,8 @@ describe("source field", () => {
 
     const vscodeMeta = { ...meta, source: "vscode" as const };
     expect(vscodeMeta.source).toBe("vscode");
+
+    const claudeCodeMeta = { ...meta, source: "claude-code" as const };
+    expect(claudeCodeMeta.source).toBe("claude-code");
   });
 });

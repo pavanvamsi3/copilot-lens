@@ -148,8 +148,7 @@ function renderSessions() {
     .map(
       (s) => {
         const c = getDirColor(s.cwd);
-        const sourceClass = s.source === "vscode" ? "badge-vscode" : "badge-cli";
-        const sourceLabel = s.source === "vscode" ? "VS Code" : "CLI";
+        const { cls: sourceClass, label: sourceLabel } = getSourceBadge(s.source);
         const displayName = s.title || shortId(s.id);
         return `
     <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 3px solid ${c.border}">
@@ -238,12 +237,12 @@ function renderDetail(s) {
     <div class="detail-header">
       <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
       <div class="detail-meta">
-        <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : "CLI"}</strong></div>
+        <div><span>Source:</span> <strong class="badge ${getSourceBadge(s.source).cls}">${getSourceBadge(s.source).label}</strong></div>
         <div><span>Directory:</span> <strong>${s.cwd || "—"}</strong></div>
         <div><span>Branch:</span> <strong>${s.branch || "—"}</strong></div>
         <div><span>Created:</span> <strong>${new Date(s.createdAt).toLocaleString()}</strong></div>
         <div><span>Duration:</span> <strong>${formatDuration(s.duration)}</strong></div>
-        ${s.source !== "vscode" ? `<div><span>Version:</span> <strong>${s.copilotVersion || "—"}</strong></div>` : ""}
+        ${s.source === "cli" ? `<div><span>Version:</span> <strong>${s.copilotVersion || "—"}</strong></div>` : ""}
         <div><span>Status:</span> <strong class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</strong></div>
       </div>
     </div>
@@ -309,6 +308,12 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+function getSourceBadge(source) {
+  if (source === "vscode") return { cls: "badge-vscode", label: "VS Code" };
+  if (source === "claude-code") return { cls: "badge-claude-code", label: "Claude Code" };
+  return { cls: "badge-cli", label: "CLI" };
 }
 
 // Analytics
@@ -566,7 +571,7 @@ function renderRepoSelector() {
   const current = repoSelector.value;
   repoSelector.innerHTML = insightsRepos
     .map((r) => {
-      const label = r.repo === "VS Code" ? "🟣 VS Code (all sessions)" : shortDir(r.repo);
+      const label = r.repo === "VS Code" ? "🟣 VS Code (all sessions)" : r.repo === "Claude Code" ? "🟠 Claude Code (all sessions)" : shortDir(r.repo);
       return `<option value="${r.repo}">${label} — ${r.totalScore}/100</option>`;
     })
     .join("");
@@ -637,7 +642,7 @@ function renderInsightsScore(data) {
       </div>
       <div class="score-summary">
         <h2>Copilot Effectiveness Score</h2>
-        <div class="repo-name">${data.repo === "VS Code" ? "🟣 VS Code Copilot Chat" : escapeHtml(data.repo)}</div>
+        <div class="repo-name">${data.repo === "VS Code" ? "🟣 VS Code Copilot Chat" : data.repo === "Claude Code" ? "🟠 Claude Code" : escapeHtml(data.repo)}</div>
         <div class="session-info">${data.sessionCount} sessions analyzed</div>
       </div>
     </div>
@@ -679,8 +684,7 @@ function renderSearchResults(results) {
     .map(({ entry, highlights }) => {
       const s = entry;
       const c = getDirColor(s.cwd);
-      const sourceClass = s.source === "vscode" ? "badge-vscode" : "badge-cli";
-      const sourceLabel = s.source === "vscode" ? "VS Code" : "CLI";
+      const { cls: sourceClass, label: sourceLabel } = getSourceBadge(s.source);
       const displayName = s.title || shortId(s.id);
       const highlightHtml = highlights && highlights.length
         ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`
