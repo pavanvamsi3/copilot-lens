@@ -36,12 +36,13 @@ const sessionList = document.getElementById("sessionList");
 const sessionCount = document.getElementById("sessionCount");
 const searchInput = document.getElementById("searchInput");
 const searchClear = document.getElementById("searchClear");
+const searchKbd = document.querySelector(".search-kbd");
 const timeFilter = document.getElementById("timeFilter");
 const statusFilter = document.getElementById("statusFilter");
 const dirFilter = document.getElementById("dirFilter");
-const detailModal = document.getElementById("detailModal");
+const detailPane = document.getElementById("detailPane");
 const detailContent = document.getElementById("detailContent");
-const modalClose = document.getElementById("modalClose");
+const paneClose = document.getElementById("paneClose");
 const refreshBtn = document.getElementById("refreshBtn");
 const statsCards = document.getElementById("statsCards");
 
@@ -57,14 +58,19 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
   });
 });
 
-// Modal
-modalClose.addEventListener("click", () => { detailModal.classList.add("hidden"); document.body.style.overflow = ""; });
-detailModal.addEventListener("click", (e) => {
-  if (e.target === detailModal) { detailModal.classList.add("hidden"); document.body.style.overflow = ""; }
+// Side pane close
+paneClose.addEventListener("click", () => {
+  detailPane.classList.remove("open");
 });
+
+// Keyboard shortcuts
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !detailModal.classList.contains("hidden")) {
-    detailModal.classList.add("hidden"); document.body.style.overflow = "";
+  if (e.key === "Escape" && detailPane.classList.contains("open")) {
+    detailPane.classList.remove("open");
+  }
+  if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
+    e.preventDefault();
+    searchInput.focus();
   }
 });
 
@@ -117,11 +123,23 @@ function getFilteredSessions() {
   const time = timeFilter.value;
   if (time !== "all") {
     const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(0, 0, 0, 0);
+
     filtered = filtered.filter((s) => {
       const created = new Date(s.createdAt);
-      if (time === "today") return now - created < 86400000;
-      if (time === "week") return now - created < 604800000;
-      if (time === "month") return now - created < 2592000000;
+      if (time === "today") return created >= midnight;
+      if (time === "week") {
+        const weekStart = new Date(midnight);
+        const day = weekStart.getDay(); // 0=Sun … 6=Sat
+        weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1)); // back to Monday
+        return created >= weekStart;
+      }
+      if (time === "month") {
+        const monthStart = new Date(midnight);
+        monthStart.setDate(1);
+        return created >= monthStart;
+      }
       return true;
     });
   }
@@ -145,6 +163,15 @@ function renderSessions() {
   const filtered = getFilteredSessions();
   sessionCount.textContent = `${filtered.length} session${filtered.length !== 1 ? "s" : ""} found`;
 
+  if (filtered.length === 0) {
+    sessionList.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <p>No sessions match your filters</p>
+      </div>`;
+    return;
+  }
+
   sessionList.innerHTML = filtered
     .map(
       (s) => {
@@ -152,8 +179,11 @@ function renderSessions() {
         const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
         const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
         const displayName = s.title || shortId(s.id);
+        const metaItems = [];
+        if (s.branch) metaItems.push(`<span class="badge badge-branch">⎇ ${escapeHtml(s.branch)}</span>`);
+        metaItems.push(`<span>${formatTime(s.createdAt)}</span>`);
         return `
-    <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 3px solid ${c.border}">
+    <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 4px solid ${c.border}">
       <div class="top-row">
         <span class="session-id">${escapeHtml(displayName)}</span>
         <span class="top-badges">
@@ -161,10 +191,9 @@ function renderSessions() {
           <span class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</span>
         </span>
       </div>
-      <div class="session-dir">${s.cwd || "—"}</div>
+      <div class="session-dir">${escapeHtml(s.cwd || "—")}</div>
       <div class="session-meta">
-        ${s.branch ? `<span class="badge badge-branch">⎇ ${s.branch}</span>` : ""}
-        <span>${formatTime(s.createdAt)}</span>
+        ${metaItems.join('<span class="meta-sep">·</span>')}
       </div>
     </div>
   `;
@@ -172,24 +201,39 @@ function renderSessions() {
     )
     .join("");
 
-  // Click handlers
-  sessionList.querySelectorAll(".session-card").forEach((card) => {
+  // Stagger animation + click handlers
+  sessionList.querySelectorAll(".session-card").forEach((card, i) => {
+    const delay = Math.min(i * 30, 300);
+    card.style.animationDelay = `${delay}ms`;
+    card.classList.add("card-animate");
+    card.addEventListener("animationend", () => card.classList.remove("card-animate"), { once: true });
     card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
   });
 }
 
-// Open session detail
+// Open session detail — side panel
 async function openDetail(id, source) {
-  detailContent.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">Loading...</div>';
-  detailModal.classList.remove("hidden");
-  document.body.style.overflow = "hidden";
+  detailContent.innerHTML = `
+    <div class="skeleton-card">
+      <div class="skeleton-line" style="width:60%;height:16px;margin-bottom:12px"></div>
+      <div class="skeleton-line" style="width:40%"></div>
+      <div class="skeleton-line" style="width:55%"></div>
+      <div class="skeleton-line" style="width:35%"></div>
+    </div>
+    <div class="skeleton-card" style="margin-top:16px">
+      <div class="skeleton-line" style="width:80%"></div>
+      <div class="skeleton-line" style="width:65%"></div>
+      <div class="skeleton-line" style="width:70%"></div>
+      <div class="skeleton-line" style="width:50%"></div>
+    </div>`;
+  detailPane.classList.add("open");
 
   try {
     const res = await fetch(`/api/sessions/${id}`);
     const session = await res.json();
     renderDetail(session);
   } catch (err) {
-    detailContent.innerHTML = `<div style="color:var(--danger)">Failed to load session: ${err.message}</div>`;
+    detailContent.innerHTML = `<div style="color:var(--danger)">Failed to load session: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -227,7 +271,7 @@ function renderDetail(s) {
       const content = e.data?.content || "";
       const display = content.length > 800 ? content.slice(0, 800) + "\n...(truncated)" : content;
       const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-      const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${modelAtIndex[i]}</span>` : "";
+      const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>` : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
         <div class="message-label">${isUser ? "👤 You" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
         <div class="message-body">${escapeHtml(display)}</div>
@@ -235,16 +279,25 @@ function renderDetail(s) {
     })
     .join("");
 
+  const toolsHtml = toolCalls.length
+    ? toolCalls
+        .map((e) => {
+          const name = e.data?.tool || e.data?.toolName || "unknown";
+          return `<div class="tool-card"><span class="tool-card-icon">⚙️</span><span class="tool-card-name">${escapeHtml(name)}</span></div>`;
+        })
+        .join("")
+    : '<div style="color:var(--text-dim)">No tool calls</div>';
+
   detailContent.innerHTML = `
     <div class="detail-header">
       <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
       <div class="detail-meta">
         <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI"}</strong></div>
-        <div><span>Directory:</span> <strong>${s.cwd || "—"}</strong></div>
-        <div><span>Branch:</span> <strong>${s.branch || "—"}</strong></div>
+        <div><span>Directory:</span> <strong>${escapeHtml(s.cwd || "—")}</strong></div>
+        <div><span>Branch:</span> <strong>${escapeHtml(s.branch || "—")}</strong></div>
         <div><span>Created:</span> <strong>${new Date(s.createdAt).toLocaleString()}</strong></div>
         <div><span>Duration:</span> <strong>${formatDuration(s.duration)}</strong></div>
-        ${s.source !== "vscode" ? `<div><span>Version:</span> <strong>${s.copilotVersion || "—"}</strong></div>` : ""}
+        ${s.source !== "vscode" ? `<div><span>Version:</span> <strong>${escapeHtml(s.copilotVersion || "—")}</strong></div>` : ""}
         <div><span>Status:</span> <strong class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</strong></div>
       </div>
     </div>
@@ -252,7 +305,7 @@ function renderDetail(s) {
     <div class="event-counts" style="margin-bottom:16px">
       ${Object.entries(s.eventCounts)
         .sort((a, b) => b[1] - a[1])
-        .map(([type, count]) => `<span class="event-count-badge">${type}: ${count}</span>`)
+        .map(([type, count]) => `<span class="event-count-badge">${escapeHtml(type)}: ${count}</span>`)
         .join("")}
     </div>
 
@@ -270,13 +323,7 @@ function renderDetail(s) {
     </div>
 
     <div class="detail-panel" id="panel-tools">
-      ${
-        toolCalls.length
-          ? toolCalls
-              .map((e) => `<div class="tool-item">${e.data?.tool || e.data?.toolName || "unknown"}</div>`)
-              .join("")
-          : '<div style="color:var(--text-dim)">No tool calls</div>'
-      }
+      ${toolsHtml}
     </div>
 
     <div class="detail-panel" id="panel-errors">
@@ -323,6 +370,26 @@ async function loadAnalytics() {
   }
 }
 
+function animateStatCounters() {
+  statsCards.querySelectorAll(".stat-value").forEach((el) => {
+    const raw = el.textContent.trim();
+    if (!/^\d+$/.test(raw)) return;
+    const target = parseInt(raw, 10);
+    if (target <= 0) return;
+    let start = null;
+    const duration = 600;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.floor(eased * target);
+      if (progress < 1) requestAnimationFrame(step);
+      else el.textContent = raw;
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 function renderAnalytics() {
   if (!analytics) return;
 
@@ -334,6 +401,7 @@ function renderAnalytics() {
     <div class="stat-card"><div class="stat-value">${formatDuration(analytics.totalDuration)}</div><div class="stat-label">Total Time</div></div>
   `;
 
+  animateStatCounters();
   renderCharts();
 }
 
@@ -348,7 +416,7 @@ function setChartEmpty(canvasId, message) {
     msg.style.cssText = "color:var(--text-dim);padding:40px;text-align:center";
     canvas.parentElement.appendChild(msg);
   }
-  msg.textContent = message;
+  msg.textContent = "📭 " + message;
   msg.style.display = "";
 }
 
@@ -486,14 +554,30 @@ function renderCharts() {
 
 // Data loading
 async function loadSessions() {
+  // Show skeleton while loading
+  sessionList.innerHTML = Array.from({ length: 4 }, () => `
+    <div class="skeleton-card">
+      <div class="skeleton-line" style="width:55%;height:14px;margin-bottom:10px"></div>
+      <div class="skeleton-line" style="width:75%"></div>
+      <div class="skeleton-line" style="width:40%"></div>
+    </div>`).join("");
+
   try {
     const res = await fetch("/api/sessions");
     sessions = await res.json();
     updateDirFilter();
     renderSessions();
   } catch (err) {
-    sessionList.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load sessions: ${err.message}</div>`;
+    sessionList.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load sessions: ${escapeHtml(err.message)}</div>`;
   }
+}
+
+// Search kbd visibility
+function updateSearchKbd() {
+  if (!searchKbd) return;
+  const hasFocus = document.activeElement === searchInput;
+  const hasText = !!searchInput.value.trim();
+  searchKbd.style.display = (hasFocus || hasText) ? "none" : "";
 }
 
 // Search input (full-text search with debounce)
@@ -501,15 +585,20 @@ searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounce);
   const q = searchInput.value.trim();
   searchClear.style.display = q ? "inline" : "none";
+  updateSearchKbd();
   searchDebounce = setTimeout(() => {
     if (q) runSearch(q);
     else clearSearch();
   }, 300);
 });
 
+searchInput.addEventListener("focus", updateSearchKbd);
+searchInput.addEventListener("blur", updateSearchKbd);
+
 searchClear.addEventListener("click", () => {
   searchInput.value = "";
   searchClear.style.display = "none";
+  updateSearchKbd();
   clearSearch();
 });
 
@@ -587,7 +676,7 @@ async function loadInsights() {
       renderInsightsScore(selected);
     }
   } catch (err) {
-    insightsContent.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load insights: ${err.message}</div>`;
+    insightsContent.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load insights: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -641,7 +730,7 @@ function renderInsightsScore(data) {
       return `
         <div class="category-card">
           <div class="cat-header">
-            <span class="cat-label">${catIcons[key] || "📊"} ${cat.label}</span>
+            <span class="cat-label">${catIcons[key] || "📊"} ${escapeHtml(cat.label)}</span>
             <span class="cat-score" style="color:${barColor}">${cat.score}/${cat.maxScore}</span>
           </div>
           <div class="cat-bar"><div class="cat-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
@@ -703,7 +792,11 @@ function clearSearch() {
 function renderSearchResults(results) {
   if (!results || results.length === 0) {
     sessionCount.textContent = "No results found";
-    sessionList.innerHTML = '<div style="color:var(--text-dim);padding:40px;text-align:center">No results found</div>';
+    sessionList.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <p>No results found for your search</p>
+      </div>`;
     return;
   }
 
@@ -720,7 +813,7 @@ function renderSearchResults(results) {
         ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`
         : "";
       return `
-    <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 3px solid ${c.border}">
+    <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 4px solid ${c.border}">
       <div class="top-row">
         <span class="session-id">${escapeHtml(displayName)}</span>
         <span class="top-badges">
@@ -737,7 +830,11 @@ function renderSearchResults(results) {
     })
     .join("");
 
-  sessionList.querySelectorAll(".session-card").forEach((card) => {
+  sessionList.querySelectorAll(".session-card").forEach((card, i) => {
+    const delay = Math.min(i * 30, 300);
+    card.style.animationDelay = `${delay}ms`;
+    card.classList.add("card-animate");
+    card.addEventListener("animationend", () => card.classList.remove("card-animate"), { once: true });
     card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
   });
 }
