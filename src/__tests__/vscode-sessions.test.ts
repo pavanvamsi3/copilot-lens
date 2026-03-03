@@ -158,7 +158,7 @@ describe("requestsToEvents", () => {
     expect(assistantMsg!.data.content).toBe("Answer from result");
   });
 
-  it("skips thinking parts from response text", () => {
+  it("emits assistant.thinking event for thinking parts and excludes them from response text", () => {
     const events = requestsToEvents([
       {
         requestId: "r5",
@@ -175,6 +175,10 @@ describe("requestsToEvents", () => {
     expect(assistantMsg).toBeDefined();
     expect(assistantMsg!.data.content).toBe("Final answer");
     expect(assistantMsg!.data.content).not.toContain("internal thought");
+
+    const thinkingEvent = events.find((e) => e.type === "assistant.thinking");
+    expect(thinkingEvent).toBeDefined();
+    expect(thinkingEvent!.data.content).toBe("internal thought process");
   });
 
   it("uses modelState.completedAt for response timestamp when available", () => {

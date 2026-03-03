@@ -195,7 +195,7 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
     expect(detail!.title).toBe("test-slug");
   });
 
-  it("getClaudeCodeSession converts assistant text to assistant.message", () => {
+  it("getClaudeCodeSession converts assistant text to assistant.message and emits thinking events", () => {
     writeSession("sess-2", [
       makeEvent({ type: "user", isSidechain: false, sessionId: "sess-2", cwd: "/proj", slug: "s", timestamp: "2024-01-15T10:00:00Z", message: { content: "Hello" } }),
       makeEvent({ type: "assistant", isSidechain: false, sessionId: "sess-2", timestamp: "2024-01-15T10:00:05Z", message: { model: "claude-sonnet-4-6", content: [{ type: "thinking", thinking: "let me think" }, { type: "text", text: "World" }] } }),
@@ -206,6 +206,10 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
     expect(assistantEvents).toHaveLength(1);
     expect(assistantEvents[0].data.content).toBe("World");
     expect(assistantEvents[0].data.model).toBe("claude-sonnet-4-6");
+
+    const thinkingEvents = detail!.events.filter((e) => e.type === "assistant.thinking");
+    expect(thinkingEvents).toHaveLength(1);
+    expect(thinkingEvents[0].data.content).toBe("let me think");
   });
 
   it("getClaudeCodeSession emits tool.execution_start for each tool_use block", () => {

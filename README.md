@@ -66,9 +66,12 @@ Browse the full history of your Copilot sessions in a searchable, filterable lis
 
 **Conversation view:**
 - Chat-style layout — your prompts on the right, Copilot responses on the left
+- **Agent thinking** — collapsible reasoning blocks shown inline between messages (click "💭 View thinking" to expand)
 - Tool calls made during the session
 - Errors that occurred
 - Session plans (if created)
+
+> **Thinking support by source:** Claude Code and VS Code Copilot Chat sessions surface thinking blocks when the model was run with extended thinking enabled. Copilot CLI sessions do not include thinking — the CLI processes reasoning internally and does not persist it to disk.
 
 ![copilot-lens sessions list](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png)
 
@@ -134,6 +137,7 @@ VS Code Insiders is also supported. Sessions with pasted images (which can excee
 - **Location**: `~/.claude/projects/{sanitized-project-path}/{sessionId}.jsonl`
 - Each file is a JSONL stream of events with types `user`, `assistant`, `progress`, and others
 - `user` events contain the prompt; `assistant` events contain model responses and tool calls
+- `assistant` events may include `{ type: "thinking" }` content blocks (extended thinking) — these are surfaced as collapsible reasoning blocks in the conversation view
 - Sidechain events (warmup/internal) are filtered out automatically
 - Session title comes from the `slug` field (e.g. `happy-seeking-whistle`)
 

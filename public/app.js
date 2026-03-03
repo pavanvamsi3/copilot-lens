@@ -265,15 +265,21 @@ function renderDetail(s) {
   // Interleave conversation messages in order
   const conversation = s.events
     .map((e, i) => ({ e, i }))
-    .filter(({ e }) => (e.type === "user.message" || e.type === "assistant.message") && (e.data?.content || "").trim())
+    .filter(({ e }) => (e.type === "user.message" || e.type === "assistant.message" || e.type === "assistant.thinking") && (e.data?.content || "").trim())
     .map(({ e, i }) => {
-      const isUser = e.type === "user.message";
       const content = e.data?.content || "";
+      if (e.type === "assistant.thinking") {
+        return `<details class="message message-thinking">
+          <summary class="thinking-toggle">💭 View thinking</summary>
+          <div class="thinking-body">${escapeHtml(content)}</div>
+        </details>`;
+      }
+      const isUser = e.type === "user.message";
       const display = content.length > 800 ? content.slice(0, 800) + "\n...(truncated)" : content;
       const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
       const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>` : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
-        <div class="message-label">${isUser ? "👤 You" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
+        <div class="message-label">${isUser ? "👤 You" : s.source === "claude-code" ? "🤖 Claude" : s.source === "vscode" ? "🤖 Copilot" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
         <div class="message-body">${escapeHtml(display)}</div>
       </div>`;
     })
@@ -351,7 +357,9 @@ function renderDetail(s) {
       document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
     });
   });
+
 }
+
 
 function escapeHtml(str) {
   const div = document.createElement("div");

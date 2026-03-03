@@ -85,6 +85,13 @@ function extractToolUseBlocks(content: string | ContentBlock[] | undefined): Con
   return content.filter((b) => b.type === "tool_use");
 }
 
+function extractThinkingBlocks(content: string | ContentBlock[] | undefined): string[] {
+  if (!content || typeof content === "string") return [];
+  return content
+    .filter((b) => b.type === "thinking" && b.thinking)
+    .map((b) => b.thinking!);
+}
+
 function deriveStatus(lastTimestamp: string | undefined): SessionStatus {
   if (!lastTimestamp) return "completed";
   const age = Date.now() - new Date(lastTimestamp).getTime();
@@ -248,6 +255,16 @@ export function getClaudeCodeSession(sessionId: string): SessionDetail | null {
       }
     } else if (event.type === "assistant") {
       const msgContent = event.message?.content;
+
+      // Emit thinking blocks as assistant.thinking events
+      for (const thought of extractThinkingBlocks(msgContent)) {
+        events.push({
+          type: "assistant.thinking",
+          id: randomUUID(),
+          timestamp: ts,
+          data: { content: thought },
+        });
+      }
 
       // Emit tool_use blocks as tool.execution_start events
       for (const block of extractToolUseBlocks(msgContent)) {
