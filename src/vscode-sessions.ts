@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import type { SessionMeta, SessionDetail, SessionEvent, SessionStatus } from "./sessions";
 import { cachedCall } from "./cache";
@@ -196,7 +197,15 @@ function requestsToEvents(requests: any[]): SessionEvent[] {
     const textParts: string[] = [];
     for (const part of response) {
       if (!part || typeof part !== "object") continue;
-      if (part.kind === "thinking" && part.value) continue; // skip thinking
+      if (part.kind === "thinking" && part.value) {
+        events.push({
+          type: "assistant.thinking",
+          id: randomUUID(),
+          timestamp: ts,
+          data: { content: part.value },
+        });
+        continue;
+      }
       if (!part.kind && typeof part.value === "string") {
         textParts.push(part.value);
       }

@@ -546,6 +546,41 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   margin-left: 6px;
 }
 
+.message-thinking {
+  align-self: flex-start;
+  max-width: 88%;
+  border-left: 3px solid var(--accent);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: transparent;
+  opacity: 0.7;
+}
+
+.thinking-toggle {
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-family: inherit;
+  list-style: none;
+  user-select: none;
+}
+
+.thinking-toggle:hover {
+  text-decoration: underline;
+}
+
+.message-thinking summary::-webkit-details-marker { display: none; }
+
+.thinking-body {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-style: italic;
+  white-space: pre-wrap;
+  margin-top: 6px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
 /* Tool calls */
 .tool-card {
   display: flex;
