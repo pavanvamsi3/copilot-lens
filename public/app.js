@@ -279,7 +279,7 @@ function renderDetail(s) {
       const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
       const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>` : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
-        <div class="message-label">${isUser ? "👤 You" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
+        <div class="message-label">${isUser ? "👤 You" : s.source === "claude-code" ? "🤖 Claude" : s.source === "vscode" ? "🤖 Copilot" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
         <div class="message-body">${escapeHtml(display)}</div>
       </div>`;
     })
