@@ -183,11 +183,15 @@ main { max-width: 1400px; margin: 0 auto; padding: 24px; }
 
 .controls input, .controls select {
   padding: 10px 14px;
-  background: var(--surface);
+  background-color: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: var(--radius);
   font-size: 0.9rem;
+}
+
+.controls select {
+  padding-right: 30px;
 }
 
 .controls input { flex: 1; }
