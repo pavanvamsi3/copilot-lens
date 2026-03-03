@@ -4,6 +4,8 @@
 
 Copilot Lens is a local memory layer for AI coding assistants — search and browse everything you've ever discussed with Copilot or Claude, across Copilot CLI terminal sessions, VS Code Copilot Chat, and Claude Code. All on your machine. No cloud. No sign-in.
 
+![copilot-lens hero](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-hero.png)
+
 ## Why
 
 Copilot and Claude sessions are ephemeral by default. You solve a problem, close the terminal, and it's gone. Days later you need that same approach, that regex, that architecture decision — and you have nothing to reference.
