@@ -73,7 +73,7 @@ Browse the full history of your Copilot sessions in a searchable, filterable lis
 
 > **Thinking support by source:** Claude Code and VS Code Copilot Chat sessions surface thinking blocks when the model was run with extended thinking enabled. Copilot CLI sessions do not include thinking — the CLI processes reasoning internally and does not persist it to disk.
 
-![copilot-lens conversation view](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png?v=2)
+![copilot-lens conversation view](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png?v=3)
 
 ### 📊 Analytics — Understand your usage patterns
 
