@@ -4,6 +4,7 @@ import path from "path";
 import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, type AnalyticsSourceFilter } from "./sessions";
 import { clearCache } from "./cache";
 import { SearchIndex } from "./search";
+import { getTokenUsage } from "./token-usage";
 
 export function createApp() {
   const app = express();
@@ -95,6 +96,15 @@ export function createApp() {
       // Route "VS Code" to the global VS Code score
       const score = repo === "VS Code" ? getVSCodeScore() : getRepoScore(repo);
       res.json(score);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: Token usage (parsed from ~/.copilot/logs)
+  app.get("/api/token-usage", (_req, res) => {
+    try {
+      res.json(getTokenUsage());
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

@@ -956,3 +956,31 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
     overflow-y: auto;
   }
 }
+
+/* Token usage table */
+.token-table-wrap { overflow-x: auto; }
+.token-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.token-table th, .token-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #30363d);
+}
+.token-table th {
+  font-weight: 600;
+  color: var(--text-dim, #8b949e);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.token-table tbody tr:hover { background: var(--bg-hover, rgba(110, 118, 129, 0.08)); }
+.tokens-meta code { font-size: 11px; opacity: 0.85; }
+
+/* Constrain token chart canvases — Chart.js with maintainAspectRatio:false
+   needs a height-bounded container to avoid runaway growth. */
+#tokensPage .chart-card { min-height: 0; }
+#tokensPage .chart-card.full-width { height: 360px; }
+#tokensPage .chart-card.full-width canvas { max-height: 300px; }
+#tokensPage .chart-card:not(.full-width) { height: 360px; }
+#tokensPage .chart-card:not(.full-width) canvas { max-height: 280px; }
+/* The breakdown table card is allowed to grow with content */
+#tokensPage .chart-card.full-width:has(.token-table-wrap) { height: auto; }

@@ -13,6 +13,7 @@
     <nav>
       <button class="nav-btn active" data-page="sessions">Sessions</button>
       <button class="nav-btn" data-page="analytics">Analytics</button>
+      <button class="nav-btn" data-page="tokens">Tokens</button>
       <button class="nav-btn" data-page="insights">Insights</button>
     </nav>
     <button class="refresh-btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
@@ -107,6 +108,45 @@
         <div class="chart-card">
           <h3>MCP Servers Used</h3>
           <canvas id="mcpChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tokens Page -->
+    <section id="tokensPage" class="page">
+      <div class="tokens-meta" id="tokensMeta"></div>
+      <div class="stats-cards" id="tokenStatsCards"></div>
+      <div class="analytics-controls" style="margin-top:8px">
+        <span class="analytics-filter-label">Bucket:</span>
+        <div class="source-filter-btns" id="tokenBucketFilter">
+          <button class="source-btn active" data-bucket="daily">Daily</button>
+          <button class="source-btn" data-bucket="weekly">Weekly</button>
+          <button class="source-btn" data-bucket="monthly">Monthly</button>
+        </div>
+        <span class="analytics-filter-label" style="margin-left:16px">Cached:</span>
+        <div class="source-filter-btns" id="tokenCachedFilter">
+          <button class="source-btn active" data-cached="include">Include</button>
+          <button class="source-btn" data-cached="exclude">Exclude</button>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card full-width">
+          <h3>Token Usage Over Time</h3>
+          <canvas id="tokenStackChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Tokens by Model</h3>
+          <canvas id="tokenModelChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Prompt vs Completion</h3>
+          <canvas id="tokenRatioChart"></canvas>
+        </div>
+        <div class="chart-card full-width">
+          <h3>Breakdown</h3>
+          <div class="token-table-wrap">
+            <table class="token-table" id="tokenBreakdownTable"></table>
+          </div>
         </div>
       </div>
     </section>

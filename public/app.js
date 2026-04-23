@@ -54,6 +54,7 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.classList.add("active");
     document.getElementById(btn.dataset.page + "Page").classList.add("active");
     if (btn.dataset.page === "analytics") loadAnalytics();
+    if (btn.dataset.page === "tokens") loadTokens();
     if (btn.dataset.page === "insights") loadInsights();
   });
 });
@@ -646,6 +647,9 @@ refreshBtn.addEventListener("click", async () => {
   if (document.getElementById("insightsPage").classList.contains("active")) {
     loadInsights();
   }
+  if (document.getElementById("tokensPage").classList.contains("active")) {
+    loadTokens();
+  }
   setTimeout(() => refreshBtn.classList.remove("spinning"), 600);
 });
 
@@ -846,6 +850,321 @@ function renderSearchResults(results) {
     card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
   });
 }
+
+// ============ Token Usage ============
+let tokenData = null;
+let tokenBucket = "daily";
+let tokenIncludeCached = true;
+
+// Estimated underlying API rates (USD per 1M tokens). These are the public
+// rates of the upstream Anthropic / OpenAI / Google APIs — NOT what GitHub
+// Copilot bills you. Copilot bills on "premium requests" against your plan's
+// monthly allowance. This is shown as a rough "if you called the API directly"
+// reference. Update the table as providers change pricing.
+// Keys are matched by `startsWith` against the normalized model name.
+const MODEL_RATES = [
+  // Anthropic Claude
+  { prefix: "claude-opus",      input: 15.00, output: 75.00, cached: 1.50 },
+  { prefix: "claude-sonnet",    input:  3.00, output: 15.00, cached: 0.30 },
+  { prefix: "claude-haiku",     input:  1.00, output:  5.00, cached: 0.10 },
+  { prefix: "claude-3-5-sonnet",input:  3.00, output: 15.00, cached: 0.30 },
+  // OpenAI GPT-5 family
+  { prefix: "gpt-5-nano",       input:  0.05, output:  0.40, cached: 0.005 },
+  { prefix: "gpt-5-mini",       input:  0.25, output:  2.00, cached: 0.025 },
+  { prefix: "gpt-5",            input:  1.25, output: 10.00, cached: 0.125 },
+  // OpenAI GPT-4 family
+  { prefix: "gpt-4.1-mini",     input:  0.40, output:  1.60, cached: 0.10 },
+  { prefix: "gpt-4.1-nano",     input:  0.10, output:  0.40, cached: 0.025 },
+  { prefix: "gpt-4.1",          input:  2.00, output:  8.00, cached: 0.50 },
+  { prefix: "gpt-4o-mini",      input:  0.15, output:  0.60, cached: 0.075 },
+  { prefix: "gpt-4o",           input:  2.50, output: 10.00, cached: 1.25 },
+  // OpenAI o-series
+  { prefix: "o4-mini",          input:  1.10, output:  4.40, cached: 0.275 },
+  { prefix: "o3-mini",          input:  1.10, output:  4.40, cached: 0.55 },
+  { prefix: "o3",               input:  2.00, output:  8.00, cached: 0.50 },
+  { prefix: "o1-mini",          input:  1.10, output:  4.40, cached: 0.55 },
+  { prefix: "o1",               input: 15.00, output: 60.00, cached: 7.50 },
+  // Google Gemini
+  { prefix: "gemini-2.5-pro",   input:  1.25, output: 10.00, cached: 0.31 },
+  { prefix: "gemini-2.5-flash", input:  0.30, output:  2.50, cached: 0.075 },
+  { prefix: "gemini",           input:  1.25, output:  5.00, cached: 0.31 },
+];
+
+function rateFor(model) {
+  if (!model) return null;
+  const m = model.toLowerCase();
+  for (const r of MODEL_RATES) {
+    if (m.startsWith(r.prefix)) return r;
+  }
+  return null;
+}
+
+// USD cost for one model's totals (returns null if model rate unknown)
+function costForModel(model, prompt, cached, completion) {
+  const r = rateFor(model);
+  if (!r) return null;
+  const newPrompt = Math.max(0, prompt - cached);
+  return (newPrompt * r.input + cached * r.cached + completion * r.output) / 1_000_000;
+}
+
+// Total estimated cost across all models. Returns { cost, coverage } where
+// coverage is the fraction of total tokens that had a known rate.
+function estimateTotalCost() {
+  if (!tokenData) return { cost: 0, coverage: 0 };
+  let cost = 0;
+  let coveredTokens = 0;
+  let totalTokens = 0;
+  for (const [name, m] of Object.entries(tokenData.byModel)) {
+    totalTokens += m.total_tokens;
+    const c = costForModel(name, m.prompt_tokens, m.cached_tokens, m.completion_tokens);
+    if (c != null) {
+      cost += c;
+      coveredTokens += m.total_tokens;
+    }
+  }
+  return { cost, coverage: totalTokens > 0 ? coveredTokens / totalTokens : 0 };
+}
+
+function formatUSD(n) {
+  if (n == null) return "—";
+  if (n >= 1000) return "$" + n.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  if (n >= 10) return "$" + n.toFixed(2);
+  if (n >= 1) return "$" + n.toFixed(2);
+  if (n >= 0.01) return "$" + n.toFixed(3);
+  return "$" + n.toFixed(4);
+}
+
+function adjPrompt(p, c) {
+  return tokenIncludeCached ? p : Math.max(0, p - c);
+}
+function adjTotal(p, c, comp) {
+  return adjPrompt(p, c) + comp;
+}
+
+function formatTokens(n) {
+  if (n == null) return "—";
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return (n / 1000).toFixed(n < 10_000 ? 2 : 1) + "K";
+  if (n < 1_000_000_000) return (n / 1_000_000).toFixed(n < 10_000_000 ? 2 : 1) + "M";
+  return (n / 1_000_000_000).toFixed(2) + "B";
+}
+
+async function loadTokens() {
+  const cards = document.getElementById("tokenStatsCards");
+  cards.innerHTML = `
+    ${Array.from({ length: 6 }, () => `<div class="stat-card"><div class="stat-value">…</div><div class="stat-label">Loading</div></div>`).join("")}
+  `;
+  try {
+    const res = await fetch("/api/token-usage");
+    tokenData = await res.json();
+    renderTokens();
+  } catch (err) {
+    cards.innerHTML = `<div style="color:var(--danger)">Failed to load token usage: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderTokens() {
+  if (!tokenData) return;
+  const t = tokenData.totals;
+  const cards = document.getElementById("tokenStatsCards");
+  const cacheRatePct = (t.cache_hit_rate * 100).toFixed(1) + "%";
+  const promptShown = adjPrompt(t.prompt_tokens, t.cached_tokens);
+  const totalShown = adjTotal(t.prompt_tokens, t.cached_tokens, t.completion_tokens);
+  const compRatio = promptShown > 0 ? ((t.completion_tokens / promptShown) * 100).toFixed(1) + "%" : "—";
+  const promptLabel = tokenIncludeCached
+    ? `Prompt Tokens · ${cacheRatePct} cached`
+    : `Prompt Tokens (billed) · ${cacheRatePct} cache hit`;
+  const totalLabel = tokenIncludeCached
+    ? `Total Tokens · ${t.calls} call${t.calls === 1 ? "" : "s"}`
+    : `Total Tokens (billed) · ${t.calls} call${t.calls === 1 ? "" : "s"}`;
+  const activeDays = t.active_days || 1;
+  const avgPerDayShown = Math.round(totalShown / activeDays);
+
+  const est = estimateTotalCost();
+  const coveragePct = (est.coverage * 100).toFixed(0);
+  const costPerDay = activeDays > 0 ? est.cost / activeDays : 0;
+  const costSubLabel = est.coverage >= 0.99
+    ? `lifetime · ≈ ${formatUSD(costPerDay)} / day`
+    : `lifetime · ${coveragePct}% priced · ≈ ${formatUSD(costPerDay)} / day`;
+
+  cards.innerHTML = `
+    <div class="stat-card"><div class="stat-value">${formatTokens(totalShown)}</div><div class="stat-label">${totalLabel}</div></div>
+    <div class="stat-card"><div class="stat-value">${formatTokens(promptShown)}</div><div class="stat-label">${promptLabel}</div></div>
+    <div class="stat-card"><div class="stat-value">${formatTokens(t.completion_tokens)}</div><div class="stat-label">Completion Tokens · ${compRatio} of prompt</div></div>
+    <div class="stat-card"><div class="stat-value">${formatTokens(avgPerDayShown)}</div><div class="stat-label">Avg / Day · ${t.active_days} active day${t.active_days === 1 ? "" : "s"}</div></div>
+    <div class="stat-card"><div class="stat-value" style="font-size:18px">${escapeHtml(t.top_model || "—")}</div><div class="stat-label">Top Model</div></div>
+    <div class="stat-card" title="Estimated cost if you called the underlying APIs (Anthropic, OpenAI, Google) directly with these token counts. This is NOT what GitHub Copilot bills you — Copilot uses 'premium requests' against your monthly allowance. Aggregated across all parsed logs."><div class="stat-value">${formatUSD(est.cost)}</div><div class="stat-label">Est. API Cost · ${costSubLabel}</div></div>
+  `;
+
+  const meta = document.getElementById("tokensMeta");
+  if (t.calls === 0) {
+    meta.innerHTML = `<div class="not-enough-data"><div class="nod-icon">📊</div><p>No token usage found in <code>${escapeHtml(tokenData.logsDir)}</code>. Run Copilot CLI to generate logs, then refresh.</p></div>`;
+  } else {
+    meta.innerHTML = `<div style="color:var(--text-dim);font-size:12px;margin-bottom:8px">Parsed ${tokenData.logsScanned} log file${tokenData.logsScanned === 1 ? "" : "s"} from <code>${escapeHtml(tokenData.logsDir)}</code></div>`;
+  }
+
+  renderTokenCharts();
+  renderTokenTable();
+}
+
+function renderTokenCharts() {
+  // Destroy any prior token charts
+  ["tokenStack", "tokenModel", "tokenRatio"].forEach((k) => {
+    if (charts[k]) { charts[k].destroy(); delete charts[k]; }
+  });
+  if (!tokenData || tokenData.totals.calls === 0) return;
+
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const tickColor = isLight ? "#656d76" : "#8b949e";
+  const legendColor = isLight ? "#1f2328" : "#e6edf3";
+  const chartColors = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#bc8cff", "#f0883e", "#56d4dd", "#db61a2"];
+
+  const buckets = tokenData[tokenBucket] || [];
+  const labels = buckets.map((b) => b.period);
+  const newPrompt = buckets.map((b) => Math.max(0, b.prompt_tokens - b.cached_tokens));
+  const cached = buckets.map((b) => b.cached_tokens);
+  const completion = buckets.map((b) => b.completion_tokens);
+
+  const stackDatasets = [
+    { label: "Prompt (new)", data: newPrompt, backgroundColor: "#58a6ff", stack: "t" },
+  ];
+  if (tokenIncludeCached) {
+    stackDatasets.push({ label: "Prompt (cached)", data: cached, backgroundColor: "#56d4dd", stack: "t" });
+  }
+  stackDatasets.push({ label: "Completion", data: completion, backgroundColor: "#bc8cff", stack: "t" });
+
+  charts.tokenStack = new Chart(document.getElementById("tokenStackChart"), {
+    type: "bar",
+    data: { labels, datasets: stackDatasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: legendColor } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatTokens(ctx.raw)}` } },
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: tickColor } },
+        y: { stacked: true, ticks: { color: tickColor, callback: (v) => formatTokens(v) }, beginAtZero: true },
+      },
+    },
+  });
+
+  const models = Object.entries(tokenData.byModel)
+    .map(([k, v]) => [k, v, adjTotal(v.prompt_tokens, v.cached_tokens, v.completion_tokens)])
+    .sort((a, b) => b[2] - a[2]);
+  if (models.length) {
+    charts.tokenModel = new Chart(document.getElementById("tokenModelChart"), {
+      type: "doughnut",
+      data: {
+        labels: models.map((m) => m[0]),
+        datasets: [{ data: models.map((m) => m[2]), backgroundColor: chartColors }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatTokens(ctx.raw)}` } },
+        },
+      },
+    });
+  }
+
+  const t = tokenData.totals;
+  const ratioLabels = tokenIncludeCached
+    ? ["Prompt (new)", "Prompt (cached)", "Completion"]
+    : ["Prompt (new)", "Completion"];
+  const ratioData = tokenIncludeCached
+    ? [Math.max(0, t.prompt_tokens - t.cached_tokens), t.cached_tokens, t.completion_tokens]
+    : [Math.max(0, t.prompt_tokens - t.cached_tokens), t.completion_tokens];
+  const ratioColors = tokenIncludeCached
+    ? ["#58a6ff", "#56d4dd", "#bc8cff"]
+    : ["#58a6ff", "#bc8cff"];
+  charts.tokenRatio = new Chart(document.getElementById("tokenRatioChart"), {
+    type: "doughnut",
+    data: {
+      labels: ratioLabels,
+      datasets: [{ data: ratioData, backgroundColor: ratioColors }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatTokens(ctx.raw)}` } },
+      },
+    },
+  });
+}
+
+function bucketCost(b) {
+  let cost = 0;
+  let known = false;
+  for (const [name, m] of Object.entries(b.models || {})) {
+    const c = costForModel(name, m.prompt_tokens, m.cached_tokens, m.completion_tokens);
+    if (c != null) { cost += c; known = true; }
+  }
+  return known ? cost : null;
+}
+
+function renderTokenTable() {
+  const table = document.getElementById("tokenBreakdownTable");
+  if (!tokenData) { table.innerHTML = ""; return; }
+  const buckets = (tokenData[tokenBucket] || []).slice().reverse();
+  if (!buckets.length) { table.innerHTML = '<tbody><tr><td style="color:var(--text-dim);padding:20px">No data</td></tr></tbody>'; return; }
+  const headerLabel = tokenBucket === "daily" ? "Day" : tokenBucket === "weekly" ? "Week" : "Month";
+  const promptHeader = tokenIncludeCached ? "Prompt" : "Prompt (billed)";
+  const cachedHeader = tokenIncludeCached ? "<th>Cached</th>" : "";
+  table.innerHTML = `
+    <thead><tr>
+      <th>${headerLabel}</th>
+      <th>Calls</th>
+      <th>${promptHeader}</th>
+      ${cachedHeader}
+      <th>Completion</th>
+      <th>Total</th>
+      <th>Est. Cost</th>
+      <th>Top Model</th>
+    </tr></thead>
+    <tbody>
+      ${buckets.map((b) => {
+        const promptShown = adjPrompt(b.prompt_tokens, b.cached_tokens);
+        const totalShown = adjTotal(b.prompt_tokens, b.cached_tokens, b.completion_tokens);
+        const cachedCell = tokenIncludeCached ? `<td>${formatTokens(b.cached_tokens)}</td>` : "";
+        const cost = bucketCost(b);
+        return `
+        <tr>
+          <td>${escapeHtml(b.period)}</td>
+          <td>${b.calls}</td>
+          <td>${formatTokens(promptShown)}</td>
+          ${cachedCell}
+          <td>${formatTokens(b.completion_tokens)}</td>
+          <td><strong>${formatTokens(totalShown)}</strong></td>
+          <td>${cost == null ? '<span style="color:var(--text-dim)">—</span>' : formatUSD(cost)}</td>
+          <td>${escapeHtml(b.top_model || "—")}</td>
+        </tr>`;
+      }).join("")}
+    </tbody>
+  `;
+}
+
+document.getElementById("tokenBucketFilter").addEventListener("click", (e) => {
+  const btn = e.target.closest(".source-btn");
+  if (!btn) return;
+  tokenBucket = btn.dataset.bucket;
+  document.querySelectorAll("#tokenBucketFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderTokenCharts();
+  renderTokenTable();
+});
+
+document.getElementById("tokenCachedFilter").addEventListener("click", (e) => {
+  const btn = e.target.closest(".source-btn");
+  if (!btn) return;
+  tokenIncludeCached = btn.dataset.cached === "include";
+  document.querySelectorAll("#tokenCachedFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderTokens();
+});
 
 // Init
 loadSessions();

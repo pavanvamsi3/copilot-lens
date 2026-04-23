@@ -94,6 +94,18 @@ Dark and light mode. Interactive chart legends. Manual refresh.
 
 ![copilot-lens analytics](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-demo.png)
 
+### 🪙 Token Usage — See exactly what you're spending
+
+A dedicated **Tokens** tab that parses your Copilot CLI debug logs (`~/.copilot/logs/`) to show real, API-reported token consumption — no estimates.
+
+- Summary cards: total tokens, prompt vs completion, cache hit rate, average per active day, top model, estimated upstream API cost (USD)
+- Stacked bar chart over time — switch between **Daily / Weekly / Monthly** views
+- Tokens by model (doughnut)
+- Prompt-vs-completion ratio (doughnut)
+- Per-period breakdown table
+
+The parser uses an event-stream approach over real `[DEBUG] response (Request-ID …)` blocks, so request-config blocks (`max_prompt_tokens`) and model-catalog entries are not counted as usage. Model names are normalized — `capi:claude-opus-4.7:defaultReasoningEffort=medium` becomes `claude-opus-4.7`, and Azure deployment prefixes like `capi-noe-ptuc-h200-ib-gpt-5-mini-2025-08-07` become `gpt-5-mini-2025-08-07`.
+
 ### 🏆 Effectiveness Score — See how well you're using Copilot
 
 A 0–100 score per repository (CLI) and globally (VS Code) with actionable improvement tips.
@@ -119,6 +131,12 @@ Copilot Lens reads session data from three local sources — no network requests
 - `workspace.yaml` — session metadata (directory, git branch, timestamps)
 - `events.jsonl` — full event log (messages, tool calls, errors)
 - `plan.md` — session plans, if created
+
+### Copilot CLI Debug Logs (Token Usage)
+- **Location**: `~/.copilot/logs/process-*.log`
+- Each log contains the verbose API request/response stream from a CLI session
+- Token usage is mined from `[DEBUG] response (Request-ID …)` blocks that contain real `usage.prompt_tokens` / `usage.completion_tokens` / `usage.prompt_tokens_details.cached_tokens`
+- Model names come from the response JSON's `"model"` field, with a 30-line lookback into preceding streaming chunks when absent
 
 ### VS Code Copilot Chat Sessions
 - **Index**: `state.vscdb` (SQLite) — session list with titles and timing
