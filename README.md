@@ -106,6 +106,10 @@ A dedicated **Tokens** tab that parses your Copilot CLI debug logs (`~/.copilot/
 
 The parser uses an event-stream approach over real `[DEBUG] response (Request-ID …)` blocks, so request-config blocks (`max_prompt_tokens`) and model-catalog entries are not counted as usage. Model names are normalized — `capi:claude-opus-4.7:defaultReasoningEffort=medium` becomes `claude-opus-4.7`, and Azure deployment prefixes like `capi-noe-ptuc-h200-ib-gpt-5-mini-2025-08-07` become `gpt-5-mini-2025-08-07`.
 
+> **About the cost number:** GitHub Copilot bills you on **premium requests** against your monthly allowance, not per token. The "Est. API Cost" card is what you would pay if you were calling Anthropic / OpenAI / Google directly with the same token counts — useful as a real-world reference, but not what GitHub charges you.
+
+![copilot-lens tokens](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-tokens.png)
+
 ### 🏆 Effectiveness Score — See how well you're using Copilot
 
 A 0–100 score per repository (CLI) and globally (VS Code) with actionable improvement tips.
