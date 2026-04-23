@@ -47,17 +47,37 @@ const refreshBtn = document.getElementById("refreshBtn");
 const statsCards = document.getElementById("statsCards");
 
 // Navigation
+const VALID_PAGES = new Set(["home", "sessions", "analytics", "tokens", "insights", "docs"]);
+
+function activatePage(pageName) {
+  if (!VALID_PAGES.has(pageName)) pageName = "home";
+  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+  const btn = document.querySelector(`.nav-btn[data-page="${pageName}"]`);
+  const page = document.getElementById(pageName + "Page");
+  if (btn) btn.classList.add("active");
+  if (page) page.classList.add("active");
+  if (pageName === "home") loadHome();
+  if (pageName === "sessions") loadSessions();
+  if (pageName === "analytics") loadAnalytics();
+  if (pageName === "tokens") loadTokens();
+  if (pageName === "insights") loadInsights();
+}
+
 document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById(btn.dataset.page + "Page").classList.add("active");
-    if (btn.dataset.page === "analytics") loadAnalytics();
-    if (btn.dataset.page === "tokens") loadTokens();
-    if (btn.dataset.page === "insights") loadInsights();
+    const page = btn.dataset.page;
+    if (location.hash.slice(1) === page) activatePage(page);
+    else location.hash = page; // triggers hashchange -> activatePage
   });
 });
+
+window.addEventListener("hashchange", () => activatePage(location.hash.slice(1)));
+
+function switchToPage(pageName) {
+  if (location.hash.slice(1) === pageName) activatePage(pageName);
+  else location.hash = pageName;
+}
 
 // Side pane close
 paneClose.addEventListener("click", () => {
@@ -297,7 +317,10 @@ function renderDetail(s) {
 
   detailContent.innerHTML = `
     <div class="detail-header">
-      <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
+      <div class="detail-title-row">
+        <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
+        <a class="export-btn" href="/api/sessions/${encodeURIComponent(s.id)}/export" download title="Download this conversation as OpenAI-style chat JSONL (training format)">⬇ Export JSONL</a>
+      </div>
       <div class="detail-meta">
         <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI"}</strong></div>
         <div><span>Directory:</span> <strong>${escapeHtml(s.cwd || "—")}</strong></div>
@@ -855,6 +878,7 @@ function renderSearchResults(results) {
 let tokenData = null;
 let tokenBucket = "daily";
 let tokenIncludeCached = true;
+let tokenSource = "all";
 
 // Estimated underlying API rates (USD per 1M tokens). These are the public
 // rates of the upstream Anthropic / OpenAI / Google APIs — NOT what GitHub
@@ -955,7 +979,7 @@ async function loadTokens() {
     ${Array.from({ length: 6 }, () => `<div class="stat-card"><div class="stat-value">…</div><div class="stat-label">Loading</div></div>`).join("")}
   `;
   try {
-    const res = await fetch("/api/token-usage");
+    const res = await fetch(`/api/token-usage?source=${encodeURIComponent(tokenSource)}`);
     tokenData = await res.json();
     renderTokens();
   } catch (err) {
@@ -997,10 +1021,19 @@ function renderTokens() {
   `;
 
   const meta = document.getElementById("tokensMeta");
+  const sourceLabel = tokenSource === "all" ? "all sources" : tokenSource === "copilot-cli" ? "Copilot CLI" : "Claude Code";
   if (t.calls === 0) {
-    meta.innerHTML = `<div class="not-enough-data"><div class="nod-icon">📊</div><p>No token usage found in <code>${escapeHtml(tokenData.logsDir)}</code>. Run Copilot CLI to generate logs, then refresh.</p></div>`;
+    const hint = tokenSource === "claude-code"
+      ? "Run Claude Code to generate session logs, then refresh."
+      : tokenSource === "copilot-cli"
+        ? "Run Copilot CLI to generate logs, then refresh."
+        : "Run Copilot CLI or Claude Code to generate logs, then refresh.";
+    meta.innerHTML = `<div class="not-enough-data"><div class="nod-icon">📊</div><p>No token usage found for ${escapeHtml(sourceLabel)} in <code>${escapeHtml(tokenData.logsDir)}</code>. ${escapeHtml(hint)}</p></div>`;
   } else {
-    meta.innerHTML = `<div style="color:var(--text-dim);font-size:12px;margin-bottom:8px">Parsed ${tokenData.logsScanned} log file${tokenData.logsScanned === 1 ? "" : "s"} from <code>${escapeHtml(tokenData.logsDir)}</code></div>`;
+    const perSource = (tokenData.sources || [])
+      .map((s) => `${s.source === "copilot-cli" ? "Copilot CLI" : "Claude Code"}: ${s.calls} call${s.calls === 1 ? "" : "s"}`)
+      .join(" · ");
+    meta.innerHTML = `<div style="color:var(--text-dim);font-size:12px;margin-bottom:8px">Parsed ${tokenData.logsScanned} file${tokenData.logsScanned === 1 ? "" : "s"} for ${escapeHtml(sourceLabel)} · ${escapeHtml(perSource)}</div>`;
   }
 
   renderTokenCharts();
@@ -1166,5 +1199,26 @@ document.getElementById("tokenCachedFilter").addEventListener("click", (e) => {
   renderTokens();
 });
 
-// Init
-loadSessions();
+document.getElementById("tokenSourceFilter").addEventListener("click", (e) => {
+  const btn = e.target.closest(".source-btn");
+  if (!btn) return;
+  tokenSource = btn.dataset.source;
+  document.querySelectorAll("#tokenSourceFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  loadTokens();
+});
+
+// ============ Home page ============
+
+function loadHome() {
+  // Static documentation page; nothing to fetch.
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".home-link[data-jump]");
+  if (!btn) return;
+  switchToPage(btn.dataset.jump);
+});
+
+// Init: respect the URL hash so refresh keeps you on the same tab
+activatePage(location.hash.slice(1) || "home");

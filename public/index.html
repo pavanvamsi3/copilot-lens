@@ -11,18 +11,49 @@
   <header>
     <div class="logo">👓 <span class="logo-text">Copilot Lens</span></div>
     <nav>
-      <button class="nav-btn active" data-page="sessions">Sessions</button>
+      <button class="nav-btn active" data-page="home">Home</button>
+      <button class="nav-btn" data-page="sessions">Sessions</button>
       <button class="nav-btn" data-page="analytics">Analytics</button>
       <button class="nav-btn" data-page="tokens">Tokens</button>
       <button class="nav-btn" data-page="insights">Insights</button>
+      <button class="nav-btn" data-page="docs">Docs</button>
     </nav>
     <button class="refresh-btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
     <button class="refresh-btn" id="themeToggle" title="Toggle light/dark mode">☀️</button>
   </header>
 
   <main>
+    <!-- Home Page -->
+    <section id="homePage" class="page active">
+      <article class="docs home-doc">
+        <h1>Copilot Lens</h1>
+        <p class="home-lead">A local memory layer for your AI coding assistants. Copilot Lens parses the logs that Copilot CLI, VS Code Copilot Chat, and Claude Code already save on your machine, and makes them searchable, browsable, and measurable.</p>
+
+        <h2>Browse every conversation</h2>
+        <p>The <button class="home-link" data-jump="sessions">Sessions</button> tab lists every chat you have had with any of the three tools, side by side. Filter by source, date, status, or working directory. Click a session to replay it: messages in order, tool calls inline, and any thinking blocks expanded on demand.</p>
+
+        <h2>Search across your whole history</h2>
+        <p>Full-text search runs over every indexed session. Type in the search bar on <button class="home-link" data-jump="sessions">Sessions</button> and results rank by relevance with the matched text highlighted. Useful when you remember solving something a few weeks ago and just need to find it again.</p>
+
+        <h2>Understand how you actually use these tools</h2>
+        <p>The <button class="home-link" data-jump="analytics">Analytics</button> tab has eight charts: sessions per day, hour of day, tool usage, model usage, top directories, time per branch, time per repo, and MCP servers. A source filter at the top applies to everything on the page so you can compare Copilot CLI vs Claude Code at a glance.</p>
+
+        <h2>See where tokens go</h2>
+        <p>The <button class="home-link" data-jump="tokens">Tokens</button> tab shows daily, weekly, and monthly totals of input, output, and cached tokens, split by model. It also shows a rough cost estimate based on public API list prices. Curious how the numbers are built and what "cached" means? Read the <button class="home-link" data-jump="docs">Docs</button> tab.</p>
+
+        <h2>Score each repo's effectiveness</h2>
+        <p>The <button class="home-link" data-jump="insights">Insights</button> tab computes a per-repository score based on session outcomes, tool patterns, and time spent. A quick way to spot the codebases you are shipping in vs. the ones you are grinding through.</p>
+
+        <h2>Export a session for training</h2>
+        <p>Open any session from the <button class="home-link" data-jump="sessions">Sessions</button> tab and click <strong>⬇ Export JSONL</strong> in the header. You get one line of OpenAI-style chat JSONL, ready for supervised fine-tuning with TRL, Axolotl, or OpenAI's fine-tuning API.</p>
+
+        <h2>Your data stays on your machine</h2>
+        <p>Copilot Lens reads <code>~/.copilot/logs</code> and <code>~/.claude/projects</code> directly. No sign-in, no cloud, no upload. Everything on every tab is parsed locally and stays on your disk.</p>
+      </article>
+    </section>
+
     <!-- Sessions Page -->
-    <section id="sessionsPage" class="page active">
+    <section id="sessionsPage" class="page">
       <div class="sessions-layout">
         <div class="list-pane">
           <div class="search-bar-wrap">
@@ -114,10 +145,19 @@
 
     <!-- Tokens Page -->
     <section id="tokensPage" class="page">
+      <div class="tokens-topbar">
+        <button class="home-link" data-jump="docs">How are these calculated? →</button>
+      </div>
       <div class="tokens-meta" id="tokensMeta"></div>
       <div class="stats-cards" id="tokenStatsCards"></div>
       <div class="analytics-controls" style="margin-top:8px">
-        <span class="analytics-filter-label">Bucket:</span>
+        <span class="analytics-filter-label">Source:</span>
+        <div class="source-filter-btns" id="tokenSourceFilter">
+          <button class="source-btn active" data-source="all">All</button>
+          <button class="source-btn" data-source="copilot-cli">Copilot CLI</button>
+          <button class="source-btn" data-source="claude-code">Claude Code</button>
+        </div>
+        <span class="analytics-filter-label" style="margin-left:16px">Bucket:</span>
         <div class="source-filter-btns" id="tokenBucketFilter">
           <button class="source-btn active" data-bucket="daily">Daily</button>
           <button class="source-btn" data-bucket="weekly">Weekly</button>
@@ -149,6 +189,101 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- Docs Page -->
+    <section id="docsPage" class="page">
+      <article class="docs">
+        <h1>How tokens are counted</h1>
+
+        <p>When you chat with an AI coding tool, everything it sees (your message, the files it read, the rules it was given, the whole conversation so far) gets turned into "tokens" before the model runs. Every reply is also made of tokens. Copilot Lens reads your local logs and adds these numbers up.</p>
+
+        <p>A rough rule: 1 token is about 4 English letters, or ¾ of a word. A 200-line TypeScript file is usually 1,500 to 3,000 tokens.</p>
+
+        <h2>What Copilot CLI records</h2>
+
+        <p>GitHub Copilot CLI saves one log per day under <code>~/.copilot/logs</code>. Every AI response has a <code>usage</code> block with three numbers:</p>
+
+        <dl>
+          <dt>prompt_tokens</dt><dd>Everything the model read this turn, cached or not.</dd>
+          <dt>completion_tokens</dt><dd>Everything the model wrote back.</dd>
+          <dt>cached_tokens</dt><dd>The part of prompt_tokens that came from cache, not fresh.</dd>
+        </dl>
+
+        <p>Copilot itself does not bill you per token. It sells a subscription with a monthly budget of "premium requests". What you see here is the underlying model usage that Copilot makes on your behalf.</p>
+
+        <p class="docs-links">
+          <a href="https://github.com/features/copilot/plans" target="_blank" rel="noopener">Copilot plans and pricing</a>
+          <a href="https://docs.github.com/en/copilot/managing-copilot/understanding-and-managing-copilot-usage/about-premium-requests" target="_blank" rel="noopener">About premium requests</a>
+        </p>
+
+        <h2>What Claude Code records</h2>
+
+        <p>Claude Code saves one JSONL file per session under <code>~/.claude/projects/&lt;folder&gt;/&lt;session&gt;.jsonl</code>. Every assistant message has a <code>usage</code> block with four numbers:</p>
+
+        <dl>
+          <dt>input_tokens</dt><dd>Brand new input the model had to fully process.</dd>
+          <dt>output_tokens</dt><dd>What the model wrote back.</dd>
+          <dt>cache_creation_input_tokens</dt><dd>Input that was processed and also saved to cache for later. Billed at about 1.25x the normal input rate.</dd>
+          <dt>cache_read_input_tokens</dt><dd>Input pulled back from cache this turn. Billed at about 0.1x the normal input rate.</dd>
+        </dl>
+
+        <p>So the Copilot and Claude shapes are different. To compare them side by side, Copilot Lens folds the four Anthropic numbers into the same three the Copilot side uses:</p>
+
+        <dl>
+          <dt>Prompt</dt><dd>input + cache_creation + cache_read</dd>
+          <dt>Cached</dt><dd>cache_read</dd>
+          <dt>Completion</dt><dd>output</dd>
+          <dt>Total</dt><dd>Prompt + Completion</dd>
+        </dl>
+
+        <p class="docs-links">
+          <a href="https://www.anthropic.com/pricing" target="_blank" rel="noopener">Anthropic pricing</a>
+          <a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching" target="_blank" rel="noopener">Prompt caching (Anthropic docs)</a>
+        </p>
+
+        <h2>Why "cached" matters</h2>
+
+        <p>An AI assistant's context includes the system instructions, the whole conversation so far, and any files it has read. That can easily be tens of thousands of tokens, and it only grows as the session continues.</p>
+
+        <p>Sending all of that to the model on every turn would be slow and expensive. So the provider caches the stable part (system prompt, early messages, unchanged file contents) and reuses it the next time. You still pay for those tokens, but at roughly 10% of the normal input price.</p>
+
+        <p>The raw counters still count cached tokens as input, because the model still "sees" them. That is why a long Claude Code session can show 20 million input tokens even though almost all of it was cache reads at the discounted rate.</p>
+
+        <p>If you want to see only the fresh content the model actually had to work through, flip <strong>Cached: Exclude</strong> on the Tokens page. That subtracts the cached portion from Prompt and Total.</p>
+
+        <p class="docs-links">
+          <a href="https://platform.openai.com/docs/guides/prompt-caching" target="_blank" rel="noopener">Prompt caching (OpenAI docs)</a>
+        </p>
+
+        <h2>About the cost estimate</h2>
+
+        <p>The Est. API Cost number on the Tokens page uses the public list prices from each provider and multiplies them by the tokens we saw in your logs. It is a rough "what if you had called the API yourself" figure, not your actual bill.</p>
+
+        <p>Caveats:</p>
+
+        <ul class="docs-list">
+          <li>It is not what GitHub Copilot charges. Copilot sells a subscription and uses a premium request budget; that budget is cheaper than calling the underlying APIs directly.</li>
+          <li>It is not what Claude.ai or ChatGPT subscriptions charge. Same reason.</li>
+          <li>Cache creation is billed higher than cache reads. Copilot Lens approximates this but does not match to the exact penny.</li>
+          <li>Unknown model names count as zero cost. The "% priced" label tells you how much of the total had a known rate.</li>
+        </ul>
+
+        <p class="docs-links">
+          <a href="https://www.anthropic.com/pricing" target="_blank" rel="noopener">Anthropic (Claude) pricing</a>
+          <a href="https://openai.com/api/pricing" target="_blank" rel="noopener">OpenAI API pricing</a>
+          <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener">Google Gemini pricing</a>
+        </p>
+
+        <h2>Where the data lives</h2>
+
+        <dl>
+          <dt>~/.copilot/logs/</dt><dd>Copilot CLI response logs.</dd>
+          <dt>~/.claude/projects/</dt><dd>Claude Code JSONL session files, one folder per working directory.</dd>
+        </dl>
+
+        <p>Every number on these pages is parsed from those files on your own machine. Nothing leaves your computer.</p>
+      </article>
     </section>
 
     <!-- Insights Page -->

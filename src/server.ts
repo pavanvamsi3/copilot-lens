@@ -4,7 +4,7 @@ import path from "path";
 import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, type AnalyticsSourceFilter } from "./sessions";
 import { clearCache } from "./cache";
 import { SearchIndex } from "./search";
-import { getTokenUsage } from "./token-usage";
+import { getTokenUsage, type TokenSourceFilter } from "./token-usage";
 
 export function createApp() {
   const app = express();
@@ -62,6 +62,39 @@ export function createApp() {
     }
   });
 
+  // API: Export a session as OpenAI-style chat JSONL (one line per conversation).
+  // Suitable as SFT training data.
+  app.get("/api/sessions/:id/export", (req, res) => {
+    try {
+      const session = getSession(req.params.id);
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+      for (const e of session.events) {
+        const content = typeof e.data?.content === "string" ? e.data.content.trim() : "";
+        if (!content) continue;
+        if (e.type === "user.message") messages.push({ role: "user", content });
+        else if (e.type === "assistant.message") messages.push({ role: "assistant", content });
+      }
+      const line = JSON.stringify({
+        session_id: session.id,
+        source: session.source,
+        created_at: session.createdAt,
+        messages,
+      });
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="session-${session.id}.jsonl"`
+      );
+      res.send(line + "\n");
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API: Analytics
   app.get("/api/analytics", (req, res) => {
     try {
@@ -101,10 +134,13 @@ export function createApp() {
     }
   });
 
-  // API: Token usage (parsed from ~/.copilot/logs)
-  app.get("/api/token-usage", (_req, res) => {
+  // API: Token usage (parsed from ~/.copilot/logs and ~/.claude/projects)
+  app.get("/api/token-usage", (req, res) => {
     try {
-      res.json(getTokenUsage());
+      const validSources: TokenSourceFilter[] = ["all", "copilot-cli", "claude-code"];
+      const raw = typeof req.query.source === "string" ? req.query.source : "all";
+      const source: TokenSourceFilter = validSources.includes(raw as TokenSourceFilter) ? (raw as TokenSourceFilter) : "all";
+      res.json(getTokenUsage(source));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

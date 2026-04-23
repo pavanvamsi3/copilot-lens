@@ -3,11 +3,15 @@ import * as path from "path";
 import * as os from "os";
 import { cachedCall } from "./cache";
 
+export type TokenSource = "copilot-cli" | "claude-code";
+export type TokenSourceFilter = "all" | TokenSource;
+
 export interface TokenCall {
   timestamp: string;
   request_id: string;
   message_id?: string;
   model: string;
+  source: TokenSource;
   prompt_tokens: number;
   completion_tokens: number;
   cached_tokens: number;
@@ -54,6 +58,8 @@ export interface TokenUsageAnalytics {
   monthly: PeriodBucket[];
   logsScanned: number;
   logsDir: string;
+  source: TokenSourceFilter;
+  sources: Array<{ source: TokenSource; logsDir: string; logsScanned: number; calls: number }>;
 }
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z /;
@@ -168,6 +174,7 @@ export function parseLogContent(content: string): TokenCall[] {
       request_id: requestId,
       message_id: typeof parsed.id === "string" ? parsed.id : undefined,
       model,
+      source: "copilot-cli",
       prompt_tokens: usage.prompt_tokens,
       completion_tokens: usage.completion_tokens,
       cached_tokens: cached,
@@ -256,6 +263,117 @@ function bucketize(calls: TokenCall[], keyFn: (c: TokenCall) => string): PeriodB
   return out;
 }
 
+export function getClaudeCodeProjectsDir(): string {
+  return path.join(os.homedir(), ".claude", "projects");
+}
+
+interface ClaudeUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+/** Parse a single Claude Code JSONL file, emitting one TokenCall per assistant event that carries usage. */
+export function parseClaudeCodeJsonl(content: string): TokenCall[] {
+  const out: TokenCall[] = [];
+  for (const line of content.split("\n")) {
+    if (!line.trim()) continue;
+    let ev: any;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (ev?.type !== "assistant") continue;
+    if (ev.isSidechain === true) continue;
+    const msg = ev.message;
+    const usage: ClaudeUsage | undefined = msg?.usage;
+    if (!usage) continue;
+
+    const model: string = msg?.model || "";
+    if (!model || model === "<synthetic>") continue;
+
+    const input = Number(usage.input_tokens || 0);
+    const output = Number(usage.output_tokens || 0);
+    const cacheCreate = Number(usage.cache_creation_input_tokens || 0);
+    const cacheRead = Number(usage.cache_read_input_tokens || 0);
+    const prompt = input + cacheCreate + cacheRead;
+    const total = prompt + output;
+    if (total === 0) continue;
+
+    out.push({
+      timestamp: ev.timestamp || "",
+      request_id: ev.uuid || msg?.id || "",
+      message_id: typeof msg?.id === "string" ? msg.id : undefined,
+      model: normalizeModelName(model),
+      source: "claude-code",
+      prompt_tokens: prompt,
+      completion_tokens: output,
+      cached_tokens: cacheRead,
+      total_tokens: total,
+    });
+  }
+  return out;
+}
+
+function listClaudeCodeJsonlFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const out: string[] = [];
+  let subdirs: fs.Dirent[];
+  try {
+    subdirs = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  for (const sub of subdirs) {
+    if (!sub.isDirectory()) continue;
+    const subPath = path.join(dir, sub.name);
+    try {
+      for (const f of fs.readdirSync(subPath, { withFileTypes: true })) {
+        if (f.isFile() && f.name.endsWith(".jsonl")) {
+          out.push(path.join(subPath, f.name));
+        }
+      }
+    } catch {
+      // skip unreadable subdir
+    }
+  }
+  return out;
+}
+
+function collectCopilotCli(): { calls: TokenCall[]; logsScanned: number; logsDir: string } {
+  const dir = getLogsDir();
+  const files = listLogFiles(dir);
+  const calls: TokenCall[] = [];
+  for (const f of files) {
+    try {
+      const content = fs.readFileSync(f, "utf-8");
+      for (const c of parseLogContent(content)) calls.push(c);
+    } catch {
+      // skip unreadable files
+    }
+  }
+  return { calls, logsScanned: files.length, logsDir: dir };
+}
+
+function collectClaudeCode(): { calls: TokenCall[]; logsScanned: number; logsDir: string } {
+  const dir = getClaudeCodeProjectsDir();
+  const files = listClaudeCodeJsonlFiles(dir);
+  const calls: TokenCall[] = [];
+  for (const f of files) {
+    try {
+      const stat = fs.statSync(f);
+      if (stat.size > 200 * 1024 * 1024) continue; // 200MB cap
+      const content = fs.readFileSync(f, "utf-8");
+      for (const c of parseClaudeCodeJsonl(content)) calls.push(c);
+    } catch {
+      // skip unreadable files
+    }
+  }
+  return { calls, logsScanned: files.length, logsDir: dir };
+}
+
 export function aggregate(calls: TokenCall[], logsScanned: number, logsDir: string): TokenUsageAnalytics {
   const byModel: TokenUsageAnalytics["byModel"] = {};
   let prompt = 0;
@@ -317,24 +435,42 @@ export function aggregate(calls: TokenCall[], logsScanned: number, logsDir: stri
     monthly,
     logsScanned,
     logsDir,
+    source: "all",
+    sources: [],
   };
 }
 
-export function getTokenUsage(): TokenUsageAnalytics {
-  return cachedCall("tokenUsage", 30_000, () => {
-    const dir = getLogsDir();
-    const files = listLogFiles(dir);
-    const all: TokenCall[] = [];
-    for (const f of files) {
-      try {
-        const content = fs.readFileSync(f, "utf-8");
-        const calls = parseLogContent(content);
-        for (const c of calls) all.push(c);
-      } catch {
-        // skip unreadable files
-      }
+export function getTokenUsage(source: TokenSourceFilter = "all"): TokenUsageAnalytics {
+  return cachedCall(`tokenUsage:${source}`, 30_000, () => {
+    const cli = collectCopilotCli();
+    const cc = collectClaudeCode();
+
+    const sourcesSummary: TokenUsageAnalytics["sources"] = [
+      { source: "copilot-cli", logsDir: cli.logsDir, logsScanned: cli.logsScanned, calls: cli.calls.length },
+      { source: "claude-code", logsDir: cc.logsDir, logsScanned: cc.logsScanned, calls: cc.calls.length },
+    ];
+
+    let selected: TokenCall[];
+    let logsScanned: number;
+    let logsDir: string;
+    if (source === "copilot-cli") {
+      selected = cli.calls;
+      logsScanned = cli.logsScanned;
+      logsDir = cli.logsDir;
+    } else if (source === "claude-code") {
+      selected = cc.calls;
+      logsScanned = cc.logsScanned;
+      logsDir = cc.logsDir;
+    } else {
+      selected = [...cli.calls, ...cc.calls];
+      logsScanned = cli.logsScanned + cc.logsScanned;
+      logsDir = `${cli.logsDir}, ${cc.logsDir}`;
     }
-    all.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    return aggregate(all, files.length, dir);
+
+    selected.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const agg = aggregate(selected, logsScanned, logsDir);
+    agg.source = source;
+    agg.sources = sourcesSummary;
+    return agg;
   });
 }
