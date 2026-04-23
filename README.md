@@ -73,7 +73,7 @@ Browse the full history of your Copilot sessions in a searchable, filterable lis
 
 > **Thinking support by source:** Claude Code and VS Code Copilot Chat sessions surface thinking blocks when the model was run with extended thinking enabled. Copilot CLI sessions do not include thinking — the CLI processes reasoning internally and does not persist it to disk.
 
-![copilot-lens conversation view](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png)
+![copilot-lens conversation view](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png?v=2)
 
 ### 📊 Analytics — Understand your usage patterns
 
@@ -108,7 +108,7 @@ The parser uses an event-stream approach over real `[DEBUG] response (Request-ID
 
 > **About the cost number:** GitHub Copilot bills you on **premium requests** against your monthly allowance, not per token. The "Est. API Cost" card is what you would pay if you were calling Anthropic / OpenAI / Google directly with the same token counts — useful as a real-world reference, but not what GitHub charges you.
 
-![copilot-lens tokens](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-tokens.png)
+![copilot-lens tokens](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-tokens.png?v=2)
 
 ### 🏆 Effectiveness Score — See how well you're using Copilot
 
