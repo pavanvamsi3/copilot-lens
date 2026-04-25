@@ -33,7 +33,13 @@ copilot-lens tokens --json    # Machine-readable output
 - **Effectiveness Score**: 0 to 100 score per repo with improvement tips
 - **Export**: single-session OpenAI-style chat JSONL, suitable as SFT data
 
+![copilot-lens sessions list](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png?v=3)
+
 ![copilot-lens analytics](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-demo.png)
+
+![copilot-lens tokens](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-tokens.png?v=2)
+
+![copilot-lens score](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-score.png)
 
 > **About the cost number:** GitHub Copilot bills on **premium requests**, not tokens. The cost shown is what you'd pay calling Anthropic / OpenAI / Google directly with the same usage. Useful as a reference, not your GitHub bill.
 
