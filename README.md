@@ -26,16 +26,16 @@ copilot-lens tokens --json    # Machine-readable output
 
 ## Features
 
-- **Search** — full-text across every session, with source/date/directory filters
-- **Sessions** — unified browser for Copilot CLI, VS Code Copilot Chat, and Claude Code conversations, including extended-thinking blocks where supported
-- **Analytics** — eight charts: daily activity, hour-of-day, tools, models, top directories, time per branch/repo, MCP servers
-- **Tokens** — real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
-- **Effectiveness Score** — 0–100 score per repo with improvement tips
-- **Export** — single-session OpenAI-style chat JSONL, suitable as SFT data
+- **Search**: full-text across every session, with source/date/directory filters
+- **Sessions**: unified browser for Copilot CLI, VS Code Copilot Chat, and Claude Code conversations, including extended-thinking blocks where supported
+- **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
+- **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
+- **Effectiveness Score**: 0 to 100 score per repo with improvement tips
+- **Export**: single-session OpenAI-style chat JSONL, suitable as SFT data
 
 ![copilot-lens analytics](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-demo.png)
 
-> **About the cost number:** GitHub Copilot bills on **premium requests**, not tokens. The cost shown is what you'd pay calling Anthropic / OpenAI / Google directly with the same usage — a useful reference, not your GitHub bill.
+> **About the cost number:** GitHub Copilot bills on **premium requests**, not tokens. The cost shown is what you'd pay calling Anthropic / OpenAI / Google directly with the same usage. Useful as a reference, not your GitHub bill.
 
 ## Where the data comes from
 
