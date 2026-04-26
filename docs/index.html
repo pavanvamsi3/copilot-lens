@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copilot Lens — Search and analyze your Copilot &amp; Claude Code history</title>
+  <meta name="description" content="A local memory layer for AI coding assistants. Search and browse everything you've ever discussed with Copilot CLI, VS Code Copilot Chat, or Claude Code. All on your machine.">
+  <meta property="og:title" content="Copilot Lens">
+  <meta property="og:description" content="Your Copilot history has answers. Now you can actually find them.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-hero.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="logo"><span class="logo-text">👓 Copilot Lens</span></div>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#cli">CLI</a>
+      <a href="https://github.com/pavanvamsi3/copilot-lens" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.npmjs.com/package/copilot-lens" target="_blank" rel="noopener">npm</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Your Copilot history has answers.<br><span class="accent">Now you can actually find them.</span></h1>
+      <p class="lead">A local memory layer for AI coding assistants. Search and browse everything you've ever discussed with Copilot CLI, VS Code Copilot Chat, or Claude Code. All on your machine. No cloud, no sign-in.</p>
+      <div class="cta">
+        <code class="install-line">npx copilot-lens --open</code>
+        <a class="btn-secondary" href="https://github.com/pavanvamsi3/copilot-lens" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+      <img class="hero-img" src="https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-hero.png" alt="Copilot Lens dashboard">
+    </section>
+
+    <section id="features" class="features">
+      <h2>What it does</h2>
+      <div class="feature-grid">
+        <article>
+          <h3>Search</h3>
+          <p>Full-text search across every session you've ever had, with filters for source, date, and working directory.</p>
+        </article>
+        <article>
+          <h3>Sessions</h3>
+          <p>One unified browser for Copilot CLI, VS Code Copilot Chat, and Claude Code conversations. Extended-thinking blocks shown inline.</p>
+        </article>
+        <article>
+          <h3>Analytics</h3>
+          <p>Eight charts: daily activity, hour-of-day, tools, models, top directories, time per branch and repo, MCP servers.</p>
+        </article>
+        <article>
+          <h3>Tokens</h3>
+          <p>Real API-reported token usage from local logs. Daily, weekly, monthly. Model breakdown plus an estimated upstream cost.</p>
+        </article>
+        <article>
+          <h3>Effectiveness Score</h3>
+          <p>0 to 100 score per repo with actionable improvement tips: prompt quality, tool utilization, efficiency, MCP, engagement.</p>
+        </article>
+        <article>
+          <h3>Export</h3>
+          <p>Export any session as OpenAI-style chat JSONL for use as fine-tuning data.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="screenshot">
+      <h2>Sessions</h2>
+      <p>Unified browser across Copilot CLI, VS Code Copilot Chat, and Claude Code.</p>
+      <img src="https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-sessions-list.png?v=3" alt="Unified session list">
+    </section>
+
+    <section class="screenshot">
+      <h2>Analytics</h2>
+      <p>How and when you use Copilot and Claude, in eight charts.</p>
+      <img src="https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-demo.png" alt="Analytics charts">
+    </section>
+
+    <section class="screenshot">
+      <h2>Tokens</h2>
+      <p>Real, API-reported token usage with daily, weekly, and monthly views.</p>
+      <img src="https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-tokens.png?v=2" alt="Token usage dashboard">
+    </section>
+
+    <section class="screenshot">
+      <h2>Effectiveness Score</h2>
+      <p>0 to 100 score per repo with actionable improvement tips.</p>
+      <img src="https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-score.png" alt="Effectiveness score">
+    </section>
+
+    <section id="install" class="install">
+      <h2>Install</h2>
+      <p>Run without installing:</p>
+      <pre><code>npx copilot-lens --open</code></pre>
+      <p>Or install globally:</p>
+      <pre><code>npm install -g copilot-lens</code></pre>
+    </section>
+
+    <section id="cli" class="cli">
+      <h2>Use it from the terminal</h2>
+      <p>Token usage as an Ink TUI, no browser needed:</p>
+      <pre><code>copilot-lens tokens
+copilot-lens tokens --source claude-code
+copilot-lens tokens --json</code></pre>
+    </section>
+
+    <section class="data">
+      <h2>Where the data comes from</h2>
+      <p>Copilot Lens reads from local files only. No network requests, no telemetry.</p>
+      <table>
+        <tr><th>Source</th><th>Path</th></tr>
+        <tr><td>Copilot CLI sessions</td><td><code>~/.copilot/session-state/</code></td></tr>
+        <tr><td>Copilot CLI token logs</td><td><code>~/.copilot/logs/process-*.log</code></td></tr>
+        <tr><td>VS Code Copilot Chat</td><td><code>~/Library/Application Support/Code/</code> (macOS)</td></tr>
+        <tr><td>Claude Code</td><td><code>~/.claude/projects/</code></td></tr>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    <p>MIT licensed. Built by <a href="https://github.com/pavanvamsi3" target="_blank" rel="noopener">@pavanvamsi3</a>.</p>
+    <p><a href="https://github.com/pavanvamsi3/copilot-lens" target="_blank" rel="noopener">GitHub</a> · <a href="https://www.npmjs.com/package/copilot-lens" target="_blank" rel="noopener">npm</a></p>
+  </footer>
+</body>
+</html>
