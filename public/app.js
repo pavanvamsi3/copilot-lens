@@ -254,7 +254,7 @@ async function openDetail(id, source) {
     const session = await res.json();
     renderDetail(session);
   } catch (err) {
-    detailContent.innerHTML = `<div style="color:var(--danger)">Failed to load session: ${escapeHtml(err.message)}</div>`;
+    detailContent.innerHTML = `<div class="error-message">Failed to load session: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -362,7 +362,7 @@ function renderDetail(s) {
           ? errors
               .map(
                 (e) =>
-                  `<div class="message" style="border-left:3px solid var(--danger)"><div class="message-label" style="color:var(--danger)">Error</div>${escapeHtml(e.data?.message || "Unknown error")}</div>`
+                  `<div class="message message-error"><div class="message-label error-message">Error</div>${escapeHtml(e.data?.message || "Unknown error")}</div>`
               )
               .join("")
           : '<div style="color:var(--text-dim)">No errors 🎉</div>'
@@ -398,7 +398,7 @@ async function loadAnalytics() {
     analytics = await res.json();
     renderAnalytics();
   } catch (err) {
-    statsCards.innerHTML = `<div style="color:var(--danger)">Failed to load analytics</div>`;
+    statsCards.innerHTML = `<div class="error-message">Failed to load analytics</div>`;
   }
 }
 
@@ -600,7 +600,7 @@ async function loadSessions() {
     updateDirFilter();
     renderSessions();
   } catch (err) {
-    sessionList.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load sessions: ${escapeHtml(err.message)}</div>`;
+    sessionList.innerHTML = `<div class="error-message">Failed to load sessions: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -711,7 +711,7 @@ async function loadInsights() {
       renderInsightsScore(selected);
     }
   } catch (err) {
-    insightsContent.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load insights: ${escapeHtml(err.message)}</div>`;
+    insightsContent.innerHTML = `<div class="error-message">Failed to load insights: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -815,7 +815,7 @@ async function runSearch(q) {
     renderSearchResults(results);
   } catch (err) {
     isSearchActive = true;
-    sessionList.innerHTML = `<div style="color:var(--danger);padding:20px">Search failed: ${escapeHtml(err.message)}</div>`;
+    sessionList.innerHTML = `<div class="error-message">Search failed: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -983,7 +983,7 @@ async function loadTokens() {
     tokenData = await res.json();
     renderTokens();
   } catch (err) {
-    cards.innerHTML = `<div style="color:var(--danger)">Failed to load token usage: ${escapeHtml(err.message)}</div>`;
+    cards.innerHTML = `<div class="error-message">Failed to load token usage: ${escapeHtml(err.message)}</div>`;
   }
 }
 

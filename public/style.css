@@ -524,6 +524,10 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   overflow-y: auto;
 }
 
+.message-error {
+  border-left: 3px solid var(--danger);
+}
+
 .message-user {
   align-self: flex-end;
   background: color-mix(in srgb, var(--accent) 15%, var(--surface));
@@ -747,6 +751,11 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
 .empty-state p {
   font-size: 0.95rem;
   line-height: 1.6;
+}
+
+.error-message {
+  color: var(--danger);
+  padding: 20px;
 }
 
 /* Skeleton shimmer */
