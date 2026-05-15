@@ -186,18 +186,19 @@ function renderSessions() {
 
   if (filtered.length === 0) {
     if (sessions.length === 0) {
+      sessionCount.textContent = "";
       sessionList.innerHTML = `
         <div class="empty-state">
           <span class="empty-icon">📂</span>
           <p>No sessions found.</p>
-          <p style="font-size:0.85em;color:var(--text-muted)">Make sure you've used Copilot CLI, VS Code Copilot Chat, or Claude Code on this machine.<br>
+          <p class="empty-state-hint">Make sure you've used Copilot CLI, VS Code Copilot Chat, or Claude Code on this machine.<br>
           See the <a href="https://github.com/pavanvamsi3/copilot-lens#readme" target="_blank">README</a> for supported tools and file paths.</p>
         </div>`;
     } else {
       sessionList.innerHTML = `
         <div class="empty-state">
           <span class="empty-icon">🔍</span>
-          <p>No sessions match your filters</p>
+          <p>No sessions match your filters.</p>
         </div>`;
     }
     return;
