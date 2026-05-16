@@ -79,15 +79,21 @@ function switchToPage(pageName) {
   else location.hash = pageName;
 }
 
+function clearSelectedCard() {
+  document.querySelectorAll(".session-card.selected").forEach((c) => c.classList.remove("selected"));
+}
+
 // Side pane close
 paneClose.addEventListener("click", () => {
   detailPane.classList.remove("open");
+  clearSelectedCard();
 });
 
 // Keyboard shortcuts
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && detailPane.classList.contains("open")) {
     detailPane.classList.remove("open");
+    clearSelectedCard();
   }
   if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
     e.preventDefault();
@@ -234,6 +240,9 @@ function renderSessions() {
 
 // Open session detail — side panel
 async function openDetail(id, source) {
+  clearSelectedCard();
+  const card = sessionList.querySelector(`.session-card[data-id="${id}"]`);
+  if (card) card.classList.add("selected");
   detailContent.innerHTML = `
     <div class="skeleton-card">
       <div class="skeleton-line" style="width:60%;height:16px;margin-bottom:12px"></div>
