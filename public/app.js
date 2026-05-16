@@ -199,7 +199,7 @@ function renderSessions() {
         const c = getDirColor(s.cwd);
         const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
         const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
-        const displayName = s.title || shortId(s.id);
+        const displayName = s.title || shortDir(s.cwd) || shortId(s.id);
         const metaItems = [];
         if (s.branch) metaItems.push(`<span class="badge badge-branch">⎇ ${escapeHtml(s.branch)}</span>`);
         metaItems.push(`<span>${formatTime(s.createdAt)}</span>`);
@@ -318,7 +318,7 @@ function renderDetail(s) {
   detailContent.innerHTML = `
     <div class="detail-header">
       <div class="detail-title-row">
-        <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
+        <h2>${escapeHtml(s.title || shortDir(s.cwd) || s.id)}</h2>
         <a class="export-btn" href="/api/sessions/${encodeURIComponent(s.id)}/export" download title="Download this conversation as OpenAI-style chat JSONL (training format)">⬇ Export JSONL</a>
       </div>
       <div class="detail-meta">
