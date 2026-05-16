@@ -48,9 +48,18 @@ const statsCards = document.getElementById("statsCards");
 
 // Navigation
 const VALID_PAGES = new Set(["home", "sessions", "analytics", "tokens", "insights", "docs"]);
+const PAGE_TITLES = {
+  home: "Copilot Lens",
+  sessions: "Sessions — Copilot Lens",
+  analytics: "Analytics — Copilot Lens",
+  tokens: "Tokens — Copilot Lens",
+  insights: "Insights — Copilot Lens",
+  docs: "Docs — Copilot Lens",
+};
 
 function activatePage(pageName) {
   if (!VALID_PAGES.has(pageName)) pageName = "home";
+  document.title = PAGE_TITLES[pageName] || "Copilot Lens";
   document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   const btn = document.querySelector(`.nav-btn[data-page="${pageName}"]`);
