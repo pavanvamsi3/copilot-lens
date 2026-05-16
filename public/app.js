@@ -296,12 +296,17 @@ function renderDetail(s) {
         </details>`;
       }
       const isUser = e.type === "user.message";
-      const display = content.length > 800 ? content.slice(0, 800) + "\n...(truncated)" : content;
+      const isTruncated = content.length > 800;
+      const msgId = `msg-${i}`;
       const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
       const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>` : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
         <div class="message-label">${isUser ? "👤 You" : s.source === "claude-code" ? "🤖 Claude" : s.source === "vscode" ? "🤖 Copilot" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
-        <div class="message-body">${escapeHtml(display)}</div>
+        <div class="message-body">
+          <span id="${msgId}-short">${escapeHtml(content.slice(0, 800))}${isTruncated ? "…" : ""}</span>
+          ${isTruncated ? `<span id="${msgId}-full" style="display:none">${escapeHtml(content)}</span>` : ""}
+        </div>
+        ${isTruncated ? `<button class="show-more-btn" onclick="toggleMsg('${msgId}')">Show full message ↓</button>` : ""}
       </div>`;
     })
     .join("");
@@ -384,6 +389,16 @@ function renderDetail(s) {
 
 }
 
+
+function toggleMsg(id) {
+  const short = document.getElementById(id + "-short");
+  const full = document.getElementById(id + "-full");
+  const btn = short.closest(".message").querySelector(".show-more-btn");
+  const isExpanded = full.style.display !== "none";
+  short.style.display = isExpanded ? "" : "none";
+  full.style.display = isExpanded ? "none" : "";
+  btn.textContent = isExpanded ? "Show full message ↓" : "Show less ↑";
+}
 
 function escapeHtml(str) {
   const div = document.createElement("div");

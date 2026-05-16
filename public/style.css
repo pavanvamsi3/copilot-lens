@@ -571,6 +571,20 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   margin-left: 6px;
 }
 
+.show-more-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 4px 0;
+  text-align: left;
+}
+
+.show-more-btn:hover {
+  text-decoration: underline;
+}
+
 .message-thinking {
   align-self: flex-start;
   max-width: 88%;
