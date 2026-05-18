@@ -240,6 +240,12 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
 }
 
+.session-card.selected {
+  background: var(--surface2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -524,6 +530,10 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   overflow-y: auto;
 }
 
+.message-error {
+  border-left: 3px solid var(--danger);
+}
+
 .message-user {
   align-self: flex-end;
   background: color-mix(in srgb, var(--accent) 15%, var(--surface));
@@ -569,6 +579,20 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   background: color-mix(in srgb, var(--accent2) 15%, var(--surface));
   color: var(--accent2);
   margin-left: 6px;
+}
+
+.show-more-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 4px 0;
+  text-align: left;
+}
+
+.show-more-btn:hover {
+  text-decoration: underline;
 }
 
 .message-thinking {
@@ -752,6 +776,11 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
 .empty-state-hint {
   font-size: 0.85em;
   color: var(--text-muted);
+}
+
+.error-message {
+  color: var(--danger);
+  padding: 20px;
 }
 
 /* Skeleton shimmer */

@@ -48,9 +48,18 @@ const statsCards = document.getElementById("statsCards");
 
 // Navigation
 const VALID_PAGES = new Set(["home", "sessions", "analytics", "tokens", "insights", "docs"]);
+const PAGE_TITLES = {
+  home: "Copilot Lens",
+  sessions: "Sessions — Copilot Lens",
+  analytics: "Analytics — Copilot Lens",
+  tokens: "Tokens — Copilot Lens",
+  insights: "Insights — Copilot Lens",
+  docs: "Docs — Copilot Lens",
+};
 
 function activatePage(pageName) {
   if (!VALID_PAGES.has(pageName)) pageName = "home";
+  document.title = PAGE_TITLES[pageName] || "Copilot Lens";
   document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   const btn = document.querySelector(`.nav-btn[data-page="${pageName}"]`);
@@ -79,15 +88,21 @@ function switchToPage(pageName) {
   else location.hash = pageName;
 }
 
+function clearSelectedCard() {
+  document.querySelectorAll(".session-card.selected").forEach((c) => c.classList.remove("selected"));
+}
+
 // Side pane close
 paneClose.addEventListener("click", () => {
   detailPane.classList.remove("open");
+  clearSelectedCard();
 });
 
 // Keyboard shortcuts
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && detailPane.classList.contains("open")) {
     detailPane.classList.remove("open");
+    clearSelectedCard();
   }
   if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
     e.preventDefault();
@@ -210,7 +225,7 @@ function renderSessions() {
         const c = getDirColor(s.cwd);
         const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
         const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
-        const displayName = s.title || shortId(s.id);
+        const displayName = s.title || shortDir(s.cwd) || shortId(s.id);
         const metaItems = [];
         if (s.branch) metaItems.push(`<span class="badge badge-branch">⎇ ${escapeHtml(s.branch)}</span>`);
         metaItems.push(`<span>${formatTime(s.createdAt)}</span>`);
@@ -245,6 +260,9 @@ function renderSessions() {
 
 // Open session detail — side panel
 async function openDetail(id, source) {
+  clearSelectedCard();
+  const card = sessionList.querySelector(`.session-card[data-id="${id}"]`);
+  if (card) card.classList.add("selected");
   detailContent.innerHTML = `
     <div class="skeleton-card">
       <div class="skeleton-line" style="width:60%;height:16px;margin-bottom:12px"></div>
@@ -265,7 +283,7 @@ async function openDetail(id, source) {
     const session = await res.json();
     renderDetail(session);
   } catch (err) {
-    detailContent.innerHTML = `<div style="color:var(--danger)">Failed to load session: ${escapeHtml(err.message)}</div>`;
+    detailContent.innerHTML = `<div class="error-message">Failed to load session: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -307,12 +325,17 @@ function renderDetail(s) {
         </details>`;
       }
       const isUser = e.type === "user.message";
-      const display = content.length > 800 ? content.slice(0, 800) + "\n...(truncated)" : content;
+      const isTruncated = content.length > 800;
+      const msgId = `msg-${i}`;
       const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
       const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>` : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
         <div class="message-label">${isUser ? "👤 You" : s.source === "claude-code" ? "🤖 Claude" : s.source === "vscode" ? "🤖 Copilot" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
-        <div class="message-body">${escapeHtml(display)}</div>
+        <div class="message-body">
+          <span id="${msgId}-short">${escapeHtml(content.slice(0, 800))}${isTruncated ? "…" : ""}</span>
+          ${isTruncated ? `<span id="${msgId}-full" style="display:none">${escapeHtml(content)}</span>` : ""}
+        </div>
+        ${isTruncated ? `<button class="show-more-btn" onclick="toggleMsg('${msgId}')">Show full message ↓</button>` : ""}
       </div>`;
     })
     .join("");
@@ -329,7 +352,7 @@ function renderDetail(s) {
   detailContent.innerHTML = `
     <div class="detail-header">
       <div class="detail-title-row">
-        <h2>${s.title ? escapeHtml(s.title) : "Session " + escapeHtml(String(s.id))}</h2>
+        <h2>${escapeHtml(s.title || shortDir(s.cwd) || s.id)}</h2>
         <a class="export-btn" href="/api/sessions/${encodeURIComponent(s.id)}/export" download title="Download this conversation as OpenAI-style chat JSONL (training format)">⬇ Export JSONL</a>
       </div>
       <div class="detail-meta">
@@ -373,7 +396,7 @@ function renderDetail(s) {
           ? errors
               .map(
                 (e) =>
-                  `<div class="message" style="border-left:3px solid var(--danger)"><div class="message-label" style="color:var(--danger)">Error</div>${escapeHtml(e.data?.message || "Unknown error")}</div>`
+                  `<div class="message message-error"><div class="message-label error-message">Error</div>${escapeHtml(e.data?.message || "Unknown error")}</div>`
               )
               .join("")
           : '<div style="color:var(--text-dim)">No errors 🎉</div>'
@@ -396,6 +419,16 @@ function renderDetail(s) {
 }
 
 
+function toggleMsg(id) {
+  const short = document.getElementById(id + "-short");
+  const full = document.getElementById(id + "-full");
+  const btn = short.closest(".message").querySelector(".show-more-btn");
+  const isExpanded = full.style.display !== "none";
+  short.style.display = isExpanded ? "" : "none";
+  full.style.display = isExpanded ? "none" : "";
+  btn.textContent = isExpanded ? "Show full message ↓" : "Show less ↑";
+}
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -409,7 +442,7 @@ async function loadAnalytics() {
     analytics = await res.json();
     renderAnalytics();
   } catch (err) {
-    statsCards.innerHTML = `<div style="color:var(--danger)">Failed to load analytics</div>`;
+    statsCards.innerHTML = `<div class="error-message">Failed to load analytics</div>`;
   }
 }
 
@@ -611,7 +644,7 @@ async function loadSessions() {
     updateDirFilter();
     renderSessions();
   } catch (err) {
-    sessionList.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load sessions: ${escapeHtml(err.message)}</div>`;
+    sessionList.innerHTML = `<div class="error-message">Failed to load sessions: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -722,7 +755,7 @@ async function loadInsights() {
       renderInsightsScore(selected);
     }
   } catch (err) {
-    insightsContent.innerHTML = `<div style="color:var(--danger);padding:20px">Failed to load insights: ${escapeHtml(err.message)}</div>`;
+    insightsContent.innerHTML = `<div class="error-message">Failed to load insights: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -826,7 +859,7 @@ async function runSearch(q) {
     renderSearchResults(results);
   } catch (err) {
     isSearchActive = true;
-    sessionList.innerHTML = `<div style="color:var(--danger);padding:20px">Search failed: ${escapeHtml(err.message)}</div>`;
+    sessionList.innerHTML = `<div class="error-message">Search failed: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -994,7 +1027,7 @@ async function loadTokens() {
     tokenData = await res.json();
     renderTokens();
   } catch (err) {
-    cards.innerHTML = `<div style="color:var(--danger)">Failed to load token usage: ${escapeHtml(err.message)}</div>`;
+    cards.innerHTML = `<div class="error-message">Failed to load token usage: ${escapeHtml(err.message)}</div>`;
   }
 }
 
