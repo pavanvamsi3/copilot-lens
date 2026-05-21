@@ -39,7 +39,7 @@
       <dd>Eight charts: daily activity, hour-of-day, tools, models, top directories, time per branch and repo, MCP servers.</dd>
 
       <dt>Tokens</dt>
-      <dd>Real API-reported token usage from local logs, with daily, weekly, and monthly views, model breakdown, and an estimated upstream cost.</dd>
+      <dd>Real token usage from local session data and logs, with daily, weekly, and monthly views, model breakdown, Copilot premium requests, and an estimated upstream API cost reference for direct-API sources.</dd>
 
       <dt>Effectiveness Score</dt>
       <dd>0 to 100 score per repo with actionable improvement tips covering prompt quality, tool utilization, efficiency, MCP, and engagement.</dd>
@@ -75,8 +75,8 @@ copilot-lens tokens --json</code></pre>
     <h2>Where the data comes from</h2>
     <p>Copilot Lens reads from local files only. No network requests, no telemetry.</p>
     <ul class="paths">
-      <li><span>Copilot CLI sessions</span><code>~/.copilot/session-state/</code></li>
-      <li><span>Copilot CLI token logs</span><code>~/.copilot/logs/process-*.log</code></li>
+      <li><span>Copilot CLI sessions and usage summaries</span><code>~/.copilot/session-state/</code></li>
+      <li><span>Copilot CLI legacy token logs</span><code>~/.copilot/logs/process-*.log</code></li>
       <li><span>VS Code Copilot Chat</span><code>~/Library/Application Support/Code/</code></li>
       <li><span>Claude Code</span><code>~/.claude/projects/</code></li>
     </ul>
