@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { parseLogContent, normalizeModelName, aggregate } from "../token-usage";
+import { parseLogContent, parseCopilotCliEventsJsonl, normalizeModelName, aggregate } from "../token-usage";
 import { clearCache } from "../cache";
 
 const RESPONSE_BLOCK = `2026-01-22T18:34:17.358Z [DEBUG] response (Request-ID 00000-abc):
@@ -48,6 +48,8 @@ const FALSE_POSITIVE = `2026-01-22T18:00:00.000Z [DEBUG] request config: {
   "model": "claude-opus-4.7"
 }
 `;
+
+const SESSION_SHUTDOWN = `{"type":"session.shutdown","data":{"shutdownType":"routine","totalPremiumRequests":1,"totalApiDurationMs":12345,"sessionStartTime":1778222867017,"modelMetrics":{"gpt-5.4":{"requests":{"count":3,"cost":1},"usage":{"inputTokens":1000,"outputTokens":100,"cacheReadTokens":400,"cacheWriteTokens":50,"reasoningTokens":25}}}},"id":"session-1","timestamp":"2026-05-08T06:49:22.344Z"}`;
 
 describe("normalizeModelName", () => {
   it("strips capi: prefix and option suffix", () => {
@@ -98,6 +100,24 @@ describe("parseLogContent", () => {
   });
 });
 
+describe("parseCopilotCliEventsJsonl", () => {
+  beforeEach(() => clearCache());
+
+  it("extracts session shutdown model metrics from events.jsonl", () => {
+    const calls = parseCopilotCliEventsJsonl(SESSION_SHUTDOWN);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      request_id: "session-1:gpt-5.4",
+      model: "gpt-5.4",
+      call_count: 3,
+      prompt_tokens: 1450,
+      completion_tokens: 125,
+      cached_tokens: 400,
+      total_tokens: 1575,
+    });
+  });
+});
+
 describe("aggregate", () => {
   it("computes totals, model breakdown, and bucket data", () => {
     const calls = parseLogContent(RESPONSE_BLOCK + RESPONSE_NO_MODEL);
@@ -121,5 +141,13 @@ describe("aggregate", () => {
     expect(agg.totals.cache_hit_rate).toBe(0);
     expect(agg.totals.top_model).toBeNull();
     expect(agg.daily).toEqual([]);
+  });
+
+  it("uses weighted call counts from session shutdown metrics", () => {
+    const calls = parseCopilotCliEventsJsonl(SESSION_SHUTDOWN);
+    const agg = aggregate(calls, 1, "/tmp");
+    expect(agg.totals.calls).toBe(3);
+    expect(agg.byModel["gpt-5.4"].calls).toBe(3);
+    expect(agg.daily[0].calls).toBe(3);
   });
 });
