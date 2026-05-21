@@ -110,6 +110,7 @@ describe("parseCopilotCliEventsJsonl", () => {
       request_id: "session-1:gpt-5.4",
       model: "gpt-5.4",
       call_count: 3,
+      premium_requests: 1,
       prompt_tokens: 1450,
       completion_tokens: 125,
       cached_tokens: 400,
@@ -147,7 +148,10 @@ describe("aggregate", () => {
     const calls = parseCopilotCliEventsJsonl(SESSION_SHUTDOWN);
     const agg = aggregate(calls, 1, "/tmp");
     expect(agg.totals.calls).toBe(3);
+    expect(agg.totals.premium_requests).toBe(1);
     expect(agg.byModel["gpt-5.4"].calls).toBe(3);
+    expect(agg.byModel["gpt-5.4"].premium_requests).toBe(1);
     expect(agg.daily[0].calls).toBe(3);
+    expect(agg.daily[0].premium_requests).toBe(1);
   });
 });
