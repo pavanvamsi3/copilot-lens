@@ -773,6 +773,11 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   line-height: 1.6;
 }
 
+.empty-state-hint {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
 .error-message {
   color: var(--danger);
   padding: 20px;
