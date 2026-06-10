@@ -90,7 +90,7 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
   });
 
   const activeDays = new Set(inRange.map((s) => s.createdAt.slice(0, 10)).filter(Boolean)).size;
-  const totalDays = Math.round((cur.end.getTime() - cur.start.getTime()) / 86400000) + 1;
+  const totalDays = Math.round((cur.end.getTime() - cur.start.getTime()) / 86400000);
 
   const repoCount: Record<string, number> = {};
   const hourCount: Record<number, number> = {};
