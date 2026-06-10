@@ -1,5 +1,5 @@
 ---
-applyTo: "**/__tests__/**/*.{ts,tsx}"
+applyTo: "**/__tests__/**/*.ts,**/__tests__/**/*.tsx"
 ---
 
 # Test file guidelines
