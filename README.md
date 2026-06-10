@@ -26,7 +26,7 @@ copilot-lens tokens --json    # Machine-readable output
 
 ## Features
 
-- **Search**: full-text across every session, with source/date/directory filters
+- **Search**: full-text keyword search, TF-IDF semantic search, and hybrid mode across every session, with source/date/directory filters
 - **Sessions**: unified browser for Copilot CLI, VS Code Copilot Chat, and Claude Code conversations, including extended-thinking blocks where supported
 - **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
 - **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost

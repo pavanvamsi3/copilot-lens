@@ -3,7 +3,8 @@ import cors from "cors";
 import path from "path";
 import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, type AnalyticsSourceFilter } from "./sessions";
 import { clearCache } from "./cache";
-import { SearchIndex } from "./search";
+import { SearchIndex, type SearchMode } from "./search";
+import { SemanticIndex, blendResults } from "./semantic-search";
 import { getTokenUsage, type TokenSourceFilter } from "./token-usage";
 
 export function createApp() {
@@ -11,28 +12,46 @@ export function createApp() {
   app.use(cors());
 
   const searchIndex = new SearchIndex();
+  const semanticIndex = new SemanticIndex();
 
   // Serve static frontend files
   app.use(express.static(path.join(__dirname, "..", "public")));
 
-  // API: Full-text search
+  // API: Full-text / semantic / hybrid search
+  // ?q=      — query string
+  // ?mode=   — "keyword" (default) | "semantic" | "hybrid"
+  // ?source= — "all" (default) | "cli" | "vscode" | "claude-code" | "cursor"
+  // ?limit=  — max results (default 20)
   app.get("/api/search", async (req, res) => {
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const source = typeof req.query.source === "string" ? req.query.source : "all";
       const limit = parseInt(req.query.limit as string) || 20;
+      const rawMode = typeof req.query.mode === "string" ? req.query.mode : "keyword";
+      const mode: SearchMode = (rawMode === "semantic" || rawMode === "hybrid") ? rawMode : "keyword";
 
       if (!q) return res.json([]);
 
       const sessions = listSessions();
       searchIndex.buildIndex(sessions);
 
-      const results = searchIndex.search(q, {
-        limit,
-        source: source as "cli" | "vscode" | "all",
-      });
+      const sourceOpt = source as "cli" | "vscode" | "claude-code" | "cursor" | "all";
 
-      res.json(results);
+      if (mode === "keyword") {
+        return res.json(searchIndex.search(q, { limit, source: sourceOpt }));
+      }
+
+      // semantic or hybrid — build the semantic index lazily from keyword entries
+      semanticIndex.build(searchIndex.getEntries());
+
+      if (mode === "semantic") {
+        return res.json(semanticIndex.search(q, { limit, source: sourceOpt }));
+      }
+
+      // hybrid: blend keyword (60%) + semantic (40%)
+      const kwResults = searchIndex.search(q, { limit: limit * 2, source: sourceOpt });
+      const semResults = semanticIndex.search(q, { limit: limit * 2, source: sourceOpt });
+      return res.json(blendResults(kwResults, semResults, limit));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -150,6 +169,7 @@ export function createApp() {
   app.post("/api/cache/clear", (_req, res) => {
     clearCache();
     searchIndex.clear();
+    semanticIndex.clear();
     res.json({ ok: true });
   });
 

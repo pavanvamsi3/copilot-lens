@@ -2,7 +2,7 @@ import { SessionMeta, getSession } from "./sessions";
 
 export interface SearchEntry {
   id: string;
-  source: "cli" | "vscode" | "claude-code";
+  source: "cli" | "vscode" | "claude-code" | "cursor";
   title: string;
   cwd: string;
   date: string;      // ISO string — updatedAt from SessionMeta
@@ -13,11 +13,14 @@ export interface SearchResult {
   entry: SearchEntry;
   score: number;
   highlights: string[]; // up to 3 snippets, ±60 chars around match, trimmed to word boundaries
+  matchType?: "keyword" | "semantic" | "hybrid"; // undefined = keyword (backwards compat)
 }
+
+export type SearchMode = "keyword" | "semantic" | "hybrid";
 
 export interface SearchOptions {
   limit?: number;                        // default 20
-  source?: "cli" | "vscode" | "claude-code" | "all";    // default 'all'
+  source?: "cli" | "vscode" | "claude-code" | "cursor" | "all";    // default 'all'
 }
 
 function stripCodeBlocks(text: string): string {
@@ -199,6 +202,11 @@ export class SearchIndex {
     }
 
     return highlights;
+  }
+
+  /** Return the built index entries so other indices (e.g. SemanticIndex) can reuse them. */
+  getEntries(): SearchEntry[] {
+    return this.entries;
   }
 
   clear(): void {
