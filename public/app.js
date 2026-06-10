@@ -5,6 +5,10 @@ let charts = {};
 let searchDebounce = null;
 let isSearchActive = false;
 let analyticsSource = "all";
+let bookmarks = {};        // sessionId → { tags, note, createdAt }
+let allTags = [];          // known tag values for auto-suggest
+let activeTagFilter = null; // tag string currently filtering, or null
+let showBookmarkedOnly = false;
 
 // Directory color coding — sophisticated muted palette
 const DIR_COLORS = [
@@ -190,6 +194,17 @@ function getFilteredSessions() {
     filtered = filtered.filter((s) => (s.cwd || "") === dir);
   }
 
+  if (showBookmarkedOnly) {
+    filtered = filtered.filter((s) => !!bookmarks[s.id]);
+  }
+
+  if (activeTagFilter) {
+    filtered = filtered.filter((s) => {
+      const bm = bookmarks[s.id];
+      return bm && bm.tags.includes(activeTagFilter);
+    });
+  }
+
   return filtered;
 }
 
@@ -226,9 +241,14 @@ function renderSessions() {
         const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
         const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
         const displayName = s.title || shortDir(s.cwd) || shortId(s.id);
+        const bm = bookmarks[s.id];
+        const isBookmarked = !!bm;
         const metaItems = [];
         if (s.branch) metaItems.push(`<span class="badge badge-branch">⎇ ${escapeHtml(s.branch)}</span>`);
         metaItems.push(`<span>${formatTime(s.createdAt)}</span>`);
+        const tagHtml = bm && bm.tags.length
+          ? `<div class="card-tags">${bm.tags.map((t) => `<span class="card-tag">${escapeHtml(t)}</span>`).join("")}</div>`
+          : "";
         return `
     <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 4px solid ${c.border}">
       <div class="top-row">
@@ -236,25 +256,37 @@ function renderSessions() {
         <span class="top-badges">
           <span class="badge ${sourceClass}">${sourceLabel}</span>
           <span class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</span>
+          <button class="star-btn${isBookmarked ? " starred" : ""}" data-id="${s.id}" title="${isBookmarked ? "Remove bookmark" : "Bookmark this session"}">${isBookmarked ? "★" : "☆"}</button>
         </span>
       </div>
       <div class="session-dir">${escapeHtml(s.cwd || "—")}</div>
       <div class="session-meta">
         ${metaItems.join('<span class="meta-sep">·</span>')}
       </div>
+      ${tagHtml}
     </div>
   `;
       }
     )
     .join("");
 
-  // Stagger animation + click handlers
+  // Stagger animation + click + star handlers
   sessionList.querySelectorAll(".session-card").forEach((card, i) => {
     const delay = Math.min(i * 30, 300);
     card.style.animationDelay = `${delay}ms`;
     card.classList.add("card-animate");
     card.addEventListener("animationend", () => card.classList.remove("card-animate"), { once: true });
-    card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".star-btn")) return; // star click handled separately
+      openDetail(card.dataset.id, card.dataset.source);
+    });
+  });
+
+  sessionList.querySelectorAll(".star-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleBookmark(btn.dataset.id);
+    });
   });
 }
 
@@ -416,6 +448,10 @@ function renderDetail(s) {
     });
   });
 
+  // Append bookmark section after the rest of the detail pane
+  const bmSection = buildBookmarkSection(s.id);
+  detailContent.appendChild(bmSection);
+  attachBookmarkSectionListeners(s.id);
 }
 
 
@@ -628,6 +664,168 @@ function renderCharts() {
   });
 }
 
+// ============ Bookmarks ============
+
+async function loadBookmarks() {
+  try {
+    const [bmRes, tagRes] = await Promise.all([
+      fetch("/api/bookmarks"),
+      fetch("/api/bookmarks/tags"),
+    ]);
+    const bmList = await bmRes.json();
+    allTags = await tagRes.json();
+    bookmarks = {};
+    for (const b of bmList) bookmarks[b.sessionId] = b;
+    renderBookmarkFilterBar();
+  } catch {}
+}
+
+function renderBookmarkFilterBar() {
+  const pill = document.getElementById("pillBookmarked");
+  if (showBookmarkedOnly) pill.classList.add("active");
+  else pill.classList.remove("active");
+
+  const tagRow = document.getElementById("tagPills");
+  tagRow.innerHTML = allTags
+    .map((t) => `<button class="bm-pill tag-pill${activeTagFilter === t ? " active" : ""}" data-tag="${escapeHtml(t)}"># ${escapeHtml(t)}</button>`)
+    .join("");
+  tagRow.querySelectorAll(".tag-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeTagFilter = activeTagFilter === btn.dataset.tag ? null : btn.dataset.tag;
+      renderBookmarkFilterBar();
+      renderSessions();
+    });
+  });
+}
+
+async function toggleBookmark(sessionId) {
+  const existing = bookmarks[sessionId];
+  if (existing) {
+    await fetch(`/api/bookmarks/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+    delete bookmarks[sessionId];
+  } else {
+    const res = await fetch(`/api/bookmarks/${encodeURIComponent(sessionId)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: [], note: "" }),
+    });
+    const bm = await res.json();
+    bookmarks[sessionId] = bm;
+  }
+  await loadBookmarks();
+  renderSessions();
+  // If detail pane is open for this session, re-render its bookmark section
+  const openCard = sessionList.querySelector(".session-card.selected");
+  if (openCard && openCard.dataset.id === sessionId) {
+    refreshDetailBookmarkSection(sessionId);
+  }
+}
+
+async function saveBookmarkDetail(sessionId, tags, note) {
+  const res = await fetch(`/api/bookmarks/${encodeURIComponent(sessionId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags, note }),
+  });
+  const bm = await res.json();
+  bookmarks[sessionId] = bm;
+  // Update session object tags too so card re-renders correctly
+  const s = sessions.find((x) => x.id === sessionId);
+  if (s) { s.bookmarked = true; s.tags = bm.tags; }
+  await loadBookmarks();
+  renderSessions();
+}
+
+function refreshDetailBookmarkSection(sessionId) {
+  const section = document.getElementById("bookmark-section");
+  if (!section) return;
+  section.replaceWith(buildBookmarkSection(sessionId));
+  attachBookmarkSectionListeners(sessionId);
+}
+
+function buildBookmarkSection(sessionId) {
+  const bm = bookmarks[sessionId];
+  const isBookmarked = !!bm;
+  const tags = bm ? bm.tags : [];
+  const note = bm ? bm.note : "";
+  const div = document.createElement("div");
+  div.id = "bookmark-section";
+  div.className = "bookmark-section";
+  div.innerHTML = `
+    <div class="bookmark-section-header">
+      <button class="star-btn-detail${isBookmarked ? " starred" : ""}" id="detailStarBtn" title="${isBookmarked ? "Remove bookmark" : "Bookmark this session"}">
+        ${isBookmarked ? "★" : "☆"} ${isBookmarked ? "Bookmarked" : "Bookmark"}
+      </button>
+    </div>
+    ${isBookmarked ? `
+    <div class="bookmark-fields" id="bookmarkFields">
+      <div class="bm-field-row">
+        <label class="bm-label">Tags</label>
+        <div class="bm-tag-wrap">
+          <input id="bmTagInput" class="bm-input" type="text" placeholder="Add tag and press Enter" autocomplete="off" list="bmTagSuggest" value="">
+          <datalist id="bmTagSuggest">${allTags.map((t) => `<option value="${escapeHtml(t)}">`).join("")}</datalist>
+          <div class="bm-tags-current" id="bmTagsCurrent">
+            ${tags.map((t) => `<span class="card-tag removable-tag">${escapeHtml(t)}<button class="remove-tag" data-tag="${escapeHtml(t)}">✕</button></span>`).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="bm-field-row">
+        <label class="bm-label">Note</label>
+        <textarea id="bmNote" class="bm-textarea" placeholder="Add a note about this session…" rows="3">${escapeHtml(note)}</textarea>
+      </div>
+      <button class="bm-save-btn" id="bmSaveBtn">Save</button>
+    </div>` : ""}
+  `;
+  return div;
+}
+
+function attachBookmarkSectionListeners(sessionId) {
+  const starBtn = document.getElementById("detailStarBtn");
+  if (starBtn) {
+    starBtn.addEventListener("click", () => toggleBookmark(sessionId));
+  }
+
+  const saveBtn = document.getElementById("bmSaveBtn");
+  if (!saveBtn) return;
+
+  // Collect current tags from the DOM
+  let currentTags = [...(bookmarks[sessionId]?.tags || [])];
+
+  function renderCurrentTags() {
+    document.getElementById("bmTagsCurrent").innerHTML =
+      currentTags.map((t) => `<span class="card-tag removable-tag">${escapeHtml(t)}<button class="remove-tag" data-tag="${escapeHtml(t)}">✕</button></span>`).join("");
+    document.getElementById("bmTagsCurrent").querySelectorAll(".remove-tag").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        currentTags = currentTags.filter((x) => x !== btn.dataset.tag);
+        renderCurrentTags();
+      });
+    });
+  }
+  renderCurrentTags();
+
+  const tagInput = document.getElementById("bmTagInput");
+  tagInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const val = tagInput.value.trim().toLowerCase().replace(/,/g, "");
+      if (val && !currentTags.includes(val)) {
+        currentTags.push(val);
+        renderCurrentTags();
+      }
+      tagInput.value = "";
+    }
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    const note = document.getElementById("bmNote").value;
+    saveBtn.textContent = "Saving…";
+    saveBtn.disabled = true;
+    await saveBookmarkDetail(sessionId, currentTags, note);
+    saveBtn.textContent = "Saved ✓";
+    setTimeout(() => { saveBtn.textContent = "Save"; saveBtn.disabled = false; }, 1200);
+  });
+}
+
 // Data loading
 async function loadSessions() {
   // Show skeleton while loading
@@ -639,8 +837,14 @@ async function loadSessions() {
     </div>`).join("");
 
   try {
-    const res = await fetch("/api/sessions");
-    sessions = await res.json();
+    const [sessRes] = await Promise.all([fetch("/api/sessions"), loadBookmarks()]);
+    sessions = await sessRes.json();
+    // Merge bookmark flags already present in session list response
+    for (const s of sessions) {
+      if (s.bookmarked && !bookmarks[s.id]) {
+        bookmarks[s.id] = { sessionId: s.id, tags: s.tags || [], note: "", createdAt: "" };
+      }
+    }
     updateDirFilter();
     renderSessions();
   } catch (err) {
@@ -682,6 +886,14 @@ searchClear.addEventListener("click", () => {
 timeFilter.addEventListener("change", renderSessions);
 statusFilter.addEventListener("change", renderSessions);
 dirFilter.addEventListener("change", renderSessions);
+
+// Bookmark filter bar
+document.getElementById("pillBookmarked").addEventListener("click", () => {
+  showBookmarkedOnly = !showBookmarkedOnly;
+  if (showBookmarkedOnly) activeTagFilter = null; // reset tag filter when switching to bookmarks-only
+  renderBookmarkFilterBar();
+  renderSessions();
+});
 
 // Analytics source filter
 document.getElementById("analyticsSourceFilter").addEventListener("click", (e) => {
