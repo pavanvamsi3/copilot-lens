@@ -182,7 +182,7 @@ export function getCursorSession(tabId: string): SessionDetail | null {
   for (const dataDir of getCursorDataDirs()) {
     const tabs = readCursorTabs(dataDir);
     const tab = tabs.find((t) => t.tabId === tabId);
-    if (!tab) continue;
+    if (!tab || !tabHasContent(tab)) continue;
 
     const events = tabToEvents(tab);
 
@@ -228,7 +228,7 @@ export function getCursorSession(tabId: string): SessionDetail | null {
 export function isCursorSession(tabId: string): boolean {
   for (const dataDir of getCursorDataDirs()) {
     const tabs = readCursorTabs(dataDir);
-    if (tabs.some((t) => t.tabId === tabId)) return true;
+    if (tabs.some((t) => t.tabId === tabId && tabHasContent(t))) return true;
   }
   return false;
 }
