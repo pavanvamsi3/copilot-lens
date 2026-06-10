@@ -7,6 +7,10 @@ process.on("unhandledRejection", (err: any) => {
   console.error("Unhandled rejection:", err?.message || err);
 });
 
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 const args = process.argv.slice(2);
 
 if (args[0] === "tokens") {
@@ -36,8 +40,8 @@ if (args[0] === "tokens") {
 
   try {
     ({ host, port, shouldOpen } = parseDashboardArgs(args));
-  } catch (error: any) {
-    console.error(error.message);
+  } catch (error: unknown) {
+    console.error(formatErrorMessage(error));
     process.exit(1);
   }
 

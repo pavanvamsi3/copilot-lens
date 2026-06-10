@@ -1,3 +1,6 @@
+/**
+ * Parsed options for the dashboard entrypoint.
+ */
 export interface DashboardArgs {
   host: string;
   port: number;
@@ -9,6 +12,13 @@ function getArg(args: string[], name: string, fallback: string): string {
   return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
 }
 
+/**
+ * Parse dashboard CLI flags and validate the optional port override.
+ *
+ * @param args Raw dashboard CLI arguments without the node executable prefix.
+ * @returns Parsed dashboard host, port, and browser-open flag.
+ * @throws {Error} When `--port` is missing a valid integer in the 1-65535 range.
+ */
 export function parseDashboardArgs(args: string[]): DashboardArgs {
   const rawPort = getArg(args, "--port", "3000");
   if (!/^\d+$/.test(rawPort)) {
