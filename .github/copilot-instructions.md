@@ -48,8 +48,8 @@ Vitest for tests.
 - Express route handlers should wrap their work in `try`/`catch` and return a JSON
   error with an appropriate status code, matching the existing pattern in
   `src/server.ts`. Flag new routes that can throw an unhandled error.
-- The frontend in `public/` is dependency-free vanilla JS. Flag the introduction of
-  a frontend framework or build step unless explicitly intended.
+- The frontend in `public/` is vanilla JS (no bundler/build step) with minimal browser
+  dependencies (e.g., Chart.js via CDN). Flag introducing a framework or build step unless explicitly intended.
 
 ## Tests
 
