@@ -1,5 +1,5 @@
 ---
-applyTo: "src/**/*.{ts,tsx}"
+applyTo: "src/**/*.ts,src/**/*.tsx"
 ---
 
 # TypeScript source guidelines
