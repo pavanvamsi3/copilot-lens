@@ -4,11 +4,12 @@ import * as os from "os";
 import { parse as parseYaml } from "yaml";
 import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName, scanVSCodeMcpConfig } from "./vscode-sessions";
 import { listClaudeCodeSessions, getClaudeCodeSession, isClaudeCodeSession, getClaudeCodeAnalytics } from "./claude-code-sessions";
+import { listCursorSessions, getCursorSession, isCursorSession, getCursorAnalytics } from "./cursor-sessions";
 import { cachedCall } from "./cache";
 import { isValidSessionId } from "./validation";
 
 export type SessionStatus = "running" | "completed" | "error";
-export type SessionSource = "cli" | "vscode" | "claude-code";
+export type SessionSource = "cli" | "vscode" | "claude-code" | "cursor";
 
 export interface SessionMeta {
   id: string;
@@ -175,8 +176,14 @@ export function listSessions(): SessionMeta[] {
     } catch {
       // Claude Code data may not exist
     }
+    let cursor: SessionMeta[] = [];
+    try {
+      cursor = listCursorSessions();
+    } catch {
+      // Cursor data may not exist
+    }
 
-    const sessions = [...cli, ...vscode, ...claudeCode];
+    const sessions = [...cli, ...vscode, ...claudeCode, ...cursor];
     sessions.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -199,6 +206,13 @@ export function getSession(sessionId: string): SessionDetail | null {
   try {
     if (isClaudeCodeSession(sessionId)) {
       return getClaudeCodeSession(sessionId);
+    }
+  } catch {}
+
+  // Check Cursor sessions
+  try {
+    if (isCursorSession(sessionId)) {
+      return getCursorSession(sessionId);
     }
   } catch {}
 
@@ -289,7 +303,7 @@ export function getSession(sessionId: string): SessionDetail | null {
   };
 }
 
-export type AnalyticsSourceFilter = "all" | "cli" | "vscode" | "claude-code";
+export type AnalyticsSourceFilter = "all" | "cli" | "vscode" | "claude-code" | "cursor";
 
 export function getAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData {
   return cachedCall(`getAnalytics:${source}`, CACHE_TTL, () => _computeAnalytics(source));
@@ -324,14 +338,14 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
     } catch {}
 
     // Top directories
-    const dirName = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? (s.cwd || "Claude Code") : (s.cwd || "unknown");
+    const dirName = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? (s.cwd || "Claude Code") : s.source === "cursor" ? "Cursor" : (s.cwd || "unknown");
     topDirectories[dirName] = (topDirectories[dirName] || 0) + 1;
 
     // Branch activity
     const branch = s.branch || "unknown";
 
-    // Skip VS Code and Claude Code sessions here — handled separately below
-    if (s.source === "vscode" || s.source === "claude-code") continue;
+    // Skip VS Code, Claude Code, and Cursor sessions here — handled separately below
+    if (s.source === "vscode" || s.source === "claude-code" || s.source === "cursor") continue;
 
     // Scan events.jsonl for all metrics (CLI only)
     try {
@@ -444,6 +458,20 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
         for (const [tool, count] of Object.entries(entry.toolUsage)) {
           toolUsage[tool] = (toolUsage[tool] || 0) + count;
         }
+        for (const [model, count] of Object.entries(entry.modelUsage)) {
+          modelUsage[model] = (modelUsage[model] || 0) + count;
+        }
+        if (entry.turnCount > 0) turnsPerSession.push(entry.turnCount);
+        if (entry.duration > 0) durations.push(entry.duration);
+      }
+    } catch {}
+  }
+
+  // Integrate Cursor session analytics
+  if (source === "all" || source === "cursor") {
+    try {
+      const cursorEntries = getCursorAnalytics();
+      for (const entry of cursorEntries) {
         for (const [model, count] of Object.entries(entry.modelUsage)) {
           modelUsage[model] = (modelUsage[model] || 0) + count;
         }

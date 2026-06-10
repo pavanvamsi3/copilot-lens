@@ -223,8 +223,8 @@ function renderSessions() {
     .map(
       (s) => {
         const c = getDirColor(s.cwd);
-        const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
-        const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
+        const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : s.source === "cursor" ? "badge-cursor" : "badge-cli";
+        const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : s.source === "cursor" ? "Cursor" : "Copilot CLI";
         const displayName = s.title || shortDir(s.cwd) || shortId(s.id);
         const metaItems = [];
         if (s.branch) metaItems.push(`<span class="badge badge-branch">⎇ ${escapeHtml(s.branch)}</span>`);
@@ -330,7 +330,7 @@ function renderDetail(s) {
       const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
       const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>` : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
-        <div class="message-label">${isUser ? "👤 You" : s.source === "claude-code" ? "🤖 Claude" : s.source === "vscode" ? "🤖 Copilot" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
+        <div class="message-label">${isUser ? "👤 You" : s.source === "claude-code" ? "🤖 Claude" : s.source === "cursor" ? "🤖 Cursor" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
         <div class="message-body">
           <span id="${msgId}-short">${escapeHtml(content.slice(0, 800))}${isTruncated ? "…" : ""}</span>
           ${isTruncated ? `<span id="${msgId}-full" style="display:none">${escapeHtml(content)}</span>` : ""}
@@ -356,12 +356,12 @@ function renderDetail(s) {
         <a class="export-btn" href="/api/sessions/${encodeURIComponent(s.id)}/export" download title="Download this conversation as OpenAI-style chat JSONL (training format)">⬇ Export JSONL</a>
       </div>
       <div class="detail-meta">
-        <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI"}</strong></div>
+        <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : s.source === "cursor" ? "badge-cursor" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : s.source === "cursor" ? "Cursor" : "Copilot CLI"}</strong></div>
         <div><span>Directory:</span> <strong>${escapeHtml(s.cwd || "—")}</strong></div>
         <div><span>Branch:</span> <strong>${escapeHtml(s.branch || "—")}</strong></div>
         <div><span>Created:</span> <strong>${new Date(s.createdAt).toLocaleString()}</strong></div>
         <div><span>Duration:</span> <strong>${formatDuration(s.duration)}</strong></div>
-        ${s.source !== "vscode" ? `<div><span>Version:</span> <strong>${escapeHtml(s.copilotVersion || "—")}</strong></div>` : ""}
+        ${s.source !== "vscode" && s.source !== "cursor" ? `<div><span>Version:</span> <strong>${escapeHtml(s.copilotVersion || "—")}</strong></div>` : ""}
         <div><span>Status:</span> <strong class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</strong></div>
       </div>
     </div>
@@ -885,8 +885,8 @@ function renderSearchResults(results) {
     .map(({ entry, highlights }) => {
       const s = entry;
       const c = getDirColor(s.cwd);
-      const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
-      const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
+      const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : s.source === "cursor" ? "badge-cursor" : "badge-cli";
+      const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : s.source === "cursor" ? "Cursor" : "Copilot CLI";
       const displayName = s.title || shortId(s.id);
       const highlightHtml = highlights && highlights.length
         ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`

@@ -132,7 +132,7 @@ export function createApp(options: AppOptions = {}) {
   // API: Analytics
   app.get("/api/analytics", (req, res) => {
     try {
-      const validSources: AnalyticsSourceFilter[] = ["all", "cli", "vscode", "claude-code"];
+      const validSources: AnalyticsSourceFilter[] = ["all", "cli", "vscode", "claude-code", "cursor"];
       const raw = typeof req.query.source === "string" ? req.query.source : "all";
       const source: AnalyticsSourceFilter = validSources.includes(raw as AnalyticsSourceFilter) ? (raw as AnalyticsSourceFilter) : "all";
       const analytics = getAnalytics(source);

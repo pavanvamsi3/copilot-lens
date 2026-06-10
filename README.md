@@ -27,7 +27,7 @@ copilot-lens tokens --json    # Machine-readable output
 ## Features
 
 - **Search**: full-text across every session, with source/date/directory filters
-- **Sessions**: unified browser for Copilot CLI, VS Code Copilot Chat, and Claude Code conversations, including extended-thinking blocks where supported
+- **Sessions**: unified browser for Copilot CLI, VS Code Copilot Chat, Claude Code, and Cursor conversations, including extended-thinking blocks where supported
 - **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
 - **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
 - **Effectiveness Score**: 0 to 100 score per repo with improvement tips
@@ -59,6 +59,7 @@ copilot-lens tokens --json    # Machine-readable output
 | Copilot CLI token logs | `~/.copilot/logs/process-*.log` |
 | VS Code Copilot Chat | `~/Library/Application Support/Code/` (macOS), `%APPDATA%/Code/` (Win), `~/.config/Code/` (Linux) |
 | Claude Code | `~/.claude/projects/` |
+| Cursor | `~/Library/Application Support/Cursor/` (macOS), `%APPDATA%/Cursor/` (Win), `~/.config/Cursor/` (Linux) |
 
 VS Code Insiders is supported. Pasted images are stripped; files over 200MB are skipped. Durations exclude gaps longer than 5 minutes so paused sessions aren't inflated.
 
