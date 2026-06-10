@@ -9,6 +9,7 @@ export interface SearchEntry {
   content: string[]; // array of extracted message strings
 }
 
+
 export interface SearchResult {
   entry: SearchEntry;
   score: number;
