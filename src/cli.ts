@@ -29,15 +29,17 @@ if (args[0] === "tokens") {
 `);
 } else {
   const { createApp } = require("./server");
+  const { parseDashboardArgs } = require("./cli-args");
+  let host: string;
+  let port: number;
+  let shouldOpen: boolean;
 
-  function getArg(name: string, fallback: string): string {
-    const idx = args.indexOf(name);
-    return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
+  try {
+    ({ host, port, shouldOpen } = parseDashboardArgs(args));
+  } catch (error: any) {
+    console.error(error.message);
+    process.exit(1);
   }
-
-  const port = parseInt(getArg("--port", "3000"), 10);
-  const host = getArg("--host", "localhost");
-  const shouldOpen = args.includes("--open");
 
   const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
   if (!LOOPBACK_HOSTS.has(host)) {
