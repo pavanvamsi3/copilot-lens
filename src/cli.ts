@@ -12,6 +12,9 @@ const args = process.argv.slice(2);
 if (args[0] === "tokens") {
   const { runTokensTUI } = require("./cli-tokens");
   runTokensTUI(args.slice(1));
+} else if (args[0] === "export") {
+  const { runExportCLI } = require("./cli-export");
+  runExportCLI(args.slice(1));
 } else if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
   process.stdout.write(`
   Usage: copilot-lens [command] [options]
@@ -19,6 +22,7 @@ if (args[0] === "tokens") {
   Commands:
     (default)   Start the web dashboard
     tokens      Show token usage in the terminal (Ink TUI)
+    export      Bulk-export sessions as NDJSON for SFT / fine-tuning
 
   Options:
     --port <n>  Port for the web dashboard (default: 3000)
@@ -26,6 +30,7 @@ if (args[0] === "tokens") {
     --open      Open the dashboard in your browser
 
   Run "copilot-lens tokens --help" for tokens command options.
+  Run "copilot-lens export --help" for export command options.
 `);
 } else {
   const { createApp } = require("./server");
