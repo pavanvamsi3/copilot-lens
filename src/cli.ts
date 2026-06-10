@@ -12,6 +12,9 @@ const args = process.argv.slice(2);
 if (args[0] === "tokens") {
   const { runTokensTUI } = require("./cli-tokens");
   runTokensTUI(args.slice(1));
+} else if (args[0] === "digest") {
+  const { runDigestTUI } = require("./cli-digest");
+  runDigestTUI(args.slice(1));
 } else if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
   process.stdout.write(`
   Usage: copilot-lens [command] [options]
@@ -19,6 +22,7 @@ if (args[0] === "tokens") {
   Commands:
     (default)   Start the web dashboard
     tokens      Show token usage in the terminal (Ink TUI)
+    digest      Show a period-based usage summary in the terminal
 
   Options:
     --port <n>  Port for the web dashboard (default: 3000)
@@ -26,6 +30,7 @@ if (args[0] === "tokens") {
     --open      Open the dashboard in your browser
 
   Run "copilot-lens tokens --help" for tokens command options.
+  Run "copilot-lens digest --help" for digest command options.
 `);
 } else {
   const { createApp } = require("./server");
