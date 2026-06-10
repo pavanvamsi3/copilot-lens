@@ -21,12 +21,17 @@ export interface SearchOptions {
 }
 
 function stripCodeBlocks(text: string): string {
+  // Matches markdown code blocks starting with ``` and ending with ```,
+  // including all content in between (using [\s\S]*? for non-greedy multi-line match),
+  // and replaces them with a single space.
   return text.replace(/```[\s\S]*?```/g, " ");
 }
 
 export function tokenize(query: string): string[] {
   return query
     .toLowerCase()
+    // Splits the search query on one or more non-alphanumeric characters,
+    // converting the string into an array of lowercase tokens.
     .split(/[^a-z0-9]+/)
     .filter((t) => t.length >= 2);
 }
@@ -36,11 +41,13 @@ function trimToWordBoundary(text: string, start: number, end: number): string {
   let e = end;
 
   // Trim start to nearest word boundary (move right until whitespace)
+  // /\s/.test(...) checks if the target character is a whitespace character.
   if (s > 0 && !/\s/.test(text[s - 1])) {
     while (s < e && !/\s/.test(text[s])) s++;
   }
 
   // Trim end to nearest word boundary (move left until whitespace)
+  // /\s/.test(...) checks if the target character is a whitespace character.
   if (e < text.length && !/\s/.test(text[e])) {
     while (e > s && !/\s/.test(text[e - 1])) e--;
   }

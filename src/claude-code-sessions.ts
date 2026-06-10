@@ -131,6 +131,7 @@ export function listClaudeCodeSessions(): SessionMeta[] {
 
     for (const file of jsonlFiles) {
       const filePath = path.join(subdirPath, file.name);
+      // Strip the ".jsonl" extension from the end of the filename to extract the session ID.
       const sessionId = file.name.replace(/\.jsonl$/, "");
 
       try {
@@ -384,6 +385,7 @@ function _computeClaudeCodeAnalytics(): ClaudeCodeAnalyticsEntry[] {
 
     for (const file of jsonlFiles) {
       const filePath = path.join(subdirPath, file.name);
+      // Strip the ".jsonl" extension from the end of the filename to extract the session ID.
       const sessionId = file.name.replace(/\.jsonl$/, "");
 
       const rawEvents = readAllLines(filePath);
