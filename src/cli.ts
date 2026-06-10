@@ -1,5 +1,14 @@
 #!/usr/bin/env node
 
+// Node.js version gate — must run before any modern syntax/APIs.
+const [major] = process.versions.node.split('.').map(Number);
+if (major < 18) {
+  console.error(
+    `Error: copilot-lens requires Node.js 18 or later. You are running v${process.versions.node}.`
+  );
+  process.exit(1);
+}
+
 process.on("uncaughtException", (err) => {
   console.error("Uncaught error:", err.message);
 });
