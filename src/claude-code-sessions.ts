@@ -8,7 +8,8 @@ import { cachedCall } from "./cache";
 // ============ Platform paths ============
 
 export function getClaudeCodeProjectsDir(): string {
-  return path.join(os.homedir(), ".claude", "projects");
+  const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
+  return path.join(home, ".claude", "projects");
 }
 
 // ============ JSONL parsing helpers ============

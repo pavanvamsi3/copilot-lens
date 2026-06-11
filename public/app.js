@@ -1082,11 +1082,12 @@ function renderTokens() {
 
   renderTokenCharts();
   renderTokenTable();
+  renderContextEfficiency();
 }
 
 function renderTokenCharts() {
   // Destroy any prior token charts
-  ["tokenStack", "tokenModel", "tokenRatio"].forEach((k) => {
+  ["tokenStack", "tokenModel", "tokenRatio", "ctxGauge"].forEach((k) => {
     if (charts[k]) { charts[k].destroy(); delete charts[k]; }
   });
   if (!tokenData || tokenData.totals.calls === 0) return;
@@ -1223,6 +1224,119 @@ function renderTokenTable() {
     </tbody>
   `;
 }
+
+function renderContextEfficiency() {
+  const panel = document.getElementById("contextEfficiencyContent");
+  if (!panel) return;
+  if (!tokenData || !tokenData.contextUtilization) {
+    panel.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center">No context utilization data available</div>';
+    return;
+  }
+  const ctx = tokenData.contextUtilization;
+  if (ctx.totalSessionsAnalyzed === 0) {
+    panel.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center">No calls with known model context limits found</div>';
+    return;
+  }
+
+  const avgPct = ctx.avgUtilizationPct.toFixed(1);
+  const nearPct = ctx.sessionsNearLimitPct.toFixed(1);
+  const effPct = (ctx.contextEfficiencyScore * 100).toFixed(1);
+
+  // Gauge color
+  const gaugeColor = ctx.avgUtilizationPct > 80 ? "var(--danger)" : ctx.avgUtilizationPct > 50 ? "var(--warning)" : "var(--accent2)";
+
+  // Per-model table
+  const models = Object.entries(ctx.perModel)
+    .sort((a, b) => b[1].totalCalls - a[1].totalCalls);
+
+  const modelRows = models.map(([name, m]) => {
+    const barColor = m.avgUtilizationPct > 80 ? "var(--danger)" : m.avgUtilizationPct > 50 ? "var(--warning)" : "var(--accent2)";
+    return `
+      <tr>
+        <td>${escapeHtml(name)}</td>
+        <td>${formatTokens(m.contextLimit)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;min-width:60px">
+              <div style="width:${Math.min(m.avgUtilizationPct, 100)}%;height:100%;background:${barColor};border-radius:3px"></div>
+            </div>
+            <span>${m.avgUtilizationPct.toFixed(1)}%</span>
+          </div>
+        </td>
+        <td>${m.maxUtilizationPct.toFixed(1)}%</td>
+        <td>${m.callsNearLimit}</td>
+        <td>${m.totalCalls}</td>
+      </tr>`;
+  }).join("");
+
+  panel.innerHTML = `
+    <div class="context-eff-grid">
+      <div class="context-gauge-wrap">
+        <canvas id="ctxGaugeChart" width="180" height="180"></canvas>
+      </div>
+      <div class="context-stats">
+        <div class="context-stat">
+          <div class="context-stat-value" style="color:${gaugeColor}">${avgPct}%</div>
+          <div class="context-stat-label">Avg Context Utilization</div>
+        </div>
+        <div class="context-stat">
+          <div class="context-stat-value">${ctx.sessionsNearLimit}</div>
+          <div class="context-stat-label">Calls Near Limit (&gt;80%) \u00b7 ${nearPct}%</div>
+        </div>
+        <div class="context-stat">
+          <div class="context-stat-value">${effPct}%</div>
+          <div class="context-stat-label">Efficiency Score (output / input)</div>
+        </div>
+        <div class="context-stat">
+          <div class="context-stat-value">${ctx.totalSessionsAnalyzed}</div>
+          <div class="context-stat-label">Calls Analyzed \u00b7 ${ctx.totalSessionsSkipped} skipped</div>
+        </div>
+      </div>
+    </div>
+    ${models.length > 0 ? `
+    <div class="token-table-wrap" style="margin-top:16px">
+      <table class="token-table">
+        <thead><tr>
+          <th>Model</th>
+          <th>Context Limit</th>
+          <th>Avg Utilization</th>
+          <th>Max</th>
+          <th>Near Limit</th>
+          <th>Calls</th>
+        </tr></thead>
+        <tbody>${modelRows}</tbody>
+      </table>
+    </div>` : ""}
+  `;
+
+  // Render gauge chart
+  const gaugeCanvas = document.getElementById("ctxGaugeChart");
+  if (gaugeCanvas) {
+    const isLight = document.documentElement.getAttribute("data-theme") === "light";
+    const trackColor = isLight ? "#e1e4e8" : "#30363d";
+    const used = Math.min(ctx.avgUtilizationPct, 100);
+    const remaining = 100 - used;
+    charts.ctxGauge = new Chart(gaugeCanvas, {
+      type: "doughnut",
+      data: {
+        labels: ["Used", "Available"],
+        datasets: [{ data: [used, remaining], backgroundColor: [gaugeColor, trackColor], borderWidth: 0 }],
+      },
+      options: {
+        responsive: true,
+        cutout: "75%",
+        rotation: -90,
+        circumference: 180,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
+      },
+    });
+  }
+}
+
+
 
 document.getElementById("tokenBucketFilter").addEventListener("click", (e) => {
   const btn = e.target.closest(".source-btn");

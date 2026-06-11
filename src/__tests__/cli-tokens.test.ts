@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { parseTokensArgs } from "../cli-tokens";
 
 describe("parseTokensArgs", () => {
-  it("defaults to source=all, no json, no help", () => {
-    expect(parseTokensArgs([])).toEqual({ source: "all", json: false, help: false });
+  it("defaults to source=all, no json, no help, no context", () => {
+    expect(parseTokensArgs([])).toEqual({ source: "all", json: false, help: false, context: false });
   });
 
   it("parses --source copilot-cli", () => {
@@ -11,6 +11,7 @@ describe("parseTokensArgs", () => {
       source: "copilot-cli",
       json: false,
       help: false,
+      context: false,
     });
   });
 
@@ -19,6 +20,7 @@ describe("parseTokensArgs", () => {
       source: "claude-code",
       json: false,
       help: false,
+      context: false,
     });
   });
 
@@ -27,6 +29,7 @@ describe("parseTokensArgs", () => {
       source: "all",
       json: false,
       help: false,
+      context: false,
     });
   });
 
@@ -39,11 +42,25 @@ describe("parseTokensArgs", () => {
     expect(parseTokensArgs(["-h"]).help).toBe(true);
   });
 
+  it("parses --context", () => {
+    expect(parseTokensArgs(["--context"]).context).toBe(true);
+  });
+
   it("parses combined flags", () => {
     expect(parseTokensArgs(["--source", "claude-code", "--json"])).toEqual({
       source: "claude-code",
       json: true,
       help: false,
+      context: false,
+    });
+  });
+
+  it("parses --context with other flags", () => {
+    expect(parseTokensArgs(["--source", "all", "--context", "--json"])).toEqual({
+      source: "all",
+      json: true,
+      help: false,
+      context: true,
     });
   });
 });

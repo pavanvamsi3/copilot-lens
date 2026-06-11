@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { render, Text, Box, Newline } from "ink";
-import { getTokenUsage, TokenUsageAnalytics, TokenSourceFilter } from "./token-usage";
+import { getTokenUsage, TokenUsageAnalytics, TokenSourceFilter, ContextUtilization } from "./token-usage";
 
 // ── Formatting helpers ──────────────────────────────────────────────
 
@@ -129,6 +129,69 @@ function Daily({ data }: { data: TokenUsageAnalytics }) {
   );
 }
 
+function ContextEfficiency({ data }: { data: TokenUsageAnalytics }) {
+  const ctx = data.contextUtilization;
+  if (!ctx || ctx.totalSessionsAnalyzed === 0) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold>Context Efficiency</Text>
+        <Text dimColor>  No context utilization data (model or prompt tokens unknown)</Text>
+      </Box>
+    );
+  }
+
+  const utilPct = ctx.avgUtilizationPct.toFixed(1);
+  const gaugeWidth = 20;
+  const filled = Math.round((ctx.avgUtilizationPct / 100) * gaugeWidth);
+  const gauge = "█".repeat(Math.min(filled, gaugeWidth)) + "░".repeat(Math.max(0, gaugeWidth - filled));
+  const gaugeColor = ctx.avgUtilizationPct > 80 ? "red" : ctx.avgUtilizationPct > 50 ? "yellow" : "green";
+
+  const effPct = (ctx.contextEfficiencyScore * 100).toFixed(1);
+
+  const models = Object.entries(ctx.perModel)
+    .sort((a, b) => b[1].totalCalls - a[1].totalCalls)
+    .slice(0, 5);
+  const maxName = models.length > 0 ? Math.max(...models.map(([n]) => n.length)) : 0;
+
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold>Context Efficiency</Text>
+      <Text>
+        <Text dimColor>  Avg utilization  </Text>
+        <Text color={gaugeColor}>{gauge}</Text>
+        <Text>  {utilPct}%</Text>
+      </Text>
+      <Text>
+        <Text dimColor>  Near limit (&gt;80%)  </Text>
+        <Text>{ctx.sessionsNearLimit} call{ctx.sessionsNearLimit !== 1 ? "s" : ""}</Text>
+        <Text dimColor>  ({ctx.sessionsNearLimitPct.toFixed(1)}%)</Text>
+      </Text>
+      <Text>
+        <Text dimColor>  Efficiency score  </Text>
+        <Text>{effPct}%</Text>
+        <Text dimColor>  (output / input ratio)</Text>
+      </Text>
+      <Text dimColor>  {ctx.totalSessionsAnalyzed} analyzed · {ctx.totalSessionsSkipped} skipped (unknown model)</Text>
+      {models.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>  Per-Model Context</Text>
+          {models.map(([name, m]) => (
+            <Text key={name}>
+              <Text>    {name.padEnd(maxName)}</Text>
+              <Text dimColor>  avg </Text>
+              <Text>{m.avgUtilizationPct.toFixed(1).padStart(5)}%</Text>
+              <Text dimColor>  max </Text>
+              <Text>{m.maxUtilizationPct.toFixed(1).padStart(5)}%</Text>
+              <Text dimColor>  near-limit </Text>
+              <Text>{String(m.callsNearLimit).padStart(3)}/{m.totalCalls}</Text>
+            </Text>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 function EmptyState({ source }: { source: TokenSourceFilter }) {
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -144,7 +207,7 @@ function EmptyState({ source }: { source: TokenSourceFilter }) {
   );
 }
 
-function TokensApp({ source }: { source: TokenSourceFilter }) {
+function TokensApp({ source, showContext }: { source: TokenSourceFilter; showContext: boolean }) {
   const [data, setData] = useState<TokenUsageAnalytics | null>(null);
 
   useEffect(() => {
@@ -169,6 +232,7 @@ function TokensApp({ source }: { source: TokenSourceFilter }) {
       <Header source={source} />
       <Totals data={data} />
       <Models data={data} />
+      {showContext && <ContextEfficiency data={data} />}
       <Daily data={data} />
       <Text>{""}</Text>
     </Box>
@@ -182,6 +246,7 @@ const HELP = `
 
   Options:
     --source <all|copilot-cli|claude-code>   Filter by source (default: all)
+    --context                                Show context window utilization stats
     --json                                   Output raw JSON
     --help                                   Show this help
 `.trimStart();
@@ -190,10 +255,12 @@ export function parseTokensArgs(argv: string[]): {
   source: TokenSourceFilter;
   json: boolean;
   help: boolean;
+  context: boolean;
 } {
   let source: TokenSourceFilter = "all";
   let json = false;
   let help = false;
+  let context = false;
 
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--source" && argv[i + 1]) {
@@ -203,9 +270,10 @@ export function parseTokensArgs(argv: string[]): {
     }
     if (argv[i] === "--json") json = true;
     if (argv[i] === "--help" || argv[i] === "-h") help = true;
+    if (argv[i] === "--context") context = true;
   }
 
-  return { source, json, help };
+  return { source, json, help, context };
 }
 
 export function runTokensTUI(argv: string[]): void {
@@ -222,5 +290,5 @@ export function runTokensTUI(argv: string[]): void {
     return;
   }
 
-  render(<TokensApp source={opts.source} />);
+  render(<TokensApp source={opts.source} showContext={opts.context} />);
 }

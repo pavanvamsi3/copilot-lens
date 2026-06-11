@@ -60,6 +60,7 @@ export interface TokenUsageAnalytics {
   logsDir: string;
   source: TokenSourceFilter;
   sources: Array<{ source: TokenSource; logsDir: string; logsScanned: number; calls: number }>;
+  contextUtilization: ContextUtilization;
 }
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z /;
@@ -96,6 +97,143 @@ export function normalizeModelName(raw: string): string {
   }
 
   return m;
+}
+
+// ── Context window limits (tokens) per model family ─────────────────
+// Matched by prefix against the normalized model name, same strategy as
+// MODEL_RATES in the frontend. Keep the more-specific prefixes first so
+// "gpt-4.1-mini" matches before "gpt-4.1".
+
+const MODEL_CONTEXT_LIMITS: [string, number][] = [
+  // Anthropic Claude
+  ["claude-opus",            200_000],
+  ["claude-sonnet",          200_000],
+  ["claude-haiku",           200_000],
+  ["claude-3-5-sonnet",      200_000],
+  // OpenAI GPT-5 family
+  ["gpt-5-nano",           1_000_000],
+  ["gpt-5-mini",           1_000_000],
+  ["gpt-5",                1_000_000],
+  // OpenAI GPT-4 family
+  ["gpt-4.1-mini",         1_000_000],
+  ["gpt-4.1-nano",         1_000_000],
+  ["gpt-4.1",              1_000_000],
+  ["gpt-4o-mini",            128_000],
+  ["gpt-4o",                 128_000],
+  // OpenAI o-series
+  ["o4-mini",                200_000],
+  ["o3-mini",                200_000],
+  ["o3",                     200_000],
+  ["o1-mini",                128_000],
+  ["o1",                     200_000],
+  // Google Gemini
+  ["gemini-2.5-pro",       1_000_000],
+  ["gemini-2.5-flash",     1_000_000],
+  ["gemini",               1_000_000],
+];
+
+/** Return the context window size for a model, or null if unknown. */
+export function getContextLimit(model: string): number | null {
+  if (!model) return null;
+  const m = model.toLowerCase();
+  for (const [prefix, limit] of MODEL_CONTEXT_LIMITS) {
+    if (m.startsWith(prefix)) return limit;
+  }
+  return null;
+}
+
+// ── Context utilization analytics ───────────────────────────────────
+
+export interface ContextModelUtilization {
+  contextLimit: number;
+  avgUtilizationPct: number;
+  maxUtilizationPct: number;
+  callsNearLimit: number;
+  totalCalls: number;
+}
+
+export interface ContextUtilization {
+  /** Average prompt_tokens / context_limit across all calls with a known model. */
+  avgUtilizationPct: number;
+  /** Number of calls where prompt > 80% of the model's context window. */
+  sessionsNearLimit: number;
+  /** sessionsNearLimit as a percentage of totalSessionsAnalyzed. */
+  sessionsNearLimitPct: number;
+  /** completion_tokens / prompt_tokens ratio (higher = more efficient output). */
+  contextEfficiencyScore: number;
+  /** Calls that had a known model and prompt_tokens > 0. */
+  totalSessionsAnalyzed: number;
+  /** Calls skipped because the model was unknown. */
+  totalSessionsSkipped: number;
+  /** Per-model breakdown. */
+  perModel: Record<string, ContextModelUtilization>;
+}
+
+/** Compute context-window utilization metrics from a list of token calls. */
+export function computeContextUtilization(calls: TokenCall[]): ContextUtilization {
+  const perModel: Record<string, {
+    limit: number;
+    utilizations: number[];
+    nearLimit: number;
+  }> = {};
+
+  let analyzed = 0;
+  let skipped = 0;
+  let totalUtil = 0;
+  let nearLimit = 0;
+  let totalPrompt = 0;
+  let totalCompletion = 0;
+
+  for (const c of calls) {
+    const limit = getContextLimit(c.model);
+    if (limit == null) {
+      skipped++;
+      continue;
+    }
+    if (c.prompt_tokens <= 0) continue;
+
+    analyzed++;
+    const util = c.prompt_tokens / limit;
+    totalUtil += util;
+    totalPrompt += c.prompt_tokens;
+    totalCompletion += c.completion_tokens;
+
+    if (util > 0.8) nearLimit++;
+
+    let pm = perModel[c.model];
+    if (!pm) {
+      pm = { limit, utilizations: [], nearLimit: 0 };
+      perModel[c.model] = pm;
+    }
+    pm.utilizations.push(util);
+    if (util > 0.8) pm.nearLimit++;
+  }
+
+  const avgPct = analyzed > 0 ? (totalUtil / analyzed) * 100 : 0;
+  const effScore = totalPrompt > 0 ? totalCompletion / totalPrompt : 0;
+
+  const perModelResult: Record<string, ContextModelUtilization> = {};
+  for (const [model, data] of Object.entries(perModel)) {
+    const avg = data.utilizations.reduce((a, b) => a + b, 0) / data.utilizations.length;
+    const max = Math.max(...data.utilizations);
+    perModelResult[model] = {
+      contextLimit: data.limit,
+      avgUtilizationPct: avg * 100,
+      maxUtilizationPct: max * 100,
+      callsNearLimit: data.nearLimit,
+      totalCalls: data.utilizations.length,
+    };
+  }
+
+  return {
+    avgUtilizationPct: avgPct,
+    sessionsNearLimit: nearLimit,
+    sessionsNearLimitPct: analyzed > 0 ? (nearLimit / analyzed) * 100 : 0,
+    contextEfficiencyScore: effScore,
+    totalSessionsAnalyzed: analyzed,
+    totalSessionsSkipped: skipped,
+    perModel: perModelResult,
+  };
 }
 
 /**
@@ -264,7 +402,8 @@ function bucketize(calls: TokenCall[], keyFn: (c: TokenCall) => string): PeriodB
 }
 
 export function getClaudeCodeProjectsDir(): string {
-  return path.join(os.homedir(), ".claude", "projects");
+  const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
+  return path.join(home, ".claude", "projects");
 }
 
 interface ClaudeUsage {
@@ -437,6 +576,7 @@ export function aggregate(calls: TokenCall[], logsScanned: number, logsDir: stri
     logsDir,
     source: "all",
     sources: [],
+    contextUtilization: computeContextUtilization(calls),
   };
 }
 

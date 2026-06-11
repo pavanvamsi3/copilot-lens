@@ -1367,3 +1367,62 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
 .docs-list li + li { border-top: 1px solid var(--border); }
 
 .docs strong { color: var(--text); font-weight: 600; }
+
+/* Context Efficiency Panel */
+.context-eff-grid {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 8px 0;
+}
+
+.context-gauge-wrap {
+  flex-shrink: 0;
+  width: 180px;
+  height: 110px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.context-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  flex: 1;
+}
+
+.context-stat {
+  padding: 12px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.context-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.context-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+@media (max-width: 700px) {
+  .context-eff-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .context-gauge-wrap {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .context-stats {
+    grid-template-columns: 1fr;
+  }
+}
