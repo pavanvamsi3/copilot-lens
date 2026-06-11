@@ -2,8 +2,11 @@
  * Parsed options for the dashboard entrypoint.
  */
 export interface DashboardArgs {
+  /** Hostname or interface to bind the dashboard server to. */
   host: string;
+  /** TCP port to listen on. */
   port: number;
+  /** Whether the CLI should open the dashboard URL in the default browser. */
   shouldOpen: boolean;
 }
 

@@ -3,8 +3,8 @@
 process.on("uncaughtException", (err) => {
   console.error("Uncaught error:", err.message);
 });
-process.on("unhandledRejection", (err: any) => {
-  console.error("Unhandled rejection:", err?.message || err);
+process.on("unhandledRejection", (err: unknown) => {
+  console.error("Unhandled rejection:", formatErrorMessage(err));
 });
 
 function formatErrorMessage(error: unknown): string {
