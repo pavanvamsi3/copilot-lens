@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught error:", err.message);
+process.on("uncaughtException", (error: unknown) => {
+  console.error("Uncaught error:", formatErrorMessage(error));
 });
 process.on("unhandledRejection", (err: unknown) => {
   console.error("Unhandled rejection:", formatErrorMessage(err));
