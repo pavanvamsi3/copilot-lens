@@ -1,14 +1,48 @@
 import express from "express";
-import cors from "cors";
 import path from "path";
 import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, type AnalyticsSourceFilter } from "./sessions";
 import { clearCache } from "./cache";
 import { SearchIndex } from "./search";
 import { getTokenUsage, type TokenSourceFilter } from "./token-usage";
 
-export function createApp() {
+export interface AppOptions {
+  // The host the server binds to. Used to build the allowed-Host list so a
+  // concrete LAN binding still works while loopback stays rebinding-protected.
+  host?: string;
+}
+
+const WILDCARD_HOSTS = new Set(["0.0.0.0", "::", "[::]"]);
+
+// Guards against DNS-rebinding: a malicious page that points its own domain at
+// 127.0.0.1 sends a Host header for that domain, which we reject. The dashboard
+// is same-origin so no CORS is needed; cross-origin reads stay blocked entirely.
+function hostGuard(configuredHost?: string): express.RequestHandler {
+  const host = (configuredHost || "").toLowerCase();
+
+  // When bound to a wildcard interface the user has explicitly opted into
+  // network exposure and we can't enumerate the reachable IPs, so skip the
+  // guard rather than break legitimate access (a startup warning is printed).
+  if (WILDCARD_HOSTS.has(host)) {
+    return (_req, _res, next) => next();
+  }
+
+  const allowed = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+  if (host) allowed.add(host);
+
+  return (req, res, next) => {
+    const header = (req.headers.host || "").toLowerCase();
+    const hostname = header.replace(/:\d+$/, ""); // strip port (keeps [::1])
+    if (!allowed.has(hostname)) {
+      res.status(403).json({ error: "Forbidden: invalid Host header" });
+      return;
+    }
+    next();
+  };
+}
+
+export function createApp(options: AppOptions = {}) {
   const app = express();
-  app.use(cors());
+  app.use(hostGuard(options.host));
 
   const searchIndex = new SearchIndex();
 

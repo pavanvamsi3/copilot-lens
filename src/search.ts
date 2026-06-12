@@ -51,12 +51,25 @@ function trimToWordBoundary(text: string, start: number, end: number): string {
 export class SearchIndex {
   private entries: SearchEntry[] = [];
   private storedSessions: SessionMeta[] | null = null;
+  private signature = "";
+
+  // A cheap fingerprint of the session set. Changes when sessions are added,
+  // removed, or updated, so the index can detect when it has gone stale.
+  private computeSignature(sessions: SessionMeta[]): string {
+    let latest = "";
+    for (const s of sessions) {
+      if (s.updatedAt > latest) latest = s.updatedAt;
+    }
+    return `${sessions.length}:${latest}`;
+  }
 
   buildIndex(sessions: SessionMeta[]): void {
     // Store sessions for lazy rebuild after clear()
     this.storedSessions = sessions;
-    // No-op if already built
-    if (this.entries.length > 0) return;
+    // No-op only if already built AND the session set is unchanged
+    const sig = this.computeSignature(sessions);
+    if (this.entries.length > 0 && sig === this.signature) return;
+    this.signature = sig;
     this._doBuild(sessions);
   }
 
@@ -100,7 +113,7 @@ export class SearchIndex {
     // Lazy build: only build if entries is empty
     if (this.entries.length === 0) {
       if (this.storedSessions) {
-        this._doBuild(this.storedSessions);
+        this.buildIndex(this.storedSessions);
       } else {
         return [];
       }
@@ -203,6 +216,7 @@ export class SearchIndex {
 
   clear(): void {
     this.entries = [];
+    this.signature = "";
     // storedSessions kept so search() can lazy-rebuild after clear()
   }
 }

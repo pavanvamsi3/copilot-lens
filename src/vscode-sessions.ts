@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import type { SessionMeta, SessionDetail, SessionEvent, SessionStatus } from "./sessions";
 import { cachedCall } from "./cache";
+import { isValidSessionId } from "./validation";
 
 // ============ Platform paths ============
 
@@ -64,6 +65,7 @@ const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB cap
 const MAX_TEXT_LENGTH = 10_000; // truncate huge pasted text
 
 function findSessionFile(dataDir: string, sessionId: string): string | null {
+  if (!isValidSessionId(sessionId)) return null;
   const paths = [
     path.join(dataDir, "User", "globalStorage", "emptyWindowChatSessions", `${sessionId}.json`),
   ];

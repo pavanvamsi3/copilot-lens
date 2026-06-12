@@ -4,6 +4,7 @@ import * as os from "os";
 import { randomUUID } from "crypto";
 import type { SessionMeta, SessionDetail, SessionEvent, SessionStatus } from "./sessions";
 import { cachedCall } from "./cache";
+import { isValidSessionId } from "./validation";
 
 // ============ Platform paths ============
 
@@ -196,6 +197,7 @@ export function listClaudeCodeSessions(): SessionMeta[] {
 
 /** Find the JSONL file for a given session ID by scanning projects dir */
 function findSessionFile(sessionId: string): string | null {
+  if (!isValidSessionId(sessionId)) return null;
   const projectsDir = getClaudeCodeProjectsDir();
   if (!fs.existsSync(projectsDir)) return null;
 
