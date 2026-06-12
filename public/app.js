@@ -60,11 +60,17 @@ const PAGE_TITLES = {
 function activatePage(pageName) {
   if (!VALID_PAGES.has(pageName)) pageName = "home";
   document.title = PAGE_TITLES[pageName] || "Copilot Lens";
-  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach((b) => {
+    b.classList.remove("active");
+    b.removeAttribute("aria-current");
+  });
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   const btn = document.querySelector(`.nav-btn[data-page="${pageName}"]`);
   const page = document.getElementById(pageName + "Page");
-  if (btn) btn.classList.add("active");
+  if (btn) {
+    btn.classList.add("active");
+    btn.setAttribute("aria-current", "page");
+  }
   if (page) page.classList.add("active");
   if (pageName === "home") loadHome();
   if (pageName === "sessions") loadSessions();
