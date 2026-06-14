@@ -443,6 +443,7 @@ describe("normalizeVSCodeToolName", () => {
 describe("scanVSCodeMcpConfig", () => {
   let tmpDir: string;
   let origHome: string;
+  let origUserProfile: string | undefined;
   let origAppData: string | undefined;
 
   // Helper to create platform-appropriate VS Code data directory
@@ -459,9 +460,11 @@ describe("scanVSCodeMcpConfig", () => {
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-lens-mcp-test-"));
     origHome = process.env.HOME || "";
+    origUserProfile = process.env.USERPROFILE;
     origAppData = process.env.APPDATA;
-    // Override HOME and APPDATA so scanVSCodeMcpConfig looks in our temp dir
+    // Override HOME, USERPROFILE, and APPDATA so scanVSCodeMcpConfig looks in our temp dir
     process.env.HOME = tmpDir;
+    process.env.USERPROFILE = tmpDir;
     if (process.platform === "win32") {
       process.env.APPDATA = path.join(tmpDir, "AppData", "Roaming");
     }
@@ -470,6 +473,11 @@ describe("scanVSCodeMcpConfig", () => {
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     process.env.HOME = origHome;
+    if (origUserProfile !== undefined) {
+      process.env.USERPROFILE = origUserProfile;
+    } else {
+      delete process.env.USERPROFILE;
+    }
     if (origAppData !== undefined) {
       process.env.APPDATA = origAppData;
     } else {
