@@ -993,6 +993,10 @@ function estimateTotalCost() {
   return { cost, coverage: totalTokens > 0 ? coveredTokens / totalTokens : 0 };
 }
 
+function showPremiumRequestsMetric() {
+  return !!(tokenData && tokenSource !== "claude-code" && Number(tokenData.totals?.premium_requests || 0) > 0);
+}
+
 function formatUSD(n) {
   if (n == null) return "—";
   if (n >= 1000) return "$" + n.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -1035,6 +1039,7 @@ function renderTokens() {
   if (!tokenData) return;
   const t = tokenData.totals;
   const cards = document.getElementById("tokenStatsCards");
+  const showPremiumRequests = showPremiumRequestsMetric();
   const cacheRatePct = (t.cache_hit_rate * 100).toFixed(1) + "%";
   const promptShown = adjPrompt(t.prompt_tokens, t.cached_tokens);
   const totalShown = adjTotal(t.prompt_tokens, t.cached_tokens, t.completion_tokens);
@@ -1048,12 +1053,21 @@ function renderTokens() {
   const activeDays = t.active_days || 1;
   const avgPerDayShown = Math.round(totalShown / activeDays);
 
-  const est = estimateTotalCost();
-  const coveragePct = (est.coverage * 100).toFixed(0);
-  const costPerDay = activeDays > 0 ? est.cost / activeDays : 0;
-  const costSubLabel = est.coverage >= 0.99
-    ? `lifetime · ≈ ${formatUSD(costPerDay)} / day`
-    : `lifetime · ${coveragePct}% priced · ≈ ${formatUSD(costPerDay)} / day`;
+  let pricingCardHtml = "";
+  if (showPremiumRequests) {
+    const premiumLabel = tokenSource === "copilot-cli"
+      ? "Premium Requests · GitHub billing unit"
+      : "Premium Requests · Copilot CLI only";
+    pricingCardHtml = `<div class="stat-card" title="GitHub Copilot Business and Enterprise bill premium model usage with premium requests, not raw upstream API token prices. This value comes from your local Copilot CLI session data."><div class="stat-value">${formatTokens(t.premium_requests)}</div><div class="stat-label">${premiumLabel}</div></div>`;
+  } else {
+    const est = estimateTotalCost();
+    const coveragePct = (est.coverage * 100).toFixed(0);
+    const costPerDay = activeDays > 0 ? est.cost / activeDays : 0;
+    const costSubLabel = est.coverage >= 0.99
+      ? `lifetime · ≈ ${formatUSD(costPerDay)} / day`
+      : `lifetime · ${coveragePct}% priced · ≈ ${formatUSD(costPerDay)} / day`;
+    pricingCardHtml = `<div class="stat-card" title="Estimated cost if you called the underlying APIs (Anthropic, OpenAI, Google) directly with these token counts. This is NOT what GitHub Copilot bills you — Copilot uses premium requests against your monthly allowance. Aggregated across all parsed logs."><div class="stat-value">${formatUSD(est.cost)}</div><div class="stat-label">Est. API Cost · ${costSubLabel}</div></div>`;
+  }
 
   cards.innerHTML = `
     <div class="stat-card"><div class="stat-value">${formatTokens(totalShown)}</div><div class="stat-label">${totalLabel}</div></div>
@@ -1061,7 +1075,7 @@ function renderTokens() {
     <div class="stat-card"><div class="stat-value">${formatTokens(t.completion_tokens)}</div><div class="stat-label">Completion Tokens · ${compRatio} of prompt</div></div>
     <div class="stat-card"><div class="stat-value">${formatTokens(avgPerDayShown)}</div><div class="stat-label">Avg / Day · ${t.active_days} active day${t.active_days === 1 ? "" : "s"}</div></div>
     <div class="stat-card"><div class="stat-value" style="font-size:18px">${escapeHtml(t.top_model || "—")}</div><div class="stat-label">Top Model</div></div>
-    <div class="stat-card" title="Estimated cost if you called the underlying APIs (Anthropic, OpenAI, Google) directly with these token counts. This is NOT what GitHub Copilot bills you — Copilot uses 'premium requests' against your monthly allowance. Aggregated across all parsed logs."><div class="stat-value">${formatUSD(est.cost)}</div><div class="stat-label">Est. API Cost · ${costSubLabel}</div></div>
+    ${pricingCardHtml}
   `;
 
   const meta = document.getElementById("tokensMeta");
@@ -1186,6 +1200,7 @@ function bucketCost(b) {
 function renderTokenTable() {
   const table = document.getElementById("tokenBreakdownTable");
   if (!tokenData) { table.innerHTML = ""; return; }
+  const showPremiumRequests = showPremiumRequestsMetric();
   const buckets = (tokenData[tokenBucket] || []).slice().reverse();
   if (!buckets.length) { table.innerHTML = '<tbody><tr><td style="color:var(--text-dim);padding:20px">No data</td></tr></tbody>'; return; }
   const headerLabel = tokenBucket === "daily" ? "Day" : tokenBucket === "weekly" ? "Week" : "Month";
@@ -1199,7 +1214,7 @@ function renderTokenTable() {
       ${cachedHeader}
       <th>Completion</th>
       <th>Total</th>
-      <th>Est. Cost</th>
+      <th>${showPremiumRequests ? "Premium Requests" : "Est. API Cost"}</th>
       <th>Top Model</th>
     </tr></thead>
     <tbody>
@@ -1208,6 +1223,9 @@ function renderTokenTable() {
         const totalShown = adjTotal(b.prompt_tokens, b.cached_tokens, b.completion_tokens);
         const cachedCell = tokenIncludeCached ? `<td>${formatTokens(b.cached_tokens)}</td>` : "";
         const cost = bucketCost(b);
+        const pricingCell = showPremiumRequests
+          ? (b.premium_requests > 0 ? formatTokens(b.premium_requests) : '<span style="color:var(--text-dim)">—</span>')
+          : (cost == null ? '<span style="color:var(--text-dim)">—</span>' : formatUSD(cost));
         return `
         <tr>
           <td>${escapeHtml(b.period)}</td>
@@ -1216,7 +1234,7 @@ function renderTokenTable() {
           ${cachedCell}
           <td>${formatTokens(b.completion_tokens)}</td>
           <td><strong>${formatTokens(totalShown)}</strong></td>
-          <td>${cost == null ? '<span style="color:var(--text-dim)">—</span>' : formatUSD(cost)}</td>
+          <td>${pricingCell}</td>
           <td>${escapeHtml(b.top_model || "—")}</td>
         </tr>`;
       }).join("")}

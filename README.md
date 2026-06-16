@@ -29,7 +29,7 @@ copilot-lens tokens --json    # Machine-readable output
 - **Search**: full-text across every session, with source/date/directory filters
 - **Sessions**: unified browser for Copilot CLI, VS Code Copilot Chat, and Claude Code conversations, including extended-thinking blocks where supported
 - **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
-- **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
+- **Tokens**: real token usage parsed from local session data/logs, with daily/weekly/monthly views, model breakdown, Copilot premium requests, and an estimated upstream API cost reference for direct-API sources
 - **Effectiveness Score**: 0 to 100 score per repo with improvement tips
 - **Export**: single-session OpenAI-style chat JSONL, suitable as SFT data
 
@@ -49,14 +49,14 @@ copilot-lens tokens --json    # Machine-readable output
 
 ![0 to 100 score per repo with actionable improvement tips](https://raw.githubusercontent.com/pavanvamsi3/copilot-lens/main/assets/copilot-lens-score.png)
 
-> **About the cost number:** GitHub Copilot bills on **premium requests**, not tokens. The cost shown is what you'd pay calling Anthropic / OpenAI / Google directly with the same usage. Useful as a reference, not your GitHub bill.
+> **About pricing:** GitHub Copilot bills on **premium requests**, not raw token dollars. Copilot Lens now surfaces premium requests as the primary Copilot billing signal. Any API-cost figure is only a direct-provider reference for the underlying token usage, not your GitHub bill.
 
 ## Where the data comes from
 
 | Source | Path |
 |--------|------|
-| Copilot CLI sessions | `~/.copilot/session-state/` |
-| Copilot CLI token logs | `~/.copilot/logs/process-*.log` |
+| Copilot CLI sessions and usage summaries | `~/.copilot/session-state/` |
+| Copilot CLI legacy token logs | `~/.copilot/logs/process-*.log` |
 | VS Code Copilot Chat | `~/Library/Application Support/Code/` (macOS), `%APPDATA%/Code/` (Win), `~/.config/Code/` (Linux) |
 | Claude Code | `~/.claude/projects/` |
 
