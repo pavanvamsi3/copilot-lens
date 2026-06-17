@@ -35,7 +35,12 @@ if (args[0] === "tokens") {
     return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
   }
 
-  const port = parseInt(getArg("--port", "3000"), 10);
+  const portArg = getArg("--port", "3000");
+  const port = Number(portArg);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error("Error: --port must be a number between 1 and 65535");
+    process.exit(1);
+  }
   const host = getArg("--host", "localhost");
   const shouldOpen = args.includes("--open");
 
