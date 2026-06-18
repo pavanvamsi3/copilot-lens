@@ -437,6 +437,11 @@ function escapeHtml(str) {
 
 // Analytics
 async function loadAnalytics() {
+  statsCards.innerHTML = Array.from({ length: 4 }, () => `
+    <div class="stat-card">
+      <div class="stat-value">…</div>
+      <div class="stat-label">Loading</div>
+    </div>`).join("");
   try {
     const res = await fetch(`/api/analytics?source=${analyticsSource}`);
     analytics = await res.json();
@@ -745,6 +750,17 @@ const insightsContent = document.getElementById("insightsContent");
 let insightsRepos = [];
 
 async function loadInsights() {
+  insightsContent.innerHTML = `
+    <div class="skeleton-card">
+      <div class="skeleton-line" style="width:55%;height:16px;margin-bottom:12px"></div>
+      <div class="skeleton-line" style="width:75%"></div>
+      <div class="skeleton-line" style="width:40%"></div>
+    </div>
+    <div class="skeleton-card" style="margin-top:16px">
+      <div class="skeleton-line" style="width:65%;height:14px;margin-bottom:10px"></div>
+      <div class="skeleton-line" style="width:80%"></div>
+      <div class="skeleton-line" style="width:50%"></div>
+    </div>`;
   try {
     const res = await fetch("/api/insights/repos");
     insightsRepos = await res.json();
@@ -852,6 +868,8 @@ function renderInsightsScore(data) {
 
 // Full-text search
 async function runSearch(q) {
+  const searchWrap = document.querySelector(".search-bar-wrap");
+  if (searchWrap) searchWrap.classList.add("loading");
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=all&limit=20`);
     const results = await res.json();
@@ -860,6 +878,8 @@ async function runSearch(q) {
   } catch (err) {
     isSearchActive = true;
     sessionList.innerHTML = `<div class="error-message">Search failed: ${escapeHtml(err.message)}</div>`;
+  } finally {
+    if (searchWrap) searchWrap.classList.remove("loading");
   }
 }
 
