@@ -869,12 +869,14 @@ function clearSearch() {
 }
 
 function renderSearchResults(results) {
+  const query = searchInput.value.trim();
   if (!results || results.length === 0) {
     sessionCount.textContent = "No results found";
     sessionList.innerHTML = `
       <div class="empty-state">
         <span class="empty-icon">🔍</span>
-        <p>No results found for your search</p>
+        <p>${query ? `No sessions matched "<strong>${escapeHtml(query)}</strong>".` : "No sessions found."}</p>
+        <p class="empty-state-hint">Try using broader search terms or clearing filters.</p>
       </div>`;
     return;
   }
