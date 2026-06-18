@@ -1,5 +1,5 @@
 ---
-description: Review an open pull request against project guidelines and post inline comments. Pass a PR number to review a specific PR, or omit to review the current branch's open PR.
+description: Review a pull request against project guidelines and post inline comments. Run `/pr-review <PR#>` to review a specific PR, or `/pr-review` to review the open PR for the current branch.
 ---
 
 You are reviewing a pull request for the **copilot-lens** project — a local-first Node + Express + TypeScript dashboard for visualising AI coding-assistant session history. The frontend is vanilla JS/HTML/CSS (no bundler), the TUI uses Ink + React, and tests run under Vitest.
