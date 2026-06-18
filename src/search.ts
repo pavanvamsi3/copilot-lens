@@ -41,13 +41,11 @@ function trimToWordBoundary(text: string, start: number, end: number): string {
   let e = end;
 
   // Trim start to nearest word boundary (move right until whitespace)
-  // /\s/.test(...) checks if the target character is a whitespace character.
   if (s > 0 && !/\s/.test(text[s - 1])) {
     while (s < e && !/\s/.test(text[s])) s++;
   }
 
   // Trim end to nearest word boundary (move left until whitespace)
-  // /\s/.test(...) checks if the target character is a whitespace character.
   if (e < text.length && !/\s/.test(text[e])) {
     while (e > s && !/\s/.test(text[e - 1])) e--;
   }

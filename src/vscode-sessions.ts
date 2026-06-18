@@ -487,8 +487,6 @@ export function scanVSCodeMcpConfig(): string[] {
       if (!fs.existsSync(configPath)) continue;
       let raw = fs.readFileSync(configPath, "utf-8");
       // Strip trailing commas to parse JSONC / VS Code style files as valid JSON.
-      // /,\s*([\]}])/g matches a comma followed by optional whitespace and a closing bracket/brace.
-      // Replaces the whole match with the captured bracket/brace ($1), dropping the trailing comma.
       raw = raw.replace(/,\s*([\]}])/g, "$1");
       const config = JSON.parse(raw);
       const servers = config.servers || config.mcpServers || {};
