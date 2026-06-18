@@ -5,6 +5,7 @@ import { parse as parseYaml } from "yaml";
 import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName, scanVSCodeMcpConfig } from "./vscode-sessions";
 import { listClaudeCodeSessions, getClaudeCodeSession, isClaudeCodeSession, getClaudeCodeAnalytics } from "./claude-code-sessions";
 import { cachedCall } from "./cache";
+import { isValidSessionId } from "./validation";
 
 export type SessionStatus = "running" | "completed" | "error";
 export type SessionSource = "cli" | "vscode" | "claude-code";
@@ -184,6 +185,9 @@ export function listSessions(): SessionMeta[] {
 }
 
 export function getSession(sessionId: string): SessionDetail | null {
+  // Reject ids that could traverse outside the session directories.
+  if (!isValidSessionId(sessionId)) return null;
+
   // Check VS Code sessions first (avoids filesystem miss for CLI)
   try {
     if (isVSCodeSession(sessionId)) {

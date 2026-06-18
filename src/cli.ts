@@ -54,21 +54,30 @@ if (process.env.VITEST !== "true") {
     const host = getArg("--host", "localhost");
     const shouldOpen = args.includes("--open");
 
-    const app = createApp();
+    const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+    if (!LOOPBACK_HOSTS.has(host)) {
+      console.warn(
+        `\n  ⚠️  Binding to ${host} exposes your AI session data to the network with no authentication.\n`
+      );
+    }
+
+    const app = createApp({ host });
 
     app.listen(port, host, async () => {
       const url = `http://${host}:${port}`;
       console.log(`\n  👓 Copilot Lens is running at ${url}\n`);
 
       if (shouldOpen) {
-        const { exec } = await import("child_process");
-        const cmd =
-          process.platform === "win32"
-            ? `start "" "${url}"`
-            : process.platform === "darwin"
-              ? `open ${url}`
-              : `xdg-open ${url}`;
-        exec(cmd);
+        // Use execFile with an argument array (no shell) so the URL/host cannot
+        // be interpreted as shell syntax.
+        const { execFile } = await import("child_process");
+        if (process.platform === "win32") {
+          execFile("cmd", ["/c", "start", "", url]);
+        } else if (process.platform === "darwin") {
+          execFile("open", [url]);
+        } else {
+          execFile("xdg-open", [url]);
+        }
       }
     });
   }

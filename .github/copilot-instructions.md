@@ -15,6 +15,7 @@ Vitest for tests.
 - Always insist that exported public functions and React components include JSDoc comments describing their parameters and return value.
 - Prefer descriptive variable names over single-letter names except for loop indices and well-known math conventions.
 - Flag any new `console.log`, `console.debug`, or `debugger` statements in non-test source files as a review concern. Existing intentional CLI output (`src/cli.ts`) and server startup/error logging are the exception.
+- Insist on adding screenshots as necessary if they're not present in the PR Description (only for relavant code changes)
 
 ## Privacy and local-first
 

@@ -1,6 +1,6 @@
 {
   "name": "copilot-lens",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "description": "A local dashboard to visualize and analyze your GitHub Copilot CLI sessions",
   "engines": {
     "node": ">=20"
@@ -38,7 +38,6 @@
   ],
   "dependencies": {
     "better-sqlite3": "^12.6.2",
-    "cors": "^2.8.6",
     "express": "^5.2.1",
     "ink": "^3.2.0",
     "react": "^17.0.2",
@@ -46,7 +45,6 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.2",
     "@types/react": "^17.0.91",
