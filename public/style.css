@@ -311,6 +311,7 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
 .badge-cli { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); color: var(--accent); }
 .badge-vscode { background: color-mix(in srgb, #bc8cff 15%, var(--surface)); color: #bc8cff; }
 .badge-claude { background: color-mix(in srgb, #f0883e 15%, var(--surface)); color: #f0883e; }
+.badge-cursor { background: color-mix(in srgb, #56d4dd 15%, var(--surface)); color: #56d4dd; }
 
 .top-badges { display: flex; gap: 6px; align-items: center; }
 
