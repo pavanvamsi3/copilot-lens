@@ -121,7 +121,7 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
           const readSize = Math.min(stat.size, 1024 * 1024);
           const buf = Buffer.alloc(readSize);
           const fd = fs.openSync(evPath, "r");
-          fs.readSync(fd, buf, 0, readSize, 0);
+          fs.readSync(fd, buf, 0, readSize, Math.max(0, stat.size - readSize));
           fs.closeSync(fd);
           const tsList: number[] = [];
 
@@ -201,8 +201,6 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
   let topModel: string | null = null;
   if (Object.keys(modelTokens).length > 0) {
     topModel = Object.entries(modelTokens).sort((a, b) => b[1] - a[1])[0][0];
-  } else if (tokenData.totals.top_model) {
-    topModel = tokenData.totals.top_model;
   }
 
   return {

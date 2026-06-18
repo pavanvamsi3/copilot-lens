@@ -34,11 +34,11 @@ function changeBadge(current: number, prior: number | null): string | null {
 
 type Row = { icon: string; label: string; value: string; badge?: string };
 
-function DigestApp({ period }: { period: DigestPeriod }) {
-  const [data, setData] = useState<DigestData | null>(null);
+function DigestApp({ period, precomputed }: { period: DigestPeriod; precomputed?: DigestData }) {
+  const [data, setData] = useState<DigestData | null>(precomputed ?? null);
 
   useEffect(() => {
-    setData(getDigest(period));
+    if (!precomputed) setData(getDigest(period));
   }, [period]);
 
   if (!data) return <Text dimColor>Computing digest…</Text>;
@@ -152,7 +152,7 @@ function toMarkdown(data: DigestData): string {
 const HELP = `
   Usage: copilot-lens digest [options]
 
-  Print a weekly usage summary to the terminal (Spotify Wrapped-style).
+  Print a period-based usage summary to the terminal (Spotify Wrapped-style).
 
   Options:
     --last-week   Show last week instead of the current week
@@ -202,8 +202,15 @@ export function runDigestTUI(argv: string[]): void {
     const data = getDigest(opts.period);
     const md = toMarkdown(data);
     const outPath = path.join(process.cwd(), "digest.md");
-    fs.writeFileSync(outPath, md, "utf-8");
-    process.stderr.write(`Saved digest to ${outPath}\n`);
+    try {
+      fs.writeFileSync(outPath, md, "utf-8");
+      process.stderr.write(`Saved digest to ${outPath}\n`);
+    } catch (err: any) {
+      process.stderr.write(`Error: could not save digest to ${outPath}: ${err?.message || err}\n`);
+      process.exitCode = 1;
+    }
+    render(<DigestApp period={opts.period} precomputed={data} />);
+    return;
   }
 
   render(<DigestApp period={opts.period} />);
