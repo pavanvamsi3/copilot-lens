@@ -82,9 +82,9 @@ export interface DigestResult {
 
 /** Filter sessions that fall within a date range by `createdAt`. */
 function sessionsInRange(
-  sessions: Pick<SessionMeta, "createdAt" | "status">[],
+  sessions: Pick<SessionMeta, "createdAt">[],
   range: DateRange,
-): Pick<SessionMeta, "createdAt" | "status">[] {
+): Pick<SessionMeta, "createdAt">[] {
   return sessions.filter((s) => {
     if (!s.createdAt) return false;
     const t = new Date(s.createdAt).getTime();
@@ -95,7 +95,7 @@ function sessionsInRange(
 
 /** Compute aggregate stats for a set of sessions. */
 function aggregateStats(
-  sessions: Pick<SessionMeta, "createdAt" | "status">[],
+  sessions: Pick<SessionMeta, "createdAt">[],
   durations: Map<string, number>,
 ): PeriodStats {
   let totalDuration = 0;
@@ -125,7 +125,7 @@ function pctChange(current: number, previous: number): number | null {
  *                    duration is treated as 0 for every session.
  */
 export function getDigest(
-  sessions: Pick<SessionMeta, "createdAt" | "status">[],
+  sessions: Pick<SessionMeta, "createdAt">[],
   now: Date = new Date(),
   durations: Map<string, number> = new Map(),
 ): DigestResult {
