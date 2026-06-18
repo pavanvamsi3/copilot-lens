@@ -442,7 +442,7 @@ describe("normalizeVSCodeToolName", () => {
 
 describe("scanVSCodeMcpConfig", () => {
   let tmpDir: string;
-  let origHome: string;
+  let origHome: string | undefined;
   let origUserProfile: string | undefined;
   let origAppData: string | undefined;
 
@@ -459,7 +459,7 @@ describe("scanVSCodeMcpConfig", () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-lens-mcp-test-"));
-    origHome = process.env.HOME || "";
+    origHome = process.env.HOME;
     origUserProfile = process.env.USERPROFILE;
     origAppData = process.env.APPDATA;
     // Override HOME, USERPROFILE, and APPDATA so scanVSCodeMcpConfig looks in our temp dir
@@ -472,7 +472,11 @@ describe("scanVSCodeMcpConfig", () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    process.env.HOME = origHome;
+    if (origHome !== undefined) {
+      process.env.HOME = origHome;
+    } else {
+      delete process.env.HOME;
+    }
     if (origUserProfile !== undefined) {
       process.env.USERPROFILE = origUserProfile;
     } else {
