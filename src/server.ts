@@ -4,6 +4,7 @@ import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoSco
 import { clearCache } from "./cache";
 import { SearchIndex } from "./search";
 import { getTokenUsage, type TokenSourceFilter } from "./token-usage";
+import { bulkExport, type ExportSource, type ExportFormat } from "./export";
 
 export interface AppOptions {
   // The host the server binds to. Used to build the allowed-Host list so a
@@ -175,6 +176,54 @@ export function createApp(options: AppOptions = {}) {
       const raw = typeof req.query.source === "string" ? req.query.source : "all";
       const source: TokenSourceFilter = validSources.includes(raw as TokenSourceFilter) ? (raw as TokenSourceFilter) : "all";
       res.json(getTokenUsage(source));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: Bulk export — NDJSON stream, one record per session
+  // ?source=all|cli|vscode|claude-code
+  // ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
+  // ?repo=<substring>
+  // ?min_turns=N  ?min_tokens=N
+  // ?format=openai|sharegpt
+  // ?include_tools=1
+  app.get("/api/export", (req, res) => {
+    try {
+      const validSources: ExportSource[] = ["all", "cli", "vscode", "claude-code"];
+      const rawSource = typeof req.query.source === "string" ? req.query.source : "all";
+      const source: ExportSource = validSources.includes(rawSource as ExportSource)
+        ? (rawSource as ExportSource)
+        : "all";
+
+      const validFormats: ExportFormat[] = ["openai", "sharegpt"];
+      const rawFormat = typeof req.query.format === "string" ? req.query.format : "openai";
+      const format: ExportFormat = validFormats.includes(rawFormat as ExportFormat)
+        ? (rawFormat as ExportFormat)
+        : "openai";
+
+      const from = typeof req.query.from === "string" ? req.query.from : undefined;
+      const to = typeof req.query.to === "string" ? req.query.to : undefined;
+      const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
+      const minTurns = req.query.min_turns ? parseInt(req.query.min_turns as string) : 1;
+      const minTokens = req.query.min_tokens ? parseInt(req.query.min_tokens as string) : undefined;
+      const includeTools = req.query.include_tools === "1" || req.query.include_tools === "true";
+
+      const result = bulkExport({ source, from, to, repo, minTurns, minTokens, format, includeTools });
+
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="copilot-lens-export-${format}.jsonl"`
+      );
+      // Emit summary as first comment line, then data lines
+      res.write(
+        `// exported=${result.exportedSessions} total=${result.totalSessions} skipped_turns=${result.skippedTurns} skipped_tokens=${result.skippedTokens}\n`
+      );
+      for (const line of result.lines) {
+        res.write(line + "\n");
+      }
+      res.end();
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
