@@ -65,10 +65,14 @@ You are reviewing a pull request for the **copilot-lens** project — a local-fi
 
 5. Post a top-level summary comment with:
    - Total counts by severity
-   - Overall verdict: **Approve** (no errors), **Request changes** (one or more errors), or **Comment** (warnings/suggestions only)
+   - Overall verdict (see step 6 for rules)
    - A brief summary of what the PR does and the main concerns
+   - Tag the PR author (`@<login>`) telling them what to resolve and that the PR will be merged once all comments are addressed.
 
-6. Submit the formal review:
-   - `gh pr review <number> --approve` if verdict is Approve
-   - `gh pr review <number> --request-changes --body "<summary>"` if verdict is Request changes
-   - `gh pr review <number> --comment --body "<summary>"` otherwise
+6. Determine the verdict and submit the formal review:
+   - **Request changes** — if there are ANY findings (errors, warnings, or suggestions). Do NOT approve a PR that has unresolved comments, regardless of severity.
+   - **Approve** — only if there are zero findings of any kind.
+
+   Submit with:
+   - `gh pr review <number> --approve --body "<summary>"` only when verdict is Approve
+   - `gh pr review <number> --request-changes --body "<summary>"` for everything else
