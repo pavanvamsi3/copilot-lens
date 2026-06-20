@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught error:", err.message);
+process.on("uncaughtException", (error: unknown) => {
+  console.error("Uncaught error:", formatErrorMessage(error));
 });
-process.on("unhandledRejection", (err: any) => {
-  console.error("Unhandled rejection:", err?.message || err);
+process.on("unhandledRejection", (err: unknown) => {
+  console.error("Unhandled rejection:", formatErrorMessage(err));
 });
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 const args = process.argv.slice(2);
 
@@ -29,15 +33,17 @@ if (args[0] === "tokens") {
 `);
 } else {
   const { createApp } = require("./server");
+  const { parseDashboardArgs } = require("./cli-args");
+  let host: string;
+  let port: number;
+  let shouldOpen: boolean;
 
-  function getArg(name: string, fallback: string): string {
-    const idx = args.indexOf(name);
-    return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
+  try {
+    ({ host, port, shouldOpen } = parseDashboardArgs(args));
+  } catch (error: unknown) {
+    console.error(formatErrorMessage(error));
+    process.exit(1);
   }
-
-  const port = parseInt(getArg("--port", "3000"), 10);
-  const host = getArg("--host", "localhost");
-  const shouldOpen = args.includes("--open");
 
   const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
   if (!LOOPBACK_HOSTS.has(host)) {
