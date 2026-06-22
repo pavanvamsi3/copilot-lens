@@ -49,6 +49,14 @@ export function createApp(options: AppOptions = {}) {
   // Serve static frontend files
   app.use(express.static(path.join(__dirname, "..", "public")));
 
+  // API: Health check
+  app.get("/api/health", (_req, res) => {
+  res.status(200).json({
+      status: "ok",
+      version: process.env.npm_package_version ?? "unknown",
+    });
+  });
+
   // API: Full-text search
   app.get("/api/search", async (req, res) => {
     try {
