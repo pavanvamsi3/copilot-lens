@@ -82,7 +82,11 @@ nav { display: flex; gap: 4px; flex: 1; }
 }
 
 .nav-btn:hover { color: var(--text); }
-.nav-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+.nav-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
 
 .refresh-btn {
   padding: 6px 14px;
