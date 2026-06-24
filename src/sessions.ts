@@ -368,6 +368,8 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
             // MCP servers
             if (event.type === "session.info" && event.data?.infoType === "mcp") {
               const msg = event.data?.message || "";
+              // Match "Configured MCP server(s): <comma-separated server list>" case-insensitively.
+              // \s*(.+) captures everything after the colon (and optional spaces).
               const match = msg.match(/Configured MCP servers?:\s*(.+)/i);
               if (match) {
                 for (const server of match[1].split(",").map((s: string) => s.trim())) {
@@ -383,6 +385,10 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
             }
             if (event.type === "session.info" && event.data?.infoType === "model") {
               const msg = event.data?.message || "";
+              // Match "Model changed to: <model-name>" case-insensitively.
+              // [^\s.]+(?:[-.][^\s.]+)* matches a string of non-space, non-dot characters,
+              // optionally followed by separators (hyphens/dots) and more non-space, non-dot characters,
+              // capturing the model name without trailing punctuation.
               const match = msg.match(/Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i);
               if (match) modelUsage[match[1]] = (modelUsage[match[1]] || 0) + 1;
             }
@@ -507,7 +513,7 @@ function scanMcpConfig(repoPath: string): string[] {
     try {
       if (fs.existsSync(configPath)) {
         let raw = fs.readFileSync(configPath, "utf-8");
-        // Strip trailing commas (JSONC / VS Code style)
+        // Strip trailing commas to parse JSONC / VS Code style files as valid JSON.
         raw = raw.replace(/,\s*([\]}])/g, "$1");
         const config = JSON.parse(raw);
         const servers = config.servers || config.mcpServers || {};
@@ -595,6 +601,8 @@ function collectRepoData(repoPath: string, allSessions?: SessionMeta[]): RepoSes
 
           if (event.type === "session.info" && event.data?.infoType === "mcp") {
             const msg = event.data?.message || "";
+            // Match "Configured MCP server(s): <comma-separated server list>" case-insensitively.
+            // \s*(.+) captures everything after the colon (and optional spaces).
             const match = msg.match(/Configured MCP servers?:\s*(.+)/i);
             if (match) {
               for (const server of match[1].split(",").map((s: string) => s.trim())) {
@@ -692,6 +700,8 @@ function scoreMcpUtilization(data: RepoSessionData, configuredServers: string[])
     // Fuzzy match: config name "bluebird-mcp" matches usage "bluebird" or tool "bluebird-engineering_copilot"
     const usedServers = [...data.mcpServersUsed, ...data.toolsUsed];
     const used = configuredServers.filter((configured) => {
+      // Normalize names by removing hyphens, underscores, and whitespace characters.
+      // /[-_\s]/g matches any hyphen, underscore, or space character globally.
       const cfgLower = configured.toLowerCase().replace(/[-_\s]/g, "");
       return usedServers.some((u) => {
         const uLower = u.toLowerCase().replace(/[-_\s]/g, "");
@@ -765,6 +775,8 @@ function generateTips(categories: RepoScore["categories"], data: RepoSessionData
   if (categories.mcpUtilization.score < 15 && configuredServers.length > 0) {
     const usedServers = [...data.mcpServersUsed, ...data.toolsUsed];
     const unused = configuredServers.filter((configured) => {
+      // Normalize names by removing hyphens, underscores, and whitespace characters.
+      // /[-_\s]/g matches any hyphen, underscore, or space character globally.
       const cfgLower = configured.toLowerCase().replace(/[-_\s]/g, "");
       return !usedServers.some((u) => {
         const uLower = u.toLowerCase().replace(/[-_\s]/g, "");
