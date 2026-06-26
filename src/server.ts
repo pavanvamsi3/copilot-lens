@@ -46,17 +46,27 @@ export function createApp(options: AppOptions = {}) {
 
   const searchIndex = new SearchIndex();
 
-  // Serve static frontend files
-  app.use(express.static(path.join(__dirname, "..", "public")));
+  // Cache version once when the app is created (avoid per-request I/O)
+  let appVersion = process.env.npm_package_version;
+  if (!appVersion) {
+    try {
+      appVersion = (require("../package.json") as { version?: string }).version;
+    } catch {
+      appVersion = "0.0.0";
+    }
+  }
 
   // API: Health check
   app.get("/api/health", (_req, res) => {
-  res.status(200).json({
+    res.status(200).json({
       status: "ok",
-      version: process.env.npm_package_version ?? "unknown",
+      version: appVersion,
     });
   });
 
+  // Serve static frontend files
+  app.use(express.static(path.join(__dirname, "..", "public")));
+
   // API: Full-text search
   app.get("/api/search", async (req, res) => {
     try {
