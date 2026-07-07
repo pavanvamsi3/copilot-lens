@@ -1,19 +1,34 @@
 #!/usr/bin/env node
 
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught error:", err.message);
-});
-process.on("unhandledRejection", (err: any) => {
-  console.error("Unhandled rejection:", err?.message || err);
-});
+export function meetsNodeRequirement(versionString: string): boolean {
+  const [major] = versionString.split('.').map(Number);
+  return major >= 20;
+}
 
-const args = process.argv.slice(2);
+// Node.js version gate — must run before any modern syntax/APIs.
+if (!meetsNodeRequirement(process.versions.node)) {
+  console.error(
+    `Error: copilot-lens requires Node.js 20 or later. You are running v${process.versions.node}.`
+  );
+  process.exit(1);
+}
 
-if (args[0] === "tokens") {
-  const { runTokensTUI } = require("./cli-tokens");
-  runTokensTUI(args.slice(1));
-} else if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
-  process.stdout.write(`
+// Avoid running the CLI side-effects when imported by Vitest
+if (process.env.VITEST !== "true") {
+  process.on("uncaughtException", (err) => {
+    console.error("Uncaught error:", err.message);
+  });
+  process.on("unhandledRejection", (err: any) => {
+    console.error("Unhandled rejection:", err?.message || err);
+  });
+
+  const args = process.argv.slice(2);
+
+  if (args[0] === "tokens") {
+    const { runTokensTUI } = require("./cli-tokens");
+    runTokensTUI(args.slice(1));
+  } else if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
+    process.stdout.write(`
   Usage: copilot-lens [command] [options]
 
   Commands:
@@ -27,42 +42,43 @@ if (args[0] === "tokens") {
 
   Run "copilot-lens tokens --help" for tokens command options.
 `);
-} else {
-  const { createApp } = require("./server");
+  } else {
+    const { createApp } = require("./server");
 
-  function getArg(name: string, fallback: string): string {
-    const idx = args.indexOf(name);
-    return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
-  }
-
-  const port = parseInt(getArg("--port", "3000"), 10);
-  const host = getArg("--host", "localhost");
-  const shouldOpen = args.includes("--open");
-
-  const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-  if (!LOOPBACK_HOSTS.has(host)) {
-    console.warn(
-      `\n  ⚠️  Binding to ${host} exposes your AI session data to the network with no authentication.\n`
-    );
-  }
-
-  const app = createApp({ host });
-
-  app.listen(port, host, async () => {
-    const url = `http://${host}:${port}`;
-    console.log(`\n  👓 Copilot Lens is running at ${url}\n`);
-
-    if (shouldOpen) {
-      // Use execFile with an argument array (no shell) so the URL/host cannot
-      // be interpreted as shell syntax.
-      const { execFile } = await import("child_process");
-      if (process.platform === "win32") {
-        execFile("cmd", ["/c", "start", "", url]);
-      } else if (process.platform === "darwin") {
-        execFile("open", [url]);
-      } else {
-        execFile("xdg-open", [url]);
-      }
+    function getArg(name: string, fallback: string): string {
+      const idx = args.indexOf(name);
+      return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
     }
-  });
+
+    const port = parseInt(getArg("--port", "3000"), 10);
+    const host = getArg("--host", "localhost");
+    const shouldOpen = args.includes("--open");
+
+    const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+    if (!LOOPBACK_HOSTS.has(host)) {
+      console.warn(
+        `\n  ⚠️  Binding to ${host} exposes your AI session data to the network with no authentication.\n`
+      );
+    }
+
+    const app = createApp({ host });
+
+    app.listen(port, host, async () => {
+      const url = `http://${host}:${port}`;
+      console.log(`\n  👓 Copilot Lens is running at ${url}\n`);
+
+      if (shouldOpen) {
+        // Use execFile with an argument array (no shell) so the URL/host cannot
+        // be interpreted as shell syntax.
+        const { execFile } = await import("child_process");
+        if (process.platform === "win32") {
+          execFile("cmd", ["/c", "start", "", url]);
+        } else if (process.platform === "darwin") {
+          execFile("open", [url]);
+        } else {
+          execFile("xdg-open", [url]);
+        }
+      }
+    });
+  }
 }
