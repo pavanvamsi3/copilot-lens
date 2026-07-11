@@ -39,7 +39,7 @@
         <p>The <button class="home-link" data-jump="analytics">Analytics</button> tab has eight charts: sessions per day, hour of day, tool usage, model usage, top directories, time per branch, time per repo, and MCP servers. A source filter at the top applies to everything on the page so you can compare Copilot CLI vs Claude Code at a glance.</p>
 
         <h2>See where tokens go</h2>
-        <p>The <button class="home-link" data-jump="tokens">Tokens</button> tab shows daily, weekly, and monthly totals of input, output, and cached tokens, split by model. It also shows a rough cost estimate based on public API list prices. Curious how the numbers are built and what "cached" means? Read the <button class="home-link" data-jump="docs">Docs</button> tab.</p>
+        <p>The <button class="home-link" data-jump="tokens">Tokens</button> tab shows daily, weekly, and monthly totals of input, output, and cached tokens, split by model. For Copilot CLI it now shows <strong>premium requests</strong> as the primary billing signal; for Claude Code it still shows a rough upstream API cost reference. Curious how the numbers are built and what "cached" means? Read the <button class="home-link" data-jump="docs">Docs</button> tab.</p>
 
         <h2>Score each repo's effectiveness</h2>
         <p>The <button class="home-link" data-jump="insights">Insights</button> tab computes a per-repository score based on session outcomes, tool patterns, and time spent. A quick way to spot the codebases you are shipping in vs. the ones you are grinding through.</p>
@@ -202,15 +202,16 @@
 
         <h2>What Copilot CLI records</h2>
 
-        <p>GitHub Copilot CLI saves one log per day under <code>~/.copilot/logs</code>. Every AI response has a <code>usage</code> block with three numbers:</p>
+        <p>Current GitHub Copilot CLI sessions write token usage summaries under <code>~/.copilot/session-state/*/events.jsonl</code> in <code>session.shutdown</code> events. Older installs also wrote detailed response logs under <code>~/.copilot/logs</code>. Copilot Lens reads both shapes.</p>
 
         <dl>
-          <dt>prompt_tokens</dt><dd>Everything the model read this turn, cached or not.</dd>
-          <dt>completion_tokens</dt><dd>Everything the model wrote back.</dd>
-          <dt>cached_tokens</dt><dd>The part of prompt_tokens that came from cache, not fresh.</dd>
+          <dt>prompt_tokens</dt><dd>Everything the model read, including fresh input, cache writes, and cache reads.</dd>
+          <dt>completion_tokens</dt><dd>Everything the model wrote back, including reasoning/output tokens where the local session summary exposes them.</dd>
+          <dt>cached_tokens</dt><dd>The part of prompt_tokens that came from cache reads instead of fresh input.</dd>
+          <dt>premium_requests</dt><dd>The GitHub Copilot billing unit for premium model usage. This is the most relevant number for Copilot Business / Enterprise billing.</dd>
         </dl>
 
-        <p>Copilot itself does not bill you per token. It sells a subscription with a monthly budget of "premium requests". What you see here is the underlying model usage that Copilot makes on your behalf.</p>
+        <p>Copilot itself does not bill you per token. It sells a subscription with a monthly budget of premium requests. That is why the Tokens page now shows <strong>Premium Requests</strong> as the primary Copilot billing signal instead of pretending the raw token totals are your GitHub bill.</p>
 
         <p class="docs-links">
           <a href="https://github.com/features/copilot/plans" target="_blank" rel="noopener">Copilot plans and pricing</a>
@@ -256,17 +257,19 @@
           <a href="https://platform.openai.com/docs/guides/prompt-caching" target="_blank" rel="noopener">Prompt caching (OpenAI docs)</a>
         </p>
 
-        <h2>About the cost estimate</h2>
+        <h2>About pricing and premium requests</h2>
 
-        <p>The Est. API Cost number on the Tokens page uses the public list prices from each provider and multiplies them by the tokens we saw in your logs. It is a rough "what if you had called the API yourself" figure, not your actual bill.</p>
+        <p>When the Tokens page is showing <strong>Copilot CLI</strong> data, the pricing card now shows <strong>Premium Requests</strong>. That matches how GitHub Copilot Business / Enterprise meters premium model usage more closely than a raw token-to-dollar conversion.</p>
+
+        <p>When the Tokens page is showing <strong>Claude Code</strong> only, Copilot Lens still shows an <strong>Est. API Cost</strong> figure based on public API list prices, because Claude Code is a direct API-style token meter. In mixed views, Copilot Lens prefers Premium Requests if Copilot billing data is present.</p>
 
         <p>Caveats:</p>
 
         <ul class="docs-list">
-          <li>It is not what GitHub Copilot charges. Copilot sells a subscription and uses a premium request budget; that budget is cheaper than calling the underlying APIs directly.</li>
-          <li>It is not what Claude.ai or ChatGPT subscriptions charge. Same reason.</li>
-          <li>Cache creation is billed higher than cache reads. Copilot Lens approximates this but does not match to the exact penny.</li>
-          <li>Unknown model names count as zero cost. The "% priced" label tells you how much of the total had a known rate.</li>
+          <li>Premium Requests are the right unit for Copilot plan usage, but they are still not a full invoice. Seat pricing and any org-level allowances live outside these local logs.</li>
+          <li>Est. API Cost is only a reference model for direct provider pricing. It is not what GitHub Copilot, Claude.ai, or ChatGPT subscriptions charge.</li>
+          <li>Cache creation is billed higher than cache reads on direct APIs. Copilot Lens approximates this for API-style references but does not match provider invoices to the exact penny.</li>
+          <li>Unknown model names count as zero in API-cost mode. The "% priced" label tells you how much of the total had a known rate.</li>
         </ul>
 
         <p class="docs-links">
@@ -278,7 +281,8 @@
         <h2>Where the data lives</h2>
 
         <dl>
-          <dt>~/.copilot/logs/</dt><dd>Copilot CLI response logs.</dd>
+          <dt>~/.copilot/session-state/</dt><dd>Copilot CLI session summaries, including <code>session.shutdown</code> usage and premium-request data.</dd>
+          <dt>~/.copilot/logs/</dt><dd>Legacy Copilot CLI response logs.</dd>
           <dt>~/.claude/projects/</dt><dd>Claude Code JSONL session files, one folder per working directory.</dd>
         </dl>
 
