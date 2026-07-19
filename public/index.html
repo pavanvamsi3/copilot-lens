@@ -68,6 +68,14 @@
             <span id="searchClear" style="display:none">✕</span>
             <kbd class="search-kbd">/</kbd>
           </div>
+          <div class="search-mode-wrap" id="searchModeWrap" style="display:none">
+            <span class="analytics-filter-label">Mode:</span>
+            <div class="source-filter-btns" id="searchModeFilter">
+              <button class="source-btn active" data-mode="keyword" title="Exact keyword matching">Keyword</button>
+              <button class="source-btn" data-mode="hybrid" title="Blend keyword and vector similarity">Hybrid</button>
+              <button class="source-btn" data-mode="semantic" title="TF-IDF vector similarity — finds related sessions even without exact word matches">Semantic</button>
+            </div>
+          </div>
           <div class="controls">
             <select id="timeFilter">
               <option value="all">All Time</option>

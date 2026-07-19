@@ -311,8 +311,19 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
 .badge-cli { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); color: var(--accent); }
 .badge-vscode { background: color-mix(in srgb, #bc8cff 15%, var(--surface)); color: #bc8cff; }
 .badge-claude { background: color-mix(in srgb, #f0883e 15%, var(--surface)); color: #f0883e; }
+.badge-cursor { background: color-mix(in srgb, #2ac3de 15%, var(--surface)); color: #2ac3de; }
+.badge-semantic { background: color-mix(in srgb, #7ee787 15%, var(--surface)); color: #7ee787; font-size: 0.8rem; }
+.badge-semantic-match { color: var(--accent2); font-style: italic; }
 
 .top-badges { display: flex; gap: 6px; align-items: center; }
+
+/* Search mode toggle (keyword / hybrid / semantic) */
+.search-mode-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
 
 /* Analytics source filter */
 .analytics-controls {
