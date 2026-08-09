@@ -5,7 +5,7 @@ import * as os from "os";
 
 import { _testing, listClaudeCodeSessions, getClaudeCodeSession, isClaudeCodeSession, getClaudeCodeAnalytics } from "../claude-code-sessions";
 import { clearCache } from "../cache";
-const { extractTextContent, extractToolUseBlocks, deriveStatus, readAllLines } = _testing;
+const { extractTextContent, extractToolUseBlocks, deriveStatus } = _testing;
 
 // ============ Unit tests for pure helpers ============
 
