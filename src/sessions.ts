@@ -48,6 +48,9 @@ export interface AnalyticsData {
   avgDuration: number;
   minDuration: number;
   maxDuration: number;
+  p50Duration: number;
+  p90Duration: number;
+  p99Duration: number;
   totalDuration: number;
   toolUsage: Record<string, number>;
   topDirectories: Record<string, number>;
@@ -295,6 +298,28 @@ export function getAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsDa
   return cachedCall(`getAnalytics:${source}`, CACHE_TTL, () => _computeAnalytics(source));
 }
 
+/** Return the nearest-rank percentile without changing the caller's samples. */
+function durationPercentile(durations: number[], percentile: number): number {
+  if (durations.length === 0) return 0;
+
+  const sorted = [...durations].sort((a, b) => a - b);
+  const index = Math.ceil(percentile * sorted.length) - 1;
+  return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
+}
+
+function summarizeDurations(durations: number[]) {
+  const totalDuration = durations.reduce((a, b) => a + b, 0);
+  return {
+    avgDuration: durations.length ? totalDuration / durations.length : 0,
+    minDuration: durations.length ? Math.min(...durations) : 0,
+    maxDuration: durations.length ? Math.max(...durations) : 0,
+    p50Duration: durationPercentile(durations, 0.5),
+    p90Duration: durationPercentile(durations, 0.9),
+    p99Duration: durationPercentile(durations, 0.99),
+    totalDuration,
+  };
+}
+
 function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData {
   const allSessions = listSessions();
   const sessions = source === "all" ? allSessions : allSessions.filter((s) => s.source === source);
@@ -453,15 +478,12 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
     } catch {}
   }
 
-  const totalDuration = durations.reduce((a, b) => a + b, 0);
+  const durationSummary = summarizeDurations(durations);
 
   return {
     totalSessions: sessions.length,
     sessionsPerDay,
-    avgDuration: durations.length ? totalDuration / durations.length : 0,
-    minDuration: durations.length ? Math.min(...durations) : 0,
-    maxDuration: durations.length ? Math.max(...durations) : 0,
-    totalDuration,
+    ...durationSummary,
     toolUsage,
     topDirectories,
     branchTime,
@@ -918,3 +940,5 @@ export function getVSCodeScore(): RepoScore {
     tips,
   };
 }
+
+export const _testing = { durationPercentile, summarizeDurations };
