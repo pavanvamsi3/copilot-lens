@@ -15,7 +15,7 @@ npx copilot-lens --open
 ```
 
 
-Or `npm install -g copilot-lens` for a permanent install.
+Or `npm install -g copilot-lens-suggestion` for a permanent install.
 
 ## Usage
 
