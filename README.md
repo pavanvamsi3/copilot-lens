@@ -14,6 +14,7 @@ A local memory layer for AI coding assistants. Search and browse everything you'
 npx copilot-lens --open
 ```
 
+
 Or `npm install -g copilot-lens` for a permanent install.
 
 ## Usage
