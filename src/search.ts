@@ -21,7 +21,12 @@ export interface SearchOptions {
 }
 
 function stripCodeBlocks(text: string): string {
-  return text.replace(/```[\s\S]*?```/g, " ");
+  // Require matching delimiter runs so unmatched backticks cannot pair with
+  // part of a longer fence and swallow prose. Leave unmatched delimiters intact.
+  return text.replace(
+    /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)|(?<!~)(~{3,})(?!~)[\s\S]*?(?<!~)\2(?!~)/g,
+    " "
+  );
 }
 
 export function tokenize(query: string): string[] {

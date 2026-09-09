@@ -292,3 +292,59 @@ describe("SearchIndex.search — limit option", () => {
     expect(results.length).toBeLessThanOrEqual(3);
   });
 });
+
+
+describe("SearchIndex.search — code stripping", () => {
+  it.each([
+    ["triple backtick fences", "```ts\nsecretcode()\n```"],
+    ["tilde fences", "~~~ts\nsecretcode()\n~~~"],
+    ["single backtick inline code", "`secretcode`"],
+    ["double backtick inline code", "``secretcode `nested` value``"],
+    ["longer backtick fences", "````md\n```secretcode```\n````"],
+    ["mixed code spans", "`secretcode` and ~~~\nsecretcode\n~~~ and ``secretcode``"],
+  ])("excludes %s while preserving surrounding prose", (_name, code) => {
+    const index = new SearchIndex();
+    const meta = makeMeta();
+    mockGetSession.mockReturnValue(
+      makeDetail(meta, [
+        { type: "user.message", content: `beforeword${code}afterword` },
+        { type: "assistant.message", content: `explanation ${code} conclusion` },
+      ])
+    );
+    index.buildIndex([meta]);
+
+    expect(index.search("secretcode")).toEqual([]);
+    for (const word of ["beforeword", "afterword", "explanation", "conclusion"]) {
+      const results = index.search(word);
+      expect(results).toHaveLength(1);
+      expect(results[0].highlights.join(" ")).toContain(word);
+      expect(results[0].highlights.join(" ")).not.toContain("secretcode");
+    }
+    expect(index.search("beforeword")[0].entry.content[0]).toContain("beforeword ");
+  });
+
+  it.each([
+    ["single backtick", "beforeword ` afterword"],
+    ["double backticks", "beforeword `` afterword"],
+    ["triple backticks", "beforeword\n```ts\nafterword"],
+    ["tilde fence", "beforeword\n~~~ts\nafterword"],
+    ["mismatched backtick runs", "beforeword `` middleword ` afterword"],
+    ["mismatched fence types", "beforeword\n```\nmiddleword\n~~~\nafterword"],
+    ["unmatched fence around inline code", "beforeword\n```\n`secretcode`\nafterword"],
+    ["unmatched inline delimiter around a fence", "beforeword `\n```\nsecretcode\n```\nafterword"],
+  ])("preserves prose with %s", (_name, content) => {
+    const index = new SearchIndex();
+    const meta = makeMeta();
+    mockGetSession.mockReturnValue(
+      makeDetail(meta, [{ type: "user.message", content }])
+    );
+    index.buildIndex([meta]);
+
+    expect(index.search("beforeword")).toHaveLength(1);
+    expect(index.search("afterword")).toHaveLength(1);
+    if (content.includes("middleword")) {
+      expect(index.search("middleword")).toHaveLength(1);
+    }
+    expect(index.search("secretcode")).toEqual([]);
+  });
+});
