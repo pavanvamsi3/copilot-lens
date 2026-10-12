@@ -5,6 +5,7 @@ let charts = {};
 let searchDebounce = null;
 let isSearchActive = false;
 let analyticsSource = "all";
+let searchMode = "keyword"; // "keyword" | "hybrid" | "semantic"
 
 // Directory color coding — sophisticated muted palette
 const DIR_COLORS = [
@@ -666,6 +667,7 @@ searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounce);
   const q = searchInput.value.trim();
   searchClear.style.display = q ? "inline" : "none";
+  document.getElementById("searchModeWrap").style.display = q ? "flex" : "none";
   updateSearchKbd();
   searchDebounce = setTimeout(() => {
     if (q) runSearch(q);
@@ -679,8 +681,20 @@ searchInput.addEventListener("blur", updateSearchKbd);
 searchClear.addEventListener("click", () => {
   searchInput.value = "";
   searchClear.style.display = "none";
+  document.getElementById("searchModeWrap").style.display = "none";
   updateSearchKbd();
   clearSearch();
+});
+
+// Search mode toggle
+document.getElementById("searchModeFilter").addEventListener("click", (e) => {
+  const btn = e.target.closest(".source-btn");
+  if (!btn) return;
+  searchMode = btn.dataset.mode;
+  document.querySelectorAll("#searchModeFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  const q = searchInput.value.trim();
+  if (q) runSearch(q);
 });
 
 // Filter listeners
@@ -866,12 +880,12 @@ function renderInsightsScore(data) {
     </div>`;
 }
 
-// Full-text search
+// Search (keyword / semantic / hybrid)
 async function runSearch(q) {
   const searchWrap = document.querySelector(".search-bar-wrap");
   if (searchWrap) searchWrap.classList.add("loading");
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=all&limit=20`);
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=all&limit=20&mode=${searchMode}`);
     const results = await res.json();
     isSearchActive = true;
     renderSearchResults(results);
@@ -904,21 +918,25 @@ function renderSearchResults(results) {
   sessionCount.textContent = `${results.length} result${results.length !== 1 ? "s" : ""} found`;
 
   sessionList.innerHTML = results
-    .map(({ entry, highlights }) => {
+    .map(({ entry, highlights, matchType }) => {
       const s = entry;
       const c = getDirColor(s.cwd);
-      const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
-      const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
+      const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : s.source === "cursor" ? "badge-cursor" : "badge-cli";
+      const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : s.source === "cursor" ? "Cursor" : "Copilot CLI";
       const displayName = s.title || shortId(s.id);
+      const isSemantic = matchType === "semantic" || matchType === "hybrid";
       const highlightHtml = highlights && highlights.length
         ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`
-        : "";
+        : isSemantic
+          ? `<div class="search-highlights"><span class="highlight-snippet badge-semantic-match">~ Semantic match</span></div>`
+          : "";
       return `
     <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 4px solid ${c.border}">
       <div class="top-row">
         <span class="session-id">${escapeHtml(displayName)}</span>
         <span class="top-badges">
           <span class="badge ${sourceClass}">${sourceLabel}</span>
+          ${isSemantic && !highlights.length ? '<span class="badge badge-semantic">≈</span>' : ""}
         </span>
       </div>
       <div class="session-dir">${escapeHtml(s.cwd || "—")}</div>
