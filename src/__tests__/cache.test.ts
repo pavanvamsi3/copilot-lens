@@ -52,6 +52,45 @@ describe("cachedCall", () => {
     expect(result).toEqual(obj);
     expect(result).toBe(obj); // same reference
   });
+
+  it("evicts the oldest entry when the cache reaches its size limit", () => {
+    const { MAX_ENTRIES, cache } = _cacheInternals;
+
+    for (let i = 0; i < MAX_ENTRIES; i++) {
+      cachedCall(`key-${i}`, 1000, () => i);
+    }
+    cachedCall("newest", 1000, () => "newest-value");
+
+    expect(cache.size).toBe(MAX_ENTRIES);
+    expect(cache.has("key-0")).toBe(false);
+    expect(cache.get("newest")?.value).toBe("newest-value");
+  });
+
+  it("recomputes an evicted entry on its next access", () => {
+    const { MAX_ENTRIES } = _cacheInternals;
+    let callCount = 0;
+
+    cachedCall("oldest", 1000, () => ++callCount);
+    for (let i = 1; i <= MAX_ENTRIES; i++) {
+      cachedCall(`key-${i}`, 1000, () => i);
+    }
+
+    expect(cachedCall("oldest", 1000, () => ++callCount)).toBe(2);
+    expect(callCount).toBe(2);
+  });
+
+  it("recomputing an existing key at capacity does not evict another entry", () => {
+    const { MAX_ENTRIES, cache } = _cacheInternals;
+
+    for (let i = 0; i < MAX_ENTRIES; i++) {
+      cachedCall(`key-${i}`, -1, () => i);
+    }
+    cachedCall("key-0", 1000, () => "refreshed");
+
+    expect(cache.size).toBe(MAX_ENTRIES);
+    expect(cache.has("key-1")).toBe(true);
+    expect(cache.get("key-0")?.value).toBe("refreshed");
+  });
 });
 
 describe("clearCache", () => {

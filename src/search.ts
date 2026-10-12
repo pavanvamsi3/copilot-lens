@@ -32,6 +32,8 @@ function stripCodeBlocks(text: string): string {
 export function tokenize(query: string): string[] {
   return query
     .toLowerCase()
+    // Splits the search query on one or more non-alphanumeric characters,
+    // converting the string into an array of lowercase tokens.
     .split(/[^a-z0-9]+/)
     .filter((t) => t.length >= 2);
 }
