@@ -296,6 +296,8 @@ describe("SearchIndex.search — limit option", () => {
 
 describe("SearchIndex.search — code stripping", () => {
   it.each([
+    ["backtick fences closed by a longer delimiter", "```ts\nsecretcode()\n````"],
+    ["tilde fences closed by a longer delimiter", "~~~ts\nsecretcode()\n~~~~"],
     ["triple backtick fences", "```ts\nsecretcode()\n```"],
     ["tilde fences", "~~~ts\nsecretcode()\n~~~"],
     ["single backtick inline code", "`secretcode`"],
