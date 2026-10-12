@@ -755,6 +755,149 @@ select:focus { box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
   max-width: 100%;
 }
 
+/* ── Bookmark filter bar ──────────────────────────────────────────────── */
+.bookmark-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-height: 0;
+}
+
+.bm-pill {
+  padding: 4px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.bm-pill:hover { color: var(--text); border-color: var(--warning); }
+
+.bm-pill.active {
+  background: color-mix(in srgb, var(--warning) 15%, var(--surface));
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.tag-pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ── Star button on session card ──────────────────────────────────────── */
+.star-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 1rem;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s, transform 0.15s;
+}
+
+.star-btn:hover { color: var(--warning); transform: scale(1.2); }
+.star-btn.starred { color: var(--warning); }
+
+/* ── Tag chips on session card ────────────────────────────────────────── */
+.card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+.card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--accent2) 12%, var(--surface));
+  color: var(--accent2);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.removable-tag { padding-right: 4px; }
+
+.remove-tag {
+  background: none;
+  border: none;
+  color: var(--accent2);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 0.1s;
+}
+
+.remove-tag:hover { opacity: 1; }
+
+/* ── Bookmark section in detail pane ─────────────────────────────────── */
+.bookmark-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.bookmark-section-header { margin-bottom: 12px; }
+
+.star-btn-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+}
+
+.star-btn-detail:hover { border-color: var(--warning); color: var(--warning); }
+.star-btn-detail.starred { border-color: var(--warning); color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, var(--surface)); }
+
+.bookmark-fields { display: flex; flex-direction: column; gap: 12px; }
+
+.bm-field-row { display: flex; flex-direction: column; gap: 6px; }
+
+.bm-label { font-size: 0.82rem; color: var(--text-dim); font-weight: 600; }
+
+.bm-input, .bm-textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  resize: vertical;
+}
+
+.bm-input:focus, .bm-textarea:focus { outline: none; border-color: var(--accent); }
+
+.bm-tag-wrap { display: flex; flex-direction: column; gap: 6px; }
+
+.bm-tags-current { display: flex; flex-wrap: wrap; gap: 4px; min-height: 24px; }
+
+.bm-save-btn {
+  align-self: flex-start;
+  padding: 6px 16px;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+
+.bm-save-btn:hover { opacity: 0.85; }
+.bm-save-btn:disabled { opacity: 0.5; cursor: default; }
+
 /* Empty states */
 .empty-state {
   text-align: center;
