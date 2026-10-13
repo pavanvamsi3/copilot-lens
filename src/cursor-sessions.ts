@@ -3,7 +3,12 @@ import * as path from "path";
 import * as os from "os";
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
-import type { SessionMeta, SessionDetail, SessionEvent, SessionStatus } from "./sessions";
+import type {
+  SessionMeta,
+  SessionDetail,
+  SessionEvent,
+  SessionStatus,
+} from "./sessions";
 import { cachedCall } from "./cache";
 
 // ============ Platform paths ============
@@ -17,7 +22,8 @@ export function getCursorDataDirs(): string[] {
     if (process.platform === "darwin") {
       dirs.push(path.join(home, "Library", "Application Support", variant));
     } else if (process.platform === "win32") {
-      const appData = process.env.APPDATA || path.join(home, "AppData", "Roaming");
+      const appData =
+        process.env.APPDATA || path.join(home, "AppData", "Roaming");
       dirs.push(path.join(appData, variant));
     } else {
       dirs.push(path.join(home, ".config", variant));
@@ -70,13 +76,15 @@ export function readCursorTabs(dataDir: string): CursorTab[] {
     db = new Database(dbPath, { readonly: true, fileMustExist: true });
 
     for (const key of CHAT_KEYS) {
-      const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get(key) as
-        | { value: unknown }
-        | undefined;
+      const row = db
+        .prepare("SELECT value FROM ItemTable WHERE key = ?")
+        .get(key) as { value: unknown } | undefined;
       if (!row) continue;
 
       const rawValue = row.value;
-      const str = Buffer.isBuffer(rawValue) ? rawValue.toString("utf8") : (rawValue as string);
+      const str = Buffer.isBuffer(rawValue)
+        ? rawValue.toString("utf8")
+        : (rawValue as string);
       const data = JSON.parse(str);
 
       // Handle both {tabs: [...]} and direct array shapes
@@ -132,7 +140,9 @@ export function tabToEvents(tab: CursorTab): SessionEvent[] {
     } else if (bubble.type === "ai") {
       if (text) {
         const respTs = msToIso(
-          bubble.timingInfo?.clientEndTime || bubble.timingInfo?.firstTokenTime || bubble.timingInfo?.clientStartTime
+          bubble.timingInfo?.clientEndTime ||
+            bubble.timingInfo?.firstTokenTime ||
+            bubble.timingInfo?.clientStartTime
         );
         events.push({
           type: "assistant.message",
@@ -161,7 +171,9 @@ export function listCursorSessions(): SessionMeta[] {
       if (!tabHasContent(tab)) continue;
 
       const firstUserBubble = tab.bubbles?.find((b) => b.type === "user");
-      const createdAt = msToIso(firstUserBubble?.timingInfo?.clientStartTime || tab.lastSendTime);
+      const createdAt = msToIso(
+        firstUserBubble?.timingInfo?.clientStartTime || tab.lastSendTime
+      );
       const updatedAt = msToIso(tab.lastSendTime);
 
       sessions.push({
@@ -209,7 +221,9 @@ export function getCursorSession(tabId: string): SessionDetail | null {
     return {
       id: tabId,
       cwd: "",
-      createdAt: msToIso(firstUserBubble?.timingInfo?.clientStartTime || tab.lastSendTime),
+      createdAt: msToIso(
+        firstUserBubble?.timingInfo?.clientStartTime || tab.lastSendTime
+      ),
       updatedAt: msToIso(tab.lastSendTime),
       events,
       planContent: undefined,
@@ -276,7 +290,8 @@ function _computeCursorAnalytics(): CursorAnalyticsEntry[] {
         } else if (bubble.type === "ai") {
           turnCount++;
           if (bubble.modelType) {
-            modelUsage[bubble.modelType] = (modelUsage[bubble.modelType] || 0) + 1;
+            modelUsage[bubble.modelType] =
+              (modelUsage[bubble.modelType] || 0) + 1;
           }
         }
       }
@@ -291,7 +306,9 @@ function _computeCursorAnalytics(): CursorAnalyticsEntry[] {
       }
 
       const firstUserBubble = tab.bubbles?.find((b) => b.type === "user");
-      const createdAt = msToIso(firstUserBubble?.timingInfo?.clientStartTime || tab.lastSendTime);
+      const createdAt = msToIso(
+        firstUserBubble?.timingInfo?.clientStartTime || tab.lastSendTime
+      );
 
       results.push({
         sessionId: tab.tabId,

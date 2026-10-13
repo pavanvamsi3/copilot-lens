@@ -107,15 +107,15 @@ copilot-lens/
 
 Creates an Express app with CORS, static file serving, and 7 API endpoints:
 
-| Endpoint | Method | Handler | Description |
-|----------|--------|---------|-------------|
-| `/api/search` | GET | `searchIndex.search()` | Full-text search across session content; params: `q`, `source`, `limit` |
-| `/api/sessions` | GET | `listSessions()` | All sessions (Copilot CLI + VS Code + Claude Code), sorted by date |
-| `/api/sessions/:id` | GET | `getSession(id)` | Full session detail with events |
-| `/api/analytics?source=` | GET | `getAnalytics(source)` | Aggregated usage statistics; `source`: `all`\|`cli`\|`vscode`\|`claude-code` |
-| `/api/insights/repos` | GET | `listReposWithScores()` | All repos with effectiveness scores |
-| `/api/insights/score?repo=` | GET | `getRepoScore(repo)` / `getVSCodeScore()` | Score for a specific repo (or "VS Code" for global) |
-| `/api/cache/clear` | POST | `clearCache()` + `searchIndex.clear()` | Invalidate all cached data and search index |
+| Endpoint                    | Method | Handler                                   | Description                                                                  |
+| --------------------------- | ------ | ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `/api/search`               | GET    | `searchIndex.search()`                    | Full-text search across session content; params: `q`, `source`, `limit`      |
+| `/api/sessions`             | GET    | `listSessions()`                          | All sessions (Copilot CLI + VS Code + Claude Code), sorted by date           |
+| `/api/sessions/:id`         | GET    | `getSession(id)`                          | Full session detail with events                                              |
+| `/api/analytics?source=`    | GET    | `getAnalytics(source)`                    | Aggregated usage statistics; `source`: `all`\|`cli`\|`vscode`\|`claude-code` |
+| `/api/insights/repos`       | GET    | `listReposWithScores()`                   | All repos with effectiveness scores                                          |
+| `/api/insights/score?repo=` | GET    | `getRepoScore(repo)` / `getVSCodeScore()` | Score for a specific repo (or "VS Code" for global)                          |
+| `/api/cache/clear`          | POST   | `clearCache()` + `searchIndex.clear()`    | Invalidate all cached data and search index                                  |
 
 Also serves `public/` as static files and has an SPA fallback that serves `index.html` for non-API routes.
 
@@ -129,14 +129,14 @@ The largest module. Handles CLI session reading, unified session listing, analyt
 
 #### Data Types
 
-| Type | Fields | Purpose |
-|------|--------|---------|
-| `SessionMeta` | id, cwd, gitRoot, branch, createdAt, updatedAt, status, source, title | Session list item |
-| `SessionDetail` | extends SessionMeta + events[], planContent, hasSnapshots, duration, eventCounts | Full session view |
-| `SessionEvent` | type, id, timestamp, data | Individual event in a session |
-| `AnalyticsData` | sessionsPerDay, hourOfDay, toolUsage, modelUsage, branchTime, repoTime, topDirectories, mcpServers, totalSessions, totalDuration, longestSession, avgDuration, totalErrors | Dashboard analytics |
-| `RepoScore` | repo, totalScore (0-100), sessionCount, categories (5), tips[] | Effectiveness score |
-| `CategoryScore` | score, maxScore, label, detail | Individual scoring category |
+| Type            | Fields                                                                                                                                                                     | Purpose                       |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `SessionMeta`   | id, cwd, gitRoot, branch, createdAt, updatedAt, status, source, title                                                                                                      | Session list item             |
+| `SessionDetail` | extends SessionMeta + events[], planContent, hasSnapshots, duration, eventCounts                                                                                           | Full session view             |
+| `SessionEvent`  | type, id, timestamp, data                                                                                                                                                  | Individual event in a session |
+| `AnalyticsData` | sessionsPerDay, hourOfDay, toolUsage, modelUsage, branchTime, repoTime, topDirectories, mcpServers, totalSessions, totalDuration, longestSession, avgDuration, totalErrors | Dashboard analytics           |
+| `RepoScore`     | repo, totalScore (0-100), sessionCount, categories (5), tips[]                                                                                                             | Effectiveness score           |
+| `CategoryScore` | score, maxScore, label, detail                                                                                                                                             | Individual scoring category   |
 
 #### Key Functions
 
@@ -148,15 +148,16 @@ The largest module. Handles CLI session reading, unified session listing, analyt
 
 **Status Detection (CLI):**
 
-| Status | Condition |
-|--------|-----------|
-| Running | `session.db` modified within 10 min, or `events.jsonl` modified within 5 min |
-| Error | Has `abort` event with non-user reason |
-| Completed | Everything else |
+| Status    | Condition                                                                    |
+| --------- | ---------------------------------------------------------------------------- |
+| Running   | `session.db` modified within 10 min, or `events.jsonl` modified within 5 min |
+| Error     | Has `abort` event with non-user reason                                       |
+| Completed | Everything else                                                              |
 
 **Analytics (`getAnalytics(source)`):**
 
 Cached with 30s TTL, keyed by source filter. Accepts `source: "all" | "cli" | "vscode" | "claude-code"` to return per-source breakdowns. Computes:
+
 - Sessions per day (bar chart data)
 - Activity by hour of day
 - Tool usage counts (from `tool.execution_start` events)
@@ -181,13 +182,13 @@ Duration = 2min + 5min(capped) + 1min = 8min
 
 Five categories, each scored 0-20 (total 0-100):
 
-| Category | Function | What It Measures |
-|----------|----------|-----------------|
-| Prompt Quality | `scorePromptQuality()` | Avg prompt length (5-20pts) minus clarification penalty |
-| Tool Utilization | `scoreToolUtilization()` | Count of distinct tools used (5-20pts) |
-| Efficiency | `scoreEfficiency()` | Tool success rate (4-15pts) + concise session bonus (+5) |
-| MCP Utilization | `scoreMcpUtilization()` | Ratio of configured vs used MCP servers (5-20pts) |
-| Engagement | `scoreEngagement()` | Duration sweet spot 5-30min (3-15pts) + consistency bonus (+5) |
+| Category         | Function                 | What It Measures                                               |
+| ---------------- | ------------------------ | -------------------------------------------------------------- |
+| Prompt Quality   | `scorePromptQuality()`   | Avg prompt length (5-20pts) minus clarification penalty        |
+| Tool Utilization | `scoreToolUtilization()` | Count of distinct tools used (5-20pts)                         |
+| Efficiency       | `scoreEfficiency()`      | Tool success rate (4-15pts) + concise session bonus (+5)       |
+| MCP Utilization  | `scoreMcpUtilization()`  | Ratio of configured vs used MCP servers (5-20pts)              |
+| Engagement       | `scoreEngagement()`      | Duration sweet spot 5-30min (3-15pts) + consistency bonus (+5) |
 
 **Data Collection:**
 
@@ -203,6 +204,7 @@ Five categories, each scored 0-20 (total 0-100):
 **Tips Generation (`generateTips()`):**
 
 Examines low-scoring categories and generates actionable advice:
+
 - Short prompts → suggest adding context
 - Few tools → suggest specific tools to try
 - Low success rate → suggest clearer instructions
@@ -219,19 +221,19 @@ Reads Claude Code CLI sessions from `~/.claude/projects/`.
 
 #### Data Sources
 
-| Data | Location | Format |
-|------|----------|--------|
+| Data     | Location                                           | Format             |
+| -------- | -------------------------------------------------- | ------------------ |
 | Sessions | `~/.claude/projects/{sanitized-path}/{uuid}.jsonl` | JSONL event stream |
 
 Each project directory corresponds to one working directory (path encoded as `-Users-name-project`). Each top-level `.jsonl` file is one session; files inside `subagents/` subdirectories are skipped.
 
 #### Event Types
 
-| JSONL `type` | Mapped to | Key Fields |
-|-------------|-----------|------------|
-| `user` | `user.message` | `message.content` (string or content blocks), `cwd`, `gitBranch`, `slug`, `timestamp` |
-| `assistant` | `assistant.message` + `tool.execution_start` (per tool_use block) | `message.content[]`, `message.model`, `timestamp` |
-| `file-history-snapshot`, `progress`, `queue-operation`, `system` | skipped | — |
+| JSONL `type`                                                     | Mapped to                                                         | Key Fields                                                                            |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `user`                                                           | `user.message`                                                    | `message.content` (string or content blocks), `cwd`, `gitBranch`, `slug`, `timestamp` |
+| `assistant`                                                      | `assistant.message` + `tool.execution_start` (per tool_use block) | `message.content[]`, `message.model`, `timestamp`                                     |
+| `file-history-snapshot`, `progress`, `queue-operation`, `system` | skipped                                                           | —                                                                                     |
 
 Events with `isSidechain: true` are filtered out (warmup/sidebar calls made by sub-agents).
 
@@ -287,11 +289,11 @@ Provides an in-process, dependency-free full-text search over all session conten
 
 #### Exported Types
 
-| Type | Fields | Purpose |
-|------|--------|---------|
-| `SearchEntry` | id, source, title, cwd, date, content[] | Indexed representation of one session |
-| `SearchResult` | entry, score, highlights[] | Ranked search hit with extracted snippets |
-| `SearchOptions` | limit (default 20), source ('cli'\|'vscode'\|'claude-code'\|'all') | Query parameters |
+| Type            | Fields                                                             | Purpose                                   |
+| --------------- | ------------------------------------------------------------------ | ----------------------------------------- |
+| `SearchEntry`   | id, source, title, cwd, date, content[]                            | Indexed representation of one session     |
+| `SearchResult`  | entry, score, highlights[]                                         | Ranked search hit with extracted snippets |
+| `SearchOptions` | limit (default 20), source ('cli'\|'vscode'\|'claude-code'\|'all') | Query parameters                          |
 
 #### `SearchIndex` class
 
@@ -308,11 +310,11 @@ Provides an in-process, dependency-free full-text search over all session conten
 3. Tokenises query: lowercase, split on non-alphanumeric chars, drop tokens < 2 chars
 4. For each entry, computes a relevance score:
 
-   | Signal | Weight |
-   |--------|--------|
+   | Signal                            | Weight                     |
+   | --------------------------------- | -------------------------- |
    | Token occurrence count in content | `count / total_word_count` |
-   | Token appears in `title` | +0.5 per token |
-   | Token appears in `cwd` | +0.2 per token |
+   | Token appears in `title`          | +0.5 per token             |
+   | Token appears in `cwd`            | +0.2 per token             |
 
 5. Filters to score > 0, applies `source` filter, sorts descending, slices to `limit`
 6. For each result, calls `extractHighlights()` to produce up to 3 contextual snippets
@@ -340,19 +342,19 @@ Reads GitHub Copilot Chat sessions from VS Code's local storage.
 
 #### Data Sources
 
-| Data | Location | Format |
-|------|----------|--------|
-| Session Index | `{vscode-data}/User/globalStorage/state.vscdb` | SQLite, key `chat.ChatSessionStore.index` |
-| Session Content | `{vscode-data}/User/globalStorage/emptyWindowChatSessions/{id}.json` | JSON (can be 1KB-450MB) |
-| MCP Config | `{vscode-data}/User/mcp.json` | JSONC |
+| Data            | Location                                                             | Format                                    |
+| --------------- | -------------------------------------------------------------------- | ----------------------------------------- |
+| Session Index   | `{vscode-data}/User/globalStorage/state.vscdb`                       | SQLite, key `chat.ChatSessionStore.index` |
+| Session Content | `{vscode-data}/User/globalStorage/emptyWindowChatSessions/{id}.json` | JSON (can be 1KB-450MB)                   |
+| MCP Config      | `{vscode-data}/User/mcp.json`                                        | JSONC                                     |
 
 **Platform Paths** (`getVSCodeDataDirs()`):
 
-| Platform | Path |
-|----------|------|
-| macOS | `~/Library/Application Support/Code/` |
-| Windows | `%APPDATA%/Code/` |
-| Linux | `~/.config/Code/` |
+| Platform | Path                                  |
+| -------- | ------------------------------------- |
+| macOS    | `~/Library/Application Support/Code/` |
+| Windows  | `%APPDATA%/Code/`                     |
+| Linux    | `~/.config/Code/`                     |
 
 Also checks "Code - Insiders" variant on all platforms.
 
@@ -379,14 +381,14 @@ Also checks "Code - Insiders" variant on all platforms.
 
 - **`normalizeVSCodeToolName(raw)`** — Maps verbose VS Code tool descriptions to canonical short names:
 
-  | Input Pattern | Output |
-  |--------------|--------|
-  | `"bluebird-mcp (MCP Server)"` | `{ tool: "bluebird-mcp", mcpServer: "bluebird-mcp" }` |
-  | `"Running \`engineering_copilot\`"` | `{ tool: "engineering_copilot" }` |
-  | `"Reading [](file:///...)"` | `{ tool: "read_file" }` |
-  | `"Searching for regex ..."` | `{ tool: "search" }` |
-  | `"Creating [](file:///...)"` | `{ tool: "create_file" }` |
-  | `"Editing [](file:///...)"` | `{ tool: "edit_file" }` |
+  | Input Pattern                       | Output                                                |
+  | ----------------------------------- | ----------------------------------------------------- |
+  | `"bluebird-mcp (MCP Server)"`       | `{ tool: "bluebird-mcp", mcpServer: "bluebird-mcp" }` |
+  | `"Running \`engineering_copilot\`"` | `{ tool: "engineering_copilot" }`                     |
+  | `"Reading [](file:///...)"`         | `{ tool: "read_file" }`                               |
+  | `"Searching for regex ..."`         | `{ tool: "search" }`                                  |
+  | `"Creating [](file:///...)"`        | `{ tool: "create_file" }`                             |
+  | `"Editing [](file:///...)"`         | `{ tool: "edit_file" }`                               |
 
 - **`scanVSCodeMcpConfig()`** — Reads MCP server names from VS Code's `mcp.json` config.
 
@@ -425,24 +427,24 @@ Also checks "Code - Insiders" variant on all platforms.
 
 Simple in-memory cache using a `Map<string, { value, expiresAt }>`.
 
-| Function | Signature | Purpose |
-|----------|-----------|---------|
+| Function     | Signature                                         | Purpose                                                   |
+| ------------ | ------------------------------------------------- | --------------------------------------------------------- |
 | `cachedCall` | `<T>(key: string, ttlMs: number, fn: () => T): T` | Return cached value if fresh, otherwise compute and cache |
-| `clearCache` | `(): void` | Invalidate all entries (called by refresh button) |
+| `clearCache` | `(): void`                                        | Invalidate all entries (called by refresh button)         |
 
 **TTL**: 30 seconds (defined in consumers). Entries auto-expire — no background cleanup needed since stale entries are replaced on next call.
 
 **What's cached:**
 
-| Cache Key | TTL | Typical Cold Time | Purpose |
-|-----------|-----|-------------------|---------|
-| `listSessions` | 30s | ~7ms | Directory scanning + YAML parsing |
-| `getAnalytics:all` | 30s | ~1.8s | Full analytics aggregation (all sources) |
-| `getAnalytics:cli` | 30s | ~50ms | CLI-only analytics |
-| `getAnalytics:vscode` | 30s | ~1.8s | VS Code-only analytics |
-| `getAnalytics:claude-code` | 30s | ~100ms | Claude Code-only analytics |
-| `getVSCodeAnalytics` | 30s | ~1.8s | VS Code JSON file parsing |
-| `getClaudeCodeAnalytics` | 30s | ~100ms | Claude Code JSONL parsing |
+| Cache Key                  | TTL | Typical Cold Time | Purpose                                  |
+| -------------------------- | --- | ----------------- | ---------------------------------------- |
+| `listSessions`             | 30s | ~7ms              | Directory scanning + YAML parsing        |
+| `getAnalytics:all`         | 30s | ~1.8s             | Full analytics aggregation (all sources) |
+| `getAnalytics:cli`         | 30s | ~50ms             | CLI-only analytics                       |
+| `getAnalytics:vscode`      | 30s | ~1.8s             | VS Code-only analytics                   |
+| `getAnalytics:claude-code` | 30s | ~100ms            | Claude Code-only analytics               |
+| `getVSCodeAnalytics`       | 30s | ~1.8s             | VS Code JSON file parsing                |
+| `getClaudeCodeAnalytics`   | 30s | ~100ms            | Claude Code JSONL parsing                |
 
 ---
 
@@ -453,17 +455,19 @@ Simple in-memory cache using a `Map<string, { value, expiresAt }>`.
 Single HTML page with three mutually-exclusive sections:
 
 ```html
-<header>  Logo | [Sessions] [Analytics] [Insights] | 🔄 Refresh | 🌗 Theme </header>
+<header>
+  Logo | [Sessions] [Analytics] [Insights] | 🔄 Refresh | 🌗 Theme
+</header>
 <main>
   <section id="sessionsPage">
-    <div class="search-bar-wrap">  Full-text search input + clear button  </div>
-    <div class="controls">         Time / Status / Directory filters       </div>
-    <div id="sessionList">         Session cards or search results         </div>
+    <div class="search-bar-wrap">Full-text search input + clear button</div>
+    <div class="controls">Time / Status / Directory filters</div>
+    <div id="sessionList">Session cards or search results</div>
   </section>
-  <section id="analyticsPage">   Stats Cards, 8 Chart Canvases    </section>
-  <section id="insightsPage">    Repo Selector, Score Display      </section>
+  <section id="analyticsPage">Stats Cards, 8 Chart Canvases</section>
+  <section id="insightsPage">Repo Selector, Score Display</section>
 </main>
-<div id="detailModal">           Session Detail Drawer              </div>
+<div id="detailModal">Session Detail Drawer</div>
 ```
 
 External dependency: **Chart.js 4.x** via CDN.
@@ -473,6 +477,7 @@ External dependency: **Chart.js 4.x** via CDN.
 All rendering and interactivity in vanilla JavaScript (no framework).
 
 **Page: Sessions**
+
 - `loadSessions()` — Fetches `/api/sessions`, renders cards with source badges (CLI/VS Code), status indicators, color-coded directories
 - **Full-text search** (`#searchInput`): 300ms debounced input → `runSearch(q)` → `GET /api/search` → `renderSearchResults(results)`
   - Shows up to 3 highlight snippets per card (`.search-highlights > .highlight-snippet`)
@@ -482,6 +487,7 @@ All rendering and interactivity in vanilla JavaScript (no framework).
 - Click card → `openDetail(id)` fetches `/api/sessions/:id` → renders conversation view in modal
 
 **Page: Analytics**
+
 - `loadAnalytics()` — Fetches `/api/analytics?source={analyticsSource}`, renders 4 stat cards + 8 Chart.js charts
 - Source filter toggle buttons (All / Copilot CLI / VS Code / Claude Code) re-fetch with matching `?source=` param
 - Chart types: bar (sessions/day, hourly), doughnut (tools, models, MCP), horizontal bar (directories, branches, repos)
@@ -489,11 +495,13 @@ All rendering and interactivity in vanilla JavaScript (no framework).
 - Empty-state handling hides canvas and shows message in-place (preserves canvas element for re-render)
 
 **Page: Insights**
+
 - `loadInsights()` → Fetches `/api/insights/repos` → renders repo selector dropdown
 - VS Code entry shows as "🟣 VS Code (all sessions)"
 - `renderInsightsScore(data)` — SVG donut chart (score/100), 5 category bars with color coding, tips section
 
 **Utilities:**
+
 - `escapeHtml()` — XSS prevention for all user-controlled content
 - `shortDir()` / `shortId()` — Truncate long paths/IDs for display
 - `getScoreColor()` — Green (≥70%), yellow (≥40%), red (<40%)
@@ -524,6 +532,7 @@ CSS custom properties for theming:
 ```
 
 Key component styles:
+
 - `.session-card` — Bordered cards with color-coded left border
 - `.badge-cli` / `.badge-vscode` / `.badge-claude` — Source indicator badges (blue/purple/orange)
 - `.badge-running` / `.badge-completed` / `.badge-error` — Status badges
@@ -621,24 +630,24 @@ Browser                    Server                     SearchIndex
 
 All expensive operations use a 30-second in-memory TTL cache. A single page load triggers one cold computation (~1.8s for VS Code file parsing), then all subsequent calls within 30s are instant.
 
-| Scenario | Without Cache | With Cache |
-|----------|--------------|------------|
-| `listSessions()` | ~7ms | ~0ms |
-| `getAnalytics()` | ~1.8s | ~0ms |
-| `listReposWithScores()` | ~1.8s | ~6ms |
-| `getVSCodeScore()` | ~1.7s | ~0ms |
-| Full page load (all panels) | ~5.4s | ~1.8s |
+| Scenario                    | Without Cache | With Cache |
+| --------------------------- | ------------- | ---------- |
+| `listSessions()`            | ~7ms          | ~0ms       |
+| `getAnalytics()`            | ~1.8s         | ~0ms       |
+| `listReposWithScores()`     | ~1.8s         | ~6ms       |
+| `getVSCodeScore()`          | ~1.7s         | ~0ms       |
+| Full page load (all panels) | ~5.4s         | ~1.8s      |
 
 ### Large File Handling
 
 VS Code session files can reach 450MB+ due to pasted images (base64 PNG in `variableData`).
 
-| Protection | Threshold | Action |
-|-----------|-----------|--------|
-| File size cap | >200MB | Skip file entirely |
-| Image stripping | `kind: "image"` + value > 1KB | Replace with `"[image data omitted]"` |
-| Text truncation | Message text > 10KB | Truncate with `"...(truncated)"` |
-| List views | N/A | Use SQLite index only (never read JSON) |
+| Protection      | Threshold                     | Action                                  |
+| --------------- | ----------------------------- | --------------------------------------- |
+| File size cap   | >200MB                        | Skip file entirely                      |
+| Image stripping | `kind: "image"` + value > 1KB | Replace with `"[image data omitted]"`   |
+| Text truncation | Message text > 10KB           | Truncate with `"...(truncated)"`        |
+| List views      | N/A                           | Use SQLite index only (never read JSON) |
 
 ---
 
@@ -646,17 +655,18 @@ VS Code session files can reach 450MB+ due to pasted images (base64 PNG in `vari
 
 **Framework**: Vitest
 
-| Test File | Tests | What's Covered |
-|-----------|-------|----------------|
-| `cache.test.ts` | 7 | TTL expiry, cache hits, invalidation, separate keys, complex objects |
-| `sessions.test.ts` | 16 | YAML parsing, JSONL parsing, duration calc, analytics aggregation, scoring, MCP matching, source field |
-| `vscode-sessions.test.ts` | 37 | requestsToEvents (8), deriveStatus (4), msToIso (3), readSessionContent (7), normalizeVSCodeToolName (10), scanVSCodeMcpConfig (3), small image preservation (1) |
-| `claude-code-sessions.test.ts` | 27 | extractTextContent (5), extractToolUseBlocks (3), deriveStatus (4), listClaudeCodeSessions (6), isClaudeCodeSession (2), getClaudeCodeSession (6), getClaudeCodeAnalytics (2) |
-| `search.test.ts` | 10 | tokenize (punctuation, lowercase, min-length), empty/blank query, title scoring bonus, cwd scoring bonus, highlight length (≤121 chars), source filter cli/vscode, clear() + lazy rebuild, limit option |
+| Test File                      | Tests | What's Covered                                                                                                                                                                                          |
+| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cache.test.ts`                | 7     | TTL expiry, cache hits, invalidation, separate keys, complex objects                                                                                                                                    |
+| `sessions.test.ts`             | 16    | YAML parsing, JSONL parsing, duration calc, analytics aggregation, scoring, MCP matching, source field                                                                                                  |
+| `vscode-sessions.test.ts`      | 37    | requestsToEvents (8), deriveStatus (4), msToIso (3), readSessionContent (7), normalizeVSCodeToolName (10), scanVSCodeMcpConfig (3), small image preservation (1)                                        |
+| `claude-code-sessions.test.ts` | 27    | extractTextContent (5), extractToolUseBlocks (3), deriveStatus (4), listClaudeCodeSessions (6), isClaudeCodeSession (2), getClaudeCodeSession (6), getClaudeCodeAnalytics (2)                           |
+| `search.test.ts`               | 10    | tokenize (punctuation, lowercase, min-length), empty/blank query, title scoring bonus, cwd scoring bonus, highlight length (≤121 chars), source filter cli/vscode, clear() + lazy rebuild, limit option |
 
 **Total: 97 tests**
 
 Run with:
+
 ```bash
 npm test           # single run
 npm run test:watch # watch mode
@@ -666,12 +676,12 @@ npm run test:watch # watch mode
 
 ## Dependencies
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| express | ^5.2.1 | HTTP server and routing |
-| cors | ^2.8.6 | Cross-origin support |
+| Package        | Version | Purpose                                    |
+| -------------- | ------- | ------------------------------------------ |
+| express        | ^5.2.1  | HTTP server and routing                    |
+| cors           | ^2.8.6  | Cross-origin support                       |
 | better-sqlite3 | ^12.6.2 | Read VS Code's state.vscdb (native SQLite) |
-| yaml | ^2.8.2 | Parse CLI session workspace.yaml files |
-| typescript | ^5.x | Build |
-| vitest | ^4.0.x | Testing |
-| tsx | ^4.x | Dev mode (run TS directly) |
+| yaml           | ^2.8.2  | Parse CLI session workspace.yaml files     |
+| typescript     | ^5.x    | Build                                      |
+| vitest         | ^4.0.x  | Testing                                    |
+| tsx            | ^4.x    | Dev mode (run TS directly)                 |

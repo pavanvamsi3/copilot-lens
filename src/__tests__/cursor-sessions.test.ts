@@ -10,7 +10,8 @@ vi.mock("better-sqlite3", () => {
 });
 
 import { _testing } from "../cursor-sessions";
-const { tabToEvents, tabHasContent, deriveStatus, msToIso, CHAT_KEYS } = _testing;
+const { tabToEvents, tabHasContent, deriveStatus, msToIso, CHAT_KEYS } =
+  _testing;
 
 // ============ msToIso ============
 
@@ -173,7 +174,10 @@ describe("tabToEvents", () => {
           type: "ai",
           text: "A closure is a function that captures its lexical scope.",
           modelType: "gpt-4o",
-          timingInfo: { clientStartTime: 1700000001000, clientEndTime: 1700000003000 },
+          timingInfo: {
+            clientStartTime: 1700000001000,
+            clientEndTime: 1700000003000,
+          },
         },
       ],
     });
@@ -206,7 +210,10 @@ describe("tabToEvents", () => {
         {
           type: "ai",
           text: "Answer",
-          timingInfo: { clientStartTime: 1700000000000, firstTokenTime: 1700000001000 },
+          timingInfo: {
+            clientStartTime: 1700000000000,
+            firstTokenTime: 1700000001000,
+          },
         },
       ],
     });
@@ -248,7 +255,9 @@ describe("getCursorDataDirs", () => {
   let origAppData: string | undefined;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-lens-cursor-test-"));
+    tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "copilot-lens-cursor-test-")
+    );
     origHome = process.env.HOME || "";
     origAppData = process.env.APPDATA;
     process.env.HOME = tmpDir;
