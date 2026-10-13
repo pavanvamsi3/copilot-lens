@@ -10,8 +10,11 @@ export interface TokenCall {
   timestamp: string;
   request_id: string;
   message_id?: string;
+  session_id?: string;
   model: string;
   source: TokenSource;
+  call_count: number;
+  premium_requests: number;
   prompt_tokens: number;
   completion_tokens: number;
   cached_tokens: number;
@@ -21,12 +24,14 @@ export interface TokenCall {
 export interface PeriodBucket {
   period: string;
   calls: number;
+  premium_requests: number;
   prompt_tokens: number;
   cached_tokens: number;
   completion_tokens: number;
   total_tokens: number;
   top_model: string;
   models: Record<string, {
+    premium_requests: number;
     prompt_tokens: number;
     cached_tokens: number;
     completion_tokens: number;
@@ -37,6 +42,7 @@ export interface PeriodBucket {
 export interface TokenUsageAnalytics {
   totals: {
     calls: number;
+    premium_requests: number;
     prompt_tokens: number;
     cached_tokens: number;
     completion_tokens: number;
@@ -48,6 +54,7 @@ export interface TokenUsageAnalytics {
   };
   byModel: Record<string, {
     calls: number;
+    premium_requests: number;
     prompt_tokens: number;
     cached_tokens: number;
     completion_tokens: number;
@@ -83,6 +90,10 @@ const MODEL_LOOKBACK_RE = /"model"\s*:\s*"([^"]+)"/;
 
 export function getLogsDir(): string {
   return path.join(os.homedir(), ".copilot", "logs");
+}
+
+export function getSessionStateDir(): string {
+  return path.join(os.homedir(), ".copilot", "session-state");
 }
 
 /**
@@ -187,8 +198,11 @@ export function parseLogContent(content: string): TokenCall[] {
       timestamp: ts,
       request_id: requestId,
       message_id: typeof parsed.id === "string" ? parsed.id : undefined,
+      session_id: typeof parsed.sessionId === "string" ? parsed.sessionId : typeof parsed.session_id === "string" ? parsed.session_id : undefined,
       model,
       source: "copilot-cli",
+      call_count: 1,
+      premium_requests: 0,
       prompt_tokens: usage.prompt_tokens,
       completion_tokens: usage.completion_tokens,
       cached_tokens: cached,
@@ -232,6 +246,7 @@ function emptyBucket(period: string): PeriodBucket & { _models: Record<string, n
   return {
     period,
     calls: 0,
+    premium_requests: 0,
     prompt_tokens: 0,
     cached_tokens: 0,
     completion_tokens: 0,
@@ -251,18 +266,21 @@ function bucketize(calls: TokenCall[], keyFn: (c: TokenCall) => string): PeriodB
       b = emptyBucket(k);
       map.set(k, b);
     }
-    b.calls += 1;
+    b.calls += c.call_count || 1;
+    b.premium_requests += c.premium_requests || 0;
     b.prompt_tokens += c.prompt_tokens;
     b.cached_tokens += c.cached_tokens;
     b.completion_tokens += c.completion_tokens;
     b.total_tokens += c.total_tokens;
     b._models[c.model] = (b._models[c.model] || 0) + c.total_tokens;
     const mb = (b.models[c.model] = b.models[c.model] || {
+      premium_requests: 0,
       prompt_tokens: 0,
       cached_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,
     });
+    mb.premium_requests += c.premium_requests || 0;
     mb.prompt_tokens += c.prompt_tokens;
     mb.cached_tokens += c.cached_tokens;
     mb.completion_tokens += c.completion_tokens;
@@ -322,12 +340,78 @@ export function parseClaudeCodeJsonl(content: string): TokenCall[] {
       message_id: typeof msg?.id === "string" ? msg.id : undefined,
       model: normalizeModelName(model),
       source: "claude-code",
+      call_count: 1,
+      premium_requests: 0,
       prompt_tokens: prompt,
       completion_tokens: output,
       cached_tokens: cacheRead,
       total_tokens: total,
     });
   }
+  return out;
+}
+
+export function parseCopilotCliEventsJsonl(content: string): TokenCall[] {
+  const out: TokenCall[] = [];
+
+  for (const line of content.split("\n")) {
+    if (!line.trim()) continue;
+
+    let ev: any;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      continue;
+    }
+
+    if (ev?.type !== "session.shutdown") continue;
+
+    const rawTime = typeof ev.timestamp === "string" ? ev.timestamp : ev?.data?.sessionStartTime;
+    if (typeof rawTime !== "string" && typeof rawTime !== "number") continue;
+    const date = new Date(rawTime);
+    if (!Number.isFinite(date.getTime())) continue;
+    const timestamp = date.toISOString();
+
+    const modelMetrics = ev?.data?.modelMetrics;
+    if (!modelMetrics || typeof modelMetrics !== "object") continue;
+    const modelMetricEntries = Object.entries(modelMetrics as Record<string, any>);
+
+    for (const [rawModel, metric] of modelMetricEntries) {
+      const usage = metric?.usage;
+      if (!usage || typeof usage !== "object") continue;
+
+      const input = Number(usage.inputTokens || 0);
+      const output = Number(usage.outputTokens || 0);
+      const cacheRead = Number(usage.cacheReadTokens || 0);
+      const cacheWrite = Number(usage.cacheWriteTokens || 0);
+      const reasoning = Number(usage.reasoningTokens || 0);
+      const requestCost = Number(metric?.requests?.cost);
+      const totalPremiumRequests = Number(ev?.data?.totalPremiumRequests);
+      const premiumRequests = Number.isFinite(requestCost)
+        ? Math.max(0, requestCost)
+        : modelMetricEntries.length === 1 && Number.isFinite(totalPremiumRequests)
+          ? Math.max(0, totalPremiumRequests)
+          : 0;
+      const prompt = input + cacheRead + cacheWrite;
+      const completion = output + reasoning;
+      const total = prompt + completion;
+      if (total === 0 || ![input, output, cacheRead, cacheWrite, reasoning].every(n => Number.isFinite(n) && n >= 0)) continue;
+
+      out.push({
+        timestamp,
+        request_id: `${ev.id || "session-shutdown"}:${rawModel}`,
+        model: normalizeModelName(rawModel),
+        source: "copilot-cli",
+        call_count: Number.isFinite(Number(metric?.requests?.count)) ? Math.max(1, Number(metric.requests.count)) : 1,
+        premium_requests: premiumRequests,
+        prompt_tokens: prompt,
+        completion_tokens: completion,
+        cached_tokens: cacheRead,
+        total_tokens: total,
+      });
+    }
+  }
+
   return out;
 }
 
@@ -356,19 +440,61 @@ function listClaudeCodeJsonlFiles(dir: string): string[] {
   return out;
 }
 
+function listSessionEventFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const out: string[] = [];
+
+  let subdirs: fs.Dirent[];
+  try {
+    subdirs = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  for (const sub of subdirs) {
+    if (!sub.isDirectory()) continue;
+    const eventsPath = path.join(dir, sub.name, "events.jsonl");
+    if (fs.existsSync(eventsPath)) out.push(eventsPath);
+  }
+
+  return out;
+}
+
 function collectCopilotCli(): { calls: TokenCall[]; logsScanned: number; logsDir: string } {
-  const dir = getLogsDir();
-  const files = listLogFiles(dir);
+  const logsDir = getLogsDir();
+  const sessionDir = getSessionStateDir();
+  const files = listLogFiles(logsDir);
+  const eventFiles = listSessionEventFiles(sessionDir);
   const calls: TokenCall[] = [];
+  const summaries = new Map<string, Map<string, TokenCall>>();
+  for (const f of eventFiles) {
+    try {
+      const sessionId = path.basename(path.dirname(f));
+      const latest = new Map<string, TokenCall>();
+      // Shutdown metrics are cumulative; keep the latest snapshot per model.
+      for (const c of parseCopilotCliEventsJsonl(fs.readFileSync(f, "utf-8"))) {
+        const previous = latest.get(c.model);
+        if (!previous || c.timestamp >= previous.timestamp) latest.set(c.model, c);
+      }
+      if (latest.size) summaries.set(sessionId, latest);
+    } catch { /* skip unreadable sessions */ }
+  }
   for (const f of files) {
     try {
-      const content = fs.readFileSync(f, "utf-8");
-      for (const c of parseLogContent(content)) calls.push(c);
-    } catch {
-      // skip unreadable files
-    }
+      for (const c of parseLogContent(fs.readFileSync(f, "utf-8"))) {
+        const sessionId = c.session_id || path.basename(f, ".log");
+        // Suppress a legacy response only when its session AND model have
+        // an authoritative cumulative summary. Never deduplicate by totals/time.
+        if (!summaries.get(sessionId)?.has(c.model)) calls.push(c);
+      }
+    } catch { /* skip unreadable logs */ }
   }
-  return { calls, logsScanned: files.length, logsDir: dir };
+  for (const models of summaries.values()) calls.push(...models.values());
+  return {
+    calls,
+    logsScanned: files.length + eventFiles.length,
+    logsDir: `${logsDir}, ${sessionDir}`,
+  };
 }
 
 function collectClaudeCode(): { calls: TokenCall[]; logsScanned: number; logsDir: string } {
@@ -390,24 +516,30 @@ function collectClaudeCode(): { calls: TokenCall[]; logsScanned: number; logsDir
 
 export function aggregate(calls: TokenCall[], logsScanned: number, logsDir: string): TokenUsageAnalytics {
   const byModel: TokenUsageAnalytics["byModel"] = {};
+  let callCount = 0;
+  let premiumRequests = 0;
   let prompt = 0;
   let cached = 0;
   let completion = 0;
   let total = 0;
 
   for (const c of calls) {
+    callCount += c.call_count || 1;
+    premiumRequests += c.premium_requests || 0;
     prompt += c.prompt_tokens;
     cached += c.cached_tokens;
     completion += c.completion_tokens;
     total += c.total_tokens;
     const m = (byModel[c.model] = byModel[c.model] || {
       calls: 0,
+      premium_requests: 0,
       prompt_tokens: 0,
       cached_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,
     });
-    m.calls += 1;
+    m.calls += c.call_count || 1;
+    m.premium_requests += c.premium_requests || 0;
     m.prompt_tokens += c.prompt_tokens;
     m.cached_tokens += c.cached_tokens;
     m.completion_tokens += c.completion_tokens;
@@ -433,7 +565,8 @@ export function aggregate(calls: TokenCall[], logsScanned: number, logsDir: stri
 
   return {
     totals: {
-      calls: calls.length,
+      calls: callCount,
+      premium_requests: premiumRequests,
       prompt_tokens: prompt,
       cached_tokens: cached,
       completion_tokens: completion,
@@ -460,8 +593,18 @@ export function getTokenUsage(source: TokenSourceFilter = "all"): TokenUsageAnal
     const cc = collectClaudeCode();
 
     const sourcesSummary: TokenUsageAnalytics["sources"] = [
-      { source: "copilot-cli", logsDir: cli.logsDir, logsScanned: cli.logsScanned, calls: cli.calls.length },
-      { source: "claude-code", logsDir: cc.logsDir, logsScanned: cc.logsScanned, calls: cc.calls.length },
+      {
+        source: "copilot-cli",
+        logsDir: cli.logsDir,
+        logsScanned: cli.logsScanned,
+        calls: cli.calls.reduce((sum, call) => sum + (call.call_count || 1), 0),
+      },
+      {
+        source: "claude-code",
+        logsDir: cc.logsDir,
+        logsScanned: cc.logsScanned,
+        calls: cc.calls.reduce((sum, call) => sum + (call.call_count || 1), 0),
+      },
     ];
 
     let selected: TokenCall[];
