@@ -5,7 +5,7 @@ export interface SearchEntry {
   source: "cli" | "vscode" | "claude-code";
   title: string;
   cwd: string;
-  date: string;      // ISO string — updatedAt from SessionMeta
+  date: string; // ISO string — updatedAt from SessionMeta
   content: string[]; // array of extracted message strings
 }
 
@@ -16,8 +16,8 @@ export interface SearchResult {
 }
 
 export interface SearchOptions {
-  limit?: number;                        // default 20
-  source?: "cli" | "vscode" | "claude-code" | "all";    // default 'all'
+  limit?: number; // default 20
+  source?: "cli" | "vscode" | "claude-code" | "all"; // default 'all'
 }
 
 function stripCodeBlocks(text: string): string {
@@ -28,12 +28,14 @@ function stripCodeBlocks(text: string): string {
 }
 
 export function tokenize(query: string): string[] {
-  return query
-    .toLowerCase()
-    // Splits the search query on one or more non-alphanumeric characters,
-    // converting the string into an array of lowercase tokens.
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 2);
+  return (
+    query
+      .toLowerCase()
+      // Splits the search query on one or more non-alphanumeric characters,
+      // converting the string into an array of lowercase tokens.
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 2)
+  );
 }
 
 function trimToWordBoundary(text: string, start: number, end: number): string {

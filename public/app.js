@@ -8,14 +8,14 @@ let analyticsSource = "all";
 
 // Directory color coding — sophisticated muted palette
 const DIR_COLORS = [
-  { border: "#6e7681", bg: "#161b2208" },  // slate
-  { border: "#58a6ff", bg: "#58a6ff08" },  // blue
-  { border: "#3fb950", bg: "#3fb95008" },  // green
-  { border: "#d29922", bg: "#d2992208" },  // amber
-  { border: "#bc8cff", bg: "#bc8cff08" },  // purple
-  { border: "#f0883e", bg: "#f0883e08" },  // orange
-  { border: "#56d4dd", bg: "#56d4dd08" },  // teal
-  { border: "#db61a2", bg: "#db61a208" },  // rose
+  { border: "#6e7681", bg: "#161b2208" }, // slate
+  { border: "#58a6ff", bg: "#58a6ff08" }, // blue
+  { border: "#3fb950", bg: "#3fb95008" }, // green
+  { border: "#d29922", bg: "#d2992208" }, // amber
+  { border: "#bc8cff", bg: "#bc8cff08" }, // purple
+  { border: "#f0883e", bg: "#f0883e08" }, // orange
+  { border: "#56d4dd", bg: "#56d4dd08" }, // teal
+  { border: "#db61a2", bg: "#db61a208" }, // rose
 ];
 const dirColorMap = {};
 let nextColorIdx = 0;
@@ -47,7 +47,14 @@ const refreshBtn = document.getElementById("refreshBtn");
 const statsCards = document.getElementById("statsCards");
 
 // Navigation
-const VALID_PAGES = new Set(["home", "sessions", "analytics", "tokens", "insights", "docs"]);
+const VALID_PAGES = new Set([
+  "home",
+  "sessions",
+  "analytics",
+  "tokens",
+  "insights",
+  "docs",
+]);
 const PAGE_TITLES = {
   home: "Copilot Lens",
   sessions: "Sessions — Copilot Lens",
@@ -60,8 +67,12 @@ const PAGE_TITLES = {
 function activatePage(pageName) {
   if (!VALID_PAGES.has(pageName)) pageName = "home";
   document.title = PAGE_TITLES[pageName] || "Copilot Lens";
-  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
-  document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+  document
+    .querySelectorAll(".nav-btn")
+    .forEach((b) => b.classList.remove("active"));
+  document
+    .querySelectorAll(".page")
+    .forEach((p) => p.classList.remove("active"));
   const btn = document.querySelector(`.nav-btn[data-page="${pageName}"]`);
   const page = document.getElementById(pageName + "Page");
   if (btn) btn.classList.add("active");
@@ -81,7 +92,9 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
   });
 });
 
-window.addEventListener("hashchange", () => activatePage(location.hash.slice(1)));
+window.addEventListener("hashchange", () =>
+  activatePage(location.hash.slice(1))
+);
 
 function switchToPage(pageName) {
   if (location.hash.slice(1) === pageName) activatePage(pageName);
@@ -89,7 +102,9 @@ function switchToPage(pageName) {
 }
 
 function clearSelectedCard() {
-  document.querySelectorAll(".session-card.selected").forEach((c) => c.classList.remove("selected"));
+  document
+    .querySelectorAll(".session-card.selected")
+    .forEach((c) => c.classList.remove("selected"));
 }
 
 // Side pane close
@@ -104,7 +119,11 @@ document.addEventListener("keydown", (e) => {
     detailPane.classList.remove("open");
     clearSelectedCard();
   }
-  if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
+  if (
+    e.key === "/" &&
+    document.activeElement.tagName !== "INPUT" &&
+    document.activeElement.tagName !== "TEXTAREA"
+  ) {
     e.preventDefault();
     searchInput.focus();
   }
@@ -129,7 +148,11 @@ function formatTime(iso) {
   if (diff < 60000) return "just now";
   if (diff < 3600000) return Math.floor(diff / 60000) + "m ago";
   if (diff < 86400000) return Math.floor(diff / 3600000) + "h ago";
-  return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return (
+    d.toLocaleDateString() +
+    " " +
+    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  );
 }
 
 function shortId(id) {
@@ -220,16 +243,28 @@ function renderSessions() {
   }
 
   sessionList.innerHTML = filtered
-    .map(
-      (s) => {
-        const c = getDirColor(s.cwd);
-        const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
-        const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
-        const displayName = s.title || shortDir(s.cwd) || shortId(s.id);
-        const metaItems = [];
-        if (s.branch) metaItems.push(`<span class="badge badge-branch">⎇ ${escapeHtml(s.branch)}</span>`);
-        metaItems.push(`<span>${formatTime(s.createdAt)}</span>`);
-        return `
+    .map((s) => {
+      const c = getDirColor(s.cwd);
+      const sourceClass =
+        s.source === "vscode"
+          ? "badge-vscode"
+          : s.source === "claude-code"
+            ? "badge-claude"
+            : "badge-cli";
+      const sourceLabel =
+        s.source === "vscode"
+          ? "VS Code"
+          : s.source === "claude-code"
+            ? "Claude Code"
+            : "Copilot CLI";
+      const displayName = s.title || shortDir(s.cwd) || shortId(s.id);
+      const metaItems = [];
+      if (s.branch)
+        metaItems.push(
+          `<span class="badge badge-branch">⎇ ${escapeHtml(s.branch)}</span>`
+        );
+      metaItems.push(`<span>${formatTime(s.createdAt)}</span>`);
+      return `
     <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 4px solid ${c.border}">
       <div class="top-row">
         <span class="session-id">${escapeHtml(displayName)}</span>
@@ -244,8 +279,7 @@ function renderSessions() {
       </div>
     </div>
   `;
-      }
-    )
+    })
     .join("");
 
   // Stagger animation + click handlers
@@ -253,8 +287,14 @@ function renderSessions() {
     const delay = Math.min(i * 30, 300);
     card.style.animationDelay = `${delay}ms`;
     card.classList.add("card-animate");
-    card.addEventListener("animationend", () => card.classList.remove("card-animate"), { once: true });
-    card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
+    card.addEventListener(
+      "animationend",
+      () => card.classList.remove("card-animate"),
+      { once: true }
+    );
+    card.addEventListener("click", () =>
+      openDetail(card.dataset.id, card.dataset.source)
+    );
   });
 }
 
@@ -289,7 +329,9 @@ async function openDetail(id, source) {
 
 function renderDetail(s) {
   const userMessages = s.events.filter((e) => e.type === "user.message");
-  const assistantMessages = s.events.filter((e) => e.type === "assistant.message");
+  const assistantMessages = s.events.filter(
+    (e) => e.type === "assistant.message"
+  );
   const toolCalls = s.events.filter((e) => e.type === "tool.execution_start");
   const errors = s.events.filter((e) => e.type === "session.error");
 
@@ -306,7 +348,9 @@ function renderDetail(s) {
       currentModel = e.data.newModel;
     }
     if (e.type === "session.info" && e.data?.infoType === "model") {
-      const match = (e.data.message || "").match(/Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i);
+      const match = (e.data.message || "").match(
+        /Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i
+      );
       if (match) currentModel = match[1];
     }
     modelAtIndex[i] = currentModel;
@@ -315,7 +359,13 @@ function renderDetail(s) {
   // Interleave conversation messages in order
   const conversation = s.events
     .map((e, i) => ({ e, i }))
-    .filter(({ e }) => (e.type === "user.message" || e.type === "assistant.message" || e.type === "assistant.thinking") && (e.data?.content || "").trim())
+    .filter(
+      ({ e }) =>
+        (e.type === "user.message" ||
+          e.type === "assistant.message" ||
+          e.type === "assistant.thinking") &&
+        (e.data?.content || "").trim()
+    )
     .map(({ e, i }) => {
       const content = e.data?.content || "";
       if (e.type === "assistant.thinking") {
@@ -327,8 +377,16 @@ function renderDetail(s) {
       const isUser = e.type === "user.message";
       const isTruncated = content.length > 800;
       const msgId = `msg-${i}`;
-      const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-      const model = !isUser && modelAtIndex[i] ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>` : "";
+      const time = e.timestamp
+        ? new Date(e.timestamp).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "";
+      const model =
+        !isUser && modelAtIndex[i]
+          ? `<span class="message-model">${escapeHtml(modelAtIndex[i])}</span>`
+          : "";
       return `<div class="message ${isUser ? "message-user" : "message-assistant"}">
         <div class="message-label">${isUser ? "👤 You" : s.source === "claude-code" ? "🤖 Claude" : s.source === "vscode" ? "🤖 Copilot" : "🤖 Copilot"}${model}${time ? `<span class="message-time">${time}</span>` : ""}</div>
         <div class="message-body">
@@ -369,7 +427,10 @@ function renderDetail(s) {
     <div class="event-counts" style="margin-bottom:16px">
       ${Object.entries(s.eventCounts)
         .sort((a, b) => b[1] - a[1])
-        .map(([type, count]) => `<span class="event-count-badge">${escapeHtml(type)}: ${count}</span>`)
+        .map(
+          ([type, count]) =>
+            `<span class="event-count-badge">${escapeHtml(type)}: ${count}</span>`
+        )
         .join("")}
     </div>
 
@@ -409,15 +470,19 @@ function renderDetail(s) {
   // Tab switching
   detailContent.querySelectorAll(".detail-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      detailContent.querySelectorAll(".detail-tab").forEach((t) => t.classList.remove("active"));
-      detailContent.querySelectorAll(".detail-panel").forEach((p) => p.classList.remove("active"));
+      detailContent
+        .querySelectorAll(".detail-tab")
+        .forEach((t) => t.classList.remove("active"));
+      detailContent
+        .querySelectorAll(".detail-panel")
+        .forEach((p) => p.classList.remove("active"));
       tab.classList.add("active");
-      document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+      document
+        .getElementById("panel-" + tab.dataset.tab)
+        .classList.add("active");
     });
   });
-
 }
-
 
 function toggleMsg(id) {
   const short = document.getElementById(id + "-short");
@@ -437,11 +502,14 @@ function escapeHtml(str) {
 
 // Analytics
 async function loadAnalytics() {
-  statsCards.innerHTML = Array.from({ length: 4 }, () => `
+  statsCards.innerHTML = Array.from(
+    { length: 4 },
+    () => `
     <div class="stat-card">
       <div class="stat-value">…</div>
       <div class="stat-label">Loading</div>
-    </div>`).join("");
+    </div>`
+  ).join("");
   try {
     const res = await fetch(`/api/analytics?source=${analyticsSource}`);
     analytics = await res.json();
@@ -502,8 +570,12 @@ function setChartEmpty(canvasId, message) {
 }
 
 function resetChartCanvases() {
-  document.querySelectorAll(".chart-empty-msg").forEach((el) => (el.style.display = "none"));
-  document.querySelectorAll(".charts-grid canvas").forEach((el) => (el.style.display = ""));
+  document
+    .querySelectorAll(".chart-empty-msg")
+    .forEach((el) => (el.style.display = "none"));
+  document
+    .querySelectorAll(".charts-grid canvas")
+    .forEach((el) => (el.style.display = ""));
 }
 
 function renderCharts() {
@@ -514,8 +586,18 @@ function renderCharts() {
   // Restore any canvases that were hidden by empty-state handlers
   resetChartCanvases();
 
-  const chartColors = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#bc8cff", "#f0883e", "#56d4dd", "#db61a2"];
-  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const chartColors = [
+    "#58a6ff",
+    "#3fb950",
+    "#d29922",
+    "#f85149",
+    "#bc8cff",
+    "#f0883e",
+    "#56d4dd",
+    "#db61a2",
+  ];
+  const isLight =
+    document.documentElement.getAttribute("data-theme") === "light";
   const tickColor = isLight ? "#656d76" : "#8b949e";
   const legendColor = isLight ? "#1f2328" : "#e6edf3";
 
@@ -525,9 +607,25 @@ function renderCharts() {
     type: "bar",
     data: {
       labels: days.map((d) => d.slice(5)), // MM-DD
-      datasets: [{ label: "Sessions", data: days.map((d) => analytics.sessionsPerDay[d]), backgroundColor: "#58a6ff88", borderColor: "#58a6ff", borderWidth: 1 }],
+      datasets: [
+        {
+          label: "Sessions",
+          data: days.map((d) => analytics.sessionsPerDay[d]),
+          backgroundColor: "#58a6ff88",
+          borderColor: "#58a6ff",
+          borderWidth: 1,
+        },
+      ],
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: tickColor } }, x: { ticks: { color: tickColor } } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: tickColor } },
+        x: { ticks: { color: tickColor } },
+      },
+    },
   });
 
   // Tool usage (top 10)
@@ -539,9 +637,24 @@ function renderCharts() {
       type: "doughnut",
       data: {
         labels: tools.map((t) => t[0]),
-        datasets: [{ data: tools.map((t) => t[1]), backgroundColor: chartColors }],
+        datasets: [
+          { data: tools.map((t) => t[1]), backgroundColor: chartColors },
+        ],
       },
-      options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              color: legendColor,
+              font: { size: 13 },
+              padding: 14,
+              boxWidth: 14,
+            },
+          },
+        },
+      },
     });
   }
 
@@ -554,9 +667,25 @@ function renderCharts() {
       type: "bar",
       data: {
         labels: dirs.map((d) => shortDir(d[0])),
-        datasets: [{ label: "Sessions", data: dirs.map((d) => d[1]), backgroundColor: "#3fb95088", borderColor: "#3fb950", borderWidth: 1 }],
+        datasets: [
+          {
+            label: "Sessions",
+            data: dirs.map((d) => d[1]),
+            backgroundColor: "#3fb95088",
+            borderColor: "#3fb950",
+            borderWidth: 1,
+          },
+        ],
       },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: tickColor } }, y: { ticks: { color: tickColor, font: { size: 12 } } } } },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: tickColor } },
+          y: { ticks: { color: tickColor, font: { size: 12 } } },
+        },
+      },
     });
   }
 
@@ -569,9 +698,34 @@ function renderCharts() {
       type: "bar",
       data: {
         labels: branches.map((b) => b[0]),
-        datasets: [{ label: "Time", data: branches.map((b) => Math.round(b[1] / 60000)), backgroundColor: "#d2992288", borderColor: "#d29922", borderWidth: 1 }],
+        datasets: [
+          {
+            label: "Time",
+            data: branches.map((b) => Math.round(b[1] / 60000)),
+            backgroundColor: "#d2992288",
+            borderColor: "#d29922",
+            borderWidth: 1,
+          },
+        ],
       },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => formatDuration(ctx.raw * 60000) } } }, scales: { x: { beginAtZero: true, title: { display: true, text: "minutes", color: tickColor }, ticks: { color: tickColor } }, y: { ticks: { color: tickColor, font: { size: 12 } } } } },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: (ctx) => formatDuration(ctx.raw * 60000) },
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            title: { display: true, text: "minutes", color: tickColor },
+            ticks: { color: tickColor },
+          },
+          y: { ticks: { color: tickColor, font: { size: 12 } } },
+        },
+      },
     });
   }
 
@@ -584,37 +738,96 @@ function renderCharts() {
       type: "bar",
       data: {
         labels: repos.map((r) => shortDir(r[0])),
-        datasets: [{ label: "Time", data: repos.map((r) => Math.round(r[1] / 60000)), backgroundColor: "#3fb95088", borderColor: "#3fb950", borderWidth: 1 }],
+        datasets: [
+          {
+            label: "Time",
+            data: repos.map((r) => Math.round(r[1] / 60000)),
+            backgroundColor: "#3fb95088",
+            borderColor: "#3fb950",
+            borderWidth: 1,
+          },
+        ],
       },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => formatDuration(ctx.raw * 60000) } } }, scales: { x: { beginAtZero: true, title: { display: true, text: "minutes", color: tickColor }, ticks: { color: tickColor } }, y: { ticks: { color: tickColor, font: { size: 12 } } } } },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: (ctx) => formatDuration(ctx.raw * 60000) },
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            title: { display: true, text: "minutes", color: tickColor },
+            ticks: { color: tickColor },
+          },
+          y: { ticks: { color: tickColor, font: { size: 12 } } },
+        },
+      },
     });
   }
 
   // MCP Servers
-  const mcpEntries = Object.entries(analytics.mcpServers || {}).sort((a, b) => b[1] - a[1]);
+  const mcpEntries = Object.entries(analytics.mcpServers || {}).sort(
+    (a, b) => b[1] - a[1]
+  );
   if (mcpEntries.length) {
     charts.mcp = new Chart(document.getElementById("mcpChart"), {
       type: "doughnut",
       data: {
         labels: mcpEntries.map((m) => m[0]),
-        datasets: [{ data: mcpEntries.map((m) => m[1]), backgroundColor: chartColors }],
+        datasets: [
+          { data: mcpEntries.map((m) => m[1]), backgroundColor: chartColors },
+        ],
       },
-      options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              color: legendColor,
+              font: { size: 13 },
+              padding: 14,
+              boxWidth: 14,
+            },
+          },
+        },
+      },
     });
   } else {
     setChartEmpty("mcpChart", "No MCP servers detected");
   }
 
   // Model Usage
-  const models = Object.entries(analytics.modelUsage || {}).sort((a, b) => b[1] - a[1]);
+  const models = Object.entries(analytics.modelUsage || {}).sort(
+    (a, b) => b[1] - a[1]
+  );
   if (models.length) {
     charts.model = new Chart(document.getElementById("modelChart"), {
       type: "doughnut",
       data: {
         labels: models.map((m) => m[0]),
-        datasets: [{ data: models.map((m) => m[1]), backgroundColor: chartColors }],
+        datasets: [
+          { data: models.map((m) => m[1]), backgroundColor: chartColors },
+        ],
       },
-      options: { responsive: true, plugins: { legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } } } },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              color: legendColor,
+              font: { size: 13 },
+              padding: 14,
+              boxWidth: 14,
+            },
+          },
+        },
+      },
     });
   } else {
     setChartEmpty("modelChart", "No model data detected");
@@ -622,26 +835,48 @@ function renderCharts() {
 
   // Activity by Hour of Day
   const hours = analytics.hourOfDay || {};
-  const allHours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0") + ":00");
+  const allHours = Array.from(
+    { length: 24 },
+    (_, i) => i.toString().padStart(2, "0") + ":00"
+  );
   charts.hour = new Chart(document.getElementById("hourChart"), {
     type: "bar",
     data: {
       labels: allHours.map((h) => h.slice(0, 2)),
-      datasets: [{ label: "Sessions", data: allHours.map((h) => hours[h] || 0), backgroundColor: "#56d4dd88", borderColor: "#56d4dd", borderWidth: 1 }],
+      datasets: [
+        {
+          label: "Sessions",
+          data: allHours.map((h) => hours[h] || 0),
+          backgroundColor: "#56d4dd88",
+          borderColor: "#56d4dd",
+          borderWidth: 1,
+        },
+      ],
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: tickColor } }, x: { ticks: { color: tickColor } } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: tickColor } },
+        x: { ticks: { color: tickColor } },
+      },
+    },
   });
 }
 
 // Data loading
 async function loadSessions() {
   // Show skeleton while loading
-  sessionList.innerHTML = Array.from({ length: 4 }, () => `
+  sessionList.innerHTML = Array.from(
+    { length: 4 },
+    () => `
     <div class="skeleton-card">
       <div class="skeleton-line" style="width:55%;height:14px;margin-bottom:10px"></div>
       <div class="skeleton-line" style="width:75%"></div>
       <div class="skeleton-line" style="width:40%"></div>
-    </div>`).join("");
+    </div>`
+  ).join("");
 
   try {
     const res = await fetch("/api/sessions");
@@ -658,7 +893,7 @@ function updateSearchKbd() {
   if (!searchKbd) return;
   const hasFocus = document.activeElement === searchInput;
   const hasText = !!searchInput.value.trim();
-  searchKbd.style.display = (hasFocus || hasText) ? "none" : "";
+  searchKbd.style.display = hasFocus || hasText ? "none" : "";
 }
 
 // Search input (full-text search with debounce)
@@ -689,20 +924,27 @@ statusFilter.addEventListener("change", renderSessions);
 dirFilter.addEventListener("change", renderSessions);
 
 // Analytics source filter
-document.getElementById("analyticsSourceFilter").addEventListener("click", (e) => {
-  const btn = e.target.closest(".source-btn");
-  if (!btn) return;
-  analyticsSource = btn.dataset.source;
-  document.querySelectorAll("#analyticsSourceFilter .source-btn").forEach((b) => b.classList.remove("active"));
-  btn.classList.add("active");
-  loadAnalytics();
-});
+document
+  .getElementById("analyticsSourceFilter")
+  .addEventListener("click", (e) => {
+    const btn = e.target.closest(".source-btn");
+    if (!btn) return;
+    analyticsSource = btn.dataset.source;
+    document
+      .querySelectorAll("#analyticsSourceFilter .source-btn")
+      .forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    loadAnalytics();
+  });
 
 // Populate directory filter from session data
 function updateDirFilter() {
-  const dirs = [...new Set(sessions.map((s) => s.cwd || "").filter(Boolean))].sort();
+  const dirs = [
+    ...new Set(sessions.map((s) => s.cwd || "").filter(Boolean)),
+  ].sort();
   const current = dirFilter.value;
-  dirFilter.innerHTML = '<option value="all">All Directories</option>' +
+  dirFilter.innerHTML =
+    '<option value="all">All Directories</option>' +
     dirs.map((d) => `<option value="${d}">${shortDir(d)}</option>`).join("");
   dirFilter.value = current;
 }
@@ -711,7 +953,9 @@ function updateDirFilter() {
 refreshBtn.addEventListener("click", async () => {
   refreshBtn.classList.add("spinning");
   // Clear server-side cache before reloading
-  try { await fetch("/api/cache/clear", { method: "POST" }); } catch {}
+  try {
+    await fetch("/api/cache/clear", { method: "POST" });
+  } catch {}
   loadSessions();
   if (document.getElementById("analyticsPage").classList.contains("active")) {
     loadAnalytics();
@@ -728,11 +972,14 @@ refreshBtn.addEventListener("click", async () => {
 // Theme toggle
 const themeToggle = document.getElementById("themeToggle");
 const savedTheme = localStorage.getItem("copilot-lens-theme");
-if (savedTheme === "light") document.documentElement.setAttribute("data-theme", "light");
-themeToggle.textContent = document.documentElement.getAttribute("data-theme") === "light" ? "🌙" : "☀️";
+if (savedTheme === "light")
+  document.documentElement.setAttribute("data-theme", "light");
+themeToggle.textContent =
+  document.documentElement.getAttribute("data-theme") === "light" ? "🌙" : "☀️";
 
 themeToggle.addEventListener("click", () => {
-  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const isLight =
+    document.documentElement.getAttribute("data-theme") === "light";
   if (isLight) {
     document.documentElement.removeAttribute("data-theme");
     localStorage.setItem("copilot-lens-theme", "dark");
@@ -766,7 +1013,9 @@ async function loadInsights() {
     insightsRepos = await res.json();
     renderRepoSelector();
     if (insightsRepos.length > 0) {
-      const selected = insightsRepos.find((r) => r.repo === repoSelector.value) || insightsRepos[0];
+      const selected =
+        insightsRepos.find((r) => r.repo === repoSelector.value) ||
+        insightsRepos[0];
       repoSelector.value = selected.repo;
       renderInsightsScore(selected);
     }
@@ -777,14 +1026,17 @@ async function loadInsights() {
 
 function renderRepoSelector() {
   if (insightsRepos.length === 0) {
-    repoSelector.innerHTML = '<option value="">No repos with enough data (need 3+ sessions)</option>';
-    insightsContent.innerHTML = '<div class="not-enough-data"><div class="nod-icon">📊</div><p>Need at least 3 sessions in a repository to generate a score.</p></div>';
+    repoSelector.innerHTML =
+      '<option value="">No repos with enough data (need 3+ sessions)</option>';
+    insightsContent.innerHTML =
+      '<div class="not-enough-data"><div class="nod-icon">📊</div><p>Need at least 3 sessions in a repository to generate a score.</p></div>';
     return;
   }
   const current = repoSelector.value;
   repoSelector.innerHTML = insightsRepos
     .map((r) => {
-      const label = r.repo === "VS Code" ? "🟣 VS Code (all sessions)" : shortDir(r.repo);
+      const label =
+        r.repo === "VS Code" ? "🟣 VS Code (all sessions)" : shortDir(r.repo);
       return `<option value="${r.repo}">${label} — ${r.totalScore}/100</option>`;
     })
     .join("");
@@ -835,7 +1087,10 @@ function renderInsightsScore(data) {
     .join("");
 
   const tipItems = data.tips
-    .map((tip) => `<div class="tip-item"><span class="tip-icon">💡</span><span>${escapeHtml(tip)}</span></div>`)
+    .map(
+      (tip) =>
+        `<div class="tip-item"><span class="tip-icon">💡</span><span>${escapeHtml(tip)}</span></div>`
+    )
     .join("");
 
   insightsContent.innerHTML = `
@@ -871,7 +1126,9 @@ async function runSearch(q) {
   const searchWrap = document.querySelector(".search-bar-wrap");
   if (searchWrap) searchWrap.classList.add("loading");
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=all&limit=20`);
+    const res = await fetch(
+      `/api/search?q=${encodeURIComponent(q)}&source=all&limit=20`
+    );
     const results = await res.json();
     isSearchActive = true;
     renderSearchResults(results);
@@ -907,12 +1164,23 @@ function renderSearchResults(results) {
     .map(({ entry, highlights }) => {
       const s = entry;
       const c = getDirColor(s.cwd);
-      const sourceClass = s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli";
-      const sourceLabel = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI";
+      const sourceClass =
+        s.source === "vscode"
+          ? "badge-vscode"
+          : s.source === "claude-code"
+            ? "badge-claude"
+            : "badge-cli";
+      const sourceLabel =
+        s.source === "vscode"
+          ? "VS Code"
+          : s.source === "claude-code"
+            ? "Claude Code"
+            : "Copilot CLI";
       const displayName = s.title || shortId(s.id);
-      const highlightHtml = highlights && highlights.length
-        ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`
-        : "";
+      const highlightHtml =
+        highlights && highlights.length
+          ? `<div class="search-highlights">${highlights.map((h) => `<span class="highlight-snippet">${escapeHtml(h)}</span>`).join("")}</div>`
+          : "";
       return `
     <div class="session-card" data-id="${s.id}" data-source="${s.source || "cli"}" style="border-left: 4px solid ${c.border}">
       <div class="top-row">
@@ -935,8 +1203,14 @@ function renderSearchResults(results) {
     const delay = Math.min(i * 30, 300);
     card.style.animationDelay = `${delay}ms`;
     card.classList.add("card-animate");
-    card.addEventListener("animationend", () => card.classList.remove("card-animate"), { once: true });
-    card.addEventListener("click", () => openDetail(card.dataset.id, card.dataset.source));
+    card.addEventListener(
+      "animationend",
+      () => card.classList.remove("card-animate"),
+      { once: true }
+    );
+    card.addEventListener("click", () =>
+      openDetail(card.dataset.id, card.dataset.source)
+    );
   });
 }
 
@@ -954,30 +1228,30 @@ let tokenSource = "all";
 // Keys are matched by `startsWith` against the normalized model name.
 const MODEL_RATES = [
   // Anthropic Claude
-  { prefix: "claude-opus",      input: 15.00, output: 75.00, cached: 1.50 },
-  { prefix: "claude-sonnet",    input:  3.00, output: 15.00, cached: 0.30 },
-  { prefix: "claude-haiku",     input:  1.00, output:  5.00, cached: 0.10 },
-  { prefix: "claude-3-5-sonnet",input:  3.00, output: 15.00, cached: 0.30 },
+  { prefix: "claude-opus", input: 15.0, output: 75.0, cached: 1.5 },
+  { prefix: "claude-sonnet", input: 3.0, output: 15.0, cached: 0.3 },
+  { prefix: "claude-haiku", input: 1.0, output: 5.0, cached: 0.1 },
+  { prefix: "claude-3-5-sonnet", input: 3.0, output: 15.0, cached: 0.3 },
   // OpenAI GPT-5 family
-  { prefix: "gpt-5-nano",       input:  0.05, output:  0.40, cached: 0.005 },
-  { prefix: "gpt-5-mini",       input:  0.25, output:  2.00, cached: 0.025 },
-  { prefix: "gpt-5",            input:  1.25, output: 10.00, cached: 0.125 },
+  { prefix: "gpt-5-nano", input: 0.05, output: 0.4, cached: 0.005 },
+  { prefix: "gpt-5-mini", input: 0.25, output: 2.0, cached: 0.025 },
+  { prefix: "gpt-5", input: 1.25, output: 10.0, cached: 0.125 },
   // OpenAI GPT-4 family
-  { prefix: "gpt-4.1-mini",     input:  0.40, output:  1.60, cached: 0.10 },
-  { prefix: "gpt-4.1-nano",     input:  0.10, output:  0.40, cached: 0.025 },
-  { prefix: "gpt-4.1",          input:  2.00, output:  8.00, cached: 0.50 },
-  { prefix: "gpt-4o-mini",      input:  0.15, output:  0.60, cached: 0.075 },
-  { prefix: "gpt-4o",           input:  2.50, output: 10.00, cached: 1.25 },
+  { prefix: "gpt-4.1-mini", input: 0.4, output: 1.6, cached: 0.1 },
+  { prefix: "gpt-4.1-nano", input: 0.1, output: 0.4, cached: 0.025 },
+  { prefix: "gpt-4.1", input: 2.0, output: 8.0, cached: 0.5 },
+  { prefix: "gpt-4o-mini", input: 0.15, output: 0.6, cached: 0.075 },
+  { prefix: "gpt-4o", input: 2.5, output: 10.0, cached: 1.25 },
   // OpenAI o-series
-  { prefix: "o4-mini",          input:  1.10, output:  4.40, cached: 0.275 },
-  { prefix: "o3-mini",          input:  1.10, output:  4.40, cached: 0.55 },
-  { prefix: "o3",               input:  2.00, output:  8.00, cached: 0.50 },
-  { prefix: "o1-mini",          input:  1.10, output:  4.40, cached: 0.55 },
-  { prefix: "o1",               input: 15.00, output: 60.00, cached: 7.50 },
+  { prefix: "o4-mini", input: 1.1, output: 4.4, cached: 0.275 },
+  { prefix: "o3-mini", input: 1.1, output: 4.4, cached: 0.55 },
+  { prefix: "o3", input: 2.0, output: 8.0, cached: 0.5 },
+  { prefix: "o1-mini", input: 1.1, output: 4.4, cached: 0.55 },
+  { prefix: "o1", input: 15.0, output: 60.0, cached: 7.5 },
   // Google Gemini
-  { prefix: "gemini-2.5-pro",   input:  1.25, output: 10.00, cached: 0.31 },
-  { prefix: "gemini-2.5-flash", input:  0.30, output:  2.50, cached: 0.075 },
-  { prefix: "gemini",           input:  1.25, output:  5.00, cached: 0.31 },
+  { prefix: "gemini-2.5-pro", input: 1.25, output: 10.0, cached: 0.31 },
+  { prefix: "gemini-2.5-flash", input: 0.3, output: 2.5, cached: 0.075 },
+  { prefix: "gemini", input: 1.25, output: 5.0, cached: 0.31 },
 ];
 
 function rateFor(model) {
@@ -994,7 +1268,10 @@ function costForModel(model, prompt, cached, completion) {
   const r = rateFor(model);
   if (!r) return null;
   const newPrompt = Math.max(0, prompt - cached);
-  return (newPrompt * r.input + cached * r.cached + completion * r.output) / 1_000_000;
+  return (
+    (newPrompt * r.input + cached * r.cached + completion * r.output) /
+    1_000_000
+  );
 }
 
 // Total estimated cost across all models. Returns { cost, coverage } where
@@ -1006,7 +1283,12 @@ function estimateTotalCost() {
   let totalTokens = 0;
   for (const [name, m] of Object.entries(tokenData.byModel)) {
     totalTokens += m.total_tokens;
-    const c = costForModel(name, m.prompt_tokens, m.cached_tokens, m.completion_tokens);
+    const c = costForModel(
+      name,
+      m.prompt_tokens,
+      m.cached_tokens,
+      m.completion_tokens
+    );
     if (c != null) {
       cost += c;
       coveredTokens += m.total_tokens;
@@ -1017,7 +1299,8 @@ function estimateTotalCost() {
 
 function formatUSD(n) {
   if (n == null) return "—";
-  if (n >= 1000) return "$" + n.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  if (n >= 1000)
+    return "$" + n.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   if (n >= 10) return "$" + n.toFixed(2);
   if (n >= 1) return "$" + n.toFixed(2);
   if (n >= 0.01) return "$" + n.toFixed(3);
@@ -1035,7 +1318,8 @@ function formatTokens(n) {
   if (n == null) return "—";
   if (n < 1000) return String(n);
   if (n < 1_000_000) return (n / 1000).toFixed(n < 10_000 ? 2 : 1) + "K";
-  if (n < 1_000_000_000) return (n / 1_000_000).toFixed(n < 10_000_000 ? 2 : 1) + "M";
+  if (n < 1_000_000_000)
+    return (n / 1_000_000).toFixed(n < 10_000_000 ? 2 : 1) + "M";
   return (n / 1_000_000_000).toFixed(2) + "B";
 }
 
@@ -1045,7 +1329,9 @@ async function loadTokens() {
     ${Array.from({ length: 6 }, () => `<div class="stat-card"><div class="stat-value">…</div><div class="stat-label">Loading</div></div>`).join("")}
   `;
   try {
-    const res = await fetch(`/api/token-usage?source=${encodeURIComponent(tokenSource)}`);
+    const res = await fetch(
+      `/api/token-usage?source=${encodeURIComponent(tokenSource)}`
+    );
     tokenData = await res.json();
     renderTokens();
   } catch (err) {
@@ -1059,8 +1345,15 @@ function renderTokens() {
   const cards = document.getElementById("tokenStatsCards");
   const cacheRatePct = (t.cache_hit_rate * 100).toFixed(1) + "%";
   const promptShown = adjPrompt(t.prompt_tokens, t.cached_tokens);
-  const totalShown = adjTotal(t.prompt_tokens, t.cached_tokens, t.completion_tokens);
-  const compRatio = promptShown > 0 ? ((t.completion_tokens / promptShown) * 100).toFixed(1) + "%" : "—";
+  const totalShown = adjTotal(
+    t.prompt_tokens,
+    t.cached_tokens,
+    t.completion_tokens
+  );
+  const compRatio =
+    promptShown > 0
+      ? ((t.completion_tokens / promptShown) * 100).toFixed(1) + "%"
+      : "—";
   const promptLabel = tokenIncludeCached
     ? `Prompt Tokens · ${cacheRatePct} cached`
     : `Prompt Tokens (billed) · ${cacheRatePct} cache hit`;
@@ -1073,9 +1366,10 @@ function renderTokens() {
   const est = estimateTotalCost();
   const coveragePct = (est.coverage * 100).toFixed(0);
   const costPerDay = activeDays > 0 ? est.cost / activeDays : 0;
-  const costSubLabel = est.coverage >= 0.99
-    ? `lifetime · ≈ ${formatUSD(costPerDay)} / day`
-    : `lifetime · ${coveragePct}% priced · ≈ ${formatUSD(costPerDay)} / day`;
+  const costSubLabel =
+    est.coverage >= 0.99
+      ? `lifetime · ≈ ${formatUSD(costPerDay)} / day`
+      : `lifetime · ${coveragePct}% priced · ≈ ${formatUSD(costPerDay)} / day`;
 
   cards.innerHTML = `
     <div class="stat-card"><div class="stat-value">${formatTokens(totalShown)}</div><div class="stat-label">${totalLabel}</div></div>
@@ -1087,17 +1381,26 @@ function renderTokens() {
   `;
 
   const meta = document.getElementById("tokensMeta");
-  const sourceLabel = tokenSource === "all" ? "all sources" : tokenSource === "copilot-cli" ? "Copilot CLI" : "Claude Code";
-  if (t.calls === 0) {
-    const hint = tokenSource === "claude-code"
-      ? "Run Claude Code to generate session logs, then refresh."
+  const sourceLabel =
+    tokenSource === "all"
+      ? "all sources"
       : tokenSource === "copilot-cli"
-        ? "Run Copilot CLI to generate logs, then refresh."
-        : "Run Copilot CLI or Claude Code to generate logs, then refresh.";
+        ? "Copilot CLI"
+        : "Claude Code";
+  if (t.calls === 0) {
+    const hint =
+      tokenSource === "claude-code"
+        ? "Run Claude Code to generate session logs, then refresh."
+        : tokenSource === "copilot-cli"
+          ? "Run Copilot CLI to generate logs, then refresh."
+          : "Run Copilot CLI or Claude Code to generate logs, then refresh.";
     meta.innerHTML = `<div class="not-enough-data"><div class="nod-icon">📊</div><p>No token usage found for ${escapeHtml(sourceLabel)} in <code>${escapeHtml(tokenData.logsDir)}</code>. ${escapeHtml(hint)}</p></div>`;
   } else {
     const perSource = (tokenData.sources || [])
-      .map((s) => `${s.source === "copilot-cli" ? "Copilot CLI" : "Claude Code"}: ${s.calls} call${s.calls === 1 ? "" : "s"}`)
+      .map(
+        (s) =>
+          `${s.source === "copilot-cli" ? "Copilot CLI" : "Claude Code"}: ${s.calls} call${s.calls === 1 ? "" : "s"}`
+      )
       .join(" · ");
     meta.innerHTML = `<div style="color:var(--text-dim);font-size:12px;margin-bottom:8px">Parsed ${tokenData.logsScanned} file${tokenData.logsScanned === 1 ? "" : "s"} for ${escapeHtml(sourceLabel)} · ${escapeHtml(perSource)}</div>`;
   }
@@ -1109,28 +1412,58 @@ function renderTokens() {
 function renderTokenCharts() {
   // Destroy any prior token charts
   ["tokenStack", "tokenModel", "tokenRatio"].forEach((k) => {
-    if (charts[k]) { charts[k].destroy(); delete charts[k]; }
+    if (charts[k]) {
+      charts[k].destroy();
+      delete charts[k];
+    }
   });
   if (!tokenData || tokenData.totals.calls === 0) return;
 
-  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const isLight =
+    document.documentElement.getAttribute("data-theme") === "light";
   const tickColor = isLight ? "#656d76" : "#8b949e";
   const legendColor = isLight ? "#1f2328" : "#e6edf3";
-  const chartColors = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#bc8cff", "#f0883e", "#56d4dd", "#db61a2"];
+  const chartColors = [
+    "#58a6ff",
+    "#3fb950",
+    "#d29922",
+    "#f85149",
+    "#bc8cff",
+    "#f0883e",
+    "#56d4dd",
+    "#db61a2",
+  ];
 
   const buckets = tokenData[tokenBucket] || [];
   const labels = buckets.map((b) => b.period);
-  const newPrompt = buckets.map((b) => Math.max(0, b.prompt_tokens - b.cached_tokens));
+  const newPrompt = buckets.map((b) =>
+    Math.max(0, b.prompt_tokens - b.cached_tokens)
+  );
   const cached = buckets.map((b) => b.cached_tokens);
   const completion = buckets.map((b) => b.completion_tokens);
 
   const stackDatasets = [
-    { label: "Prompt (new)", data: newPrompt, backgroundColor: "#58a6ff", stack: "t" },
+    {
+      label: "Prompt (new)",
+      data: newPrompt,
+      backgroundColor: "#58a6ff",
+      stack: "t",
+    },
   ];
   if (tokenIncludeCached) {
-    stackDatasets.push({ label: "Prompt (cached)", data: cached, backgroundColor: "#56d4dd", stack: "t" });
+    stackDatasets.push({
+      label: "Prompt (cached)",
+      data: cached,
+      backgroundColor: "#56d4dd",
+      stack: "t",
+    });
   }
-  stackDatasets.push({ label: "Completion", data: completion, backgroundColor: "#bc8cff", stack: "t" });
+  stackDatasets.push({
+    label: "Completion",
+    data: completion,
+    backgroundColor: "#bc8cff",
+    stack: "t",
+  });
 
   charts.tokenStack = new Chart(document.getElementById("tokenStackChart"), {
     type: "bar",
@@ -1140,30 +1473,56 @@ function renderTokenCharts() {
       maintainAspectRatio: false,
       plugins: {
         legend: { labels: { color: legendColor } },
-        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatTokens(ctx.raw)}` } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: ${formatTokens(ctx.raw)}`,
+          },
+        },
       },
       scales: {
         x: { stacked: true, ticks: { color: tickColor } },
-        y: { stacked: true, ticks: { color: tickColor, callback: (v) => formatTokens(v) }, beginAtZero: true },
+        y: {
+          stacked: true,
+          ticks: { color: tickColor, callback: (v) => formatTokens(v) },
+          beginAtZero: true,
+        },
       },
     },
   });
 
   const models = Object.entries(tokenData.byModel)
-    .map(([k, v]) => [k, v, adjTotal(v.prompt_tokens, v.cached_tokens, v.completion_tokens)])
+    .map(([k, v]) => [
+      k,
+      v,
+      adjTotal(v.prompt_tokens, v.cached_tokens, v.completion_tokens),
+    ])
     .sort((a, b) => b[2] - a[2]);
   if (models.length) {
     charts.tokenModel = new Chart(document.getElementById("tokenModelChart"), {
       type: "doughnut",
       data: {
         labels: models.map((m) => m[0]),
-        datasets: [{ data: models.map((m) => m[2]), backgroundColor: chartColors }],
+        datasets: [
+          { data: models.map((m) => m[2]), backgroundColor: chartColors },
+        ],
       },
       options: {
         responsive: true,
         plugins: {
-          legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatTokens(ctx.raw)}` } },
+          legend: {
+            position: "bottom",
+            labels: {
+              color: legendColor,
+              font: { size: 13 },
+              padding: 14,
+              boxWidth: 14,
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.label}: ${formatTokens(ctx.raw)}`,
+            },
+          },
         },
       },
     });
@@ -1174,7 +1533,11 @@ function renderTokenCharts() {
     ? ["Prompt (new)", "Prompt (cached)", "Completion"]
     : ["Prompt (new)", "Completion"];
   const ratioData = tokenIncludeCached
-    ? [Math.max(0, t.prompt_tokens - t.cached_tokens), t.cached_tokens, t.completion_tokens]
+    ? [
+        Math.max(0, t.prompt_tokens - t.cached_tokens),
+        t.cached_tokens,
+        t.completion_tokens,
+      ]
     : [Math.max(0, t.prompt_tokens - t.cached_tokens), t.completion_tokens];
   const ratioColors = tokenIncludeCached
     ? ["#58a6ff", "#56d4dd", "#bc8cff"]
@@ -1188,8 +1551,20 @@ function renderTokenCharts() {
     options: {
       responsive: true,
       plugins: {
-        legend: { position: "bottom", labels: { color: legendColor, font: { size: 13 }, padding: 14, boxWidth: 14 } },
-        tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatTokens(ctx.raw)}` } },
+        legend: {
+          position: "bottom",
+          labels: {
+            color: legendColor,
+            font: { size: 13 },
+            padding: 14,
+            boxWidth: 14,
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.label}: ${formatTokens(ctx.raw)}`,
+          },
+        },
       },
     },
   });
@@ -1199,18 +1574,38 @@ function bucketCost(b) {
   let cost = 0;
   let known = false;
   for (const [name, m] of Object.entries(b.models || {})) {
-    const c = costForModel(name, m.prompt_tokens, m.cached_tokens, m.completion_tokens);
-    if (c != null) { cost += c; known = true; }
+    const c = costForModel(
+      name,
+      m.prompt_tokens,
+      m.cached_tokens,
+      m.completion_tokens
+    );
+    if (c != null) {
+      cost += c;
+      known = true;
+    }
   }
   return known ? cost : null;
 }
 
 function renderTokenTable() {
   const table = document.getElementById("tokenBreakdownTable");
-  if (!tokenData) { table.innerHTML = ""; return; }
+  if (!tokenData) {
+    table.innerHTML = "";
+    return;
+  }
   const buckets = (tokenData[tokenBucket] || []).slice().reverse();
-  if (!buckets.length) { table.innerHTML = '<tbody><tr><td style="color:var(--text-dim);padding:20px">No data</td></tr></tbody>'; return; }
-  const headerLabel = tokenBucket === "daily" ? "Day" : tokenBucket === "weekly" ? "Week" : "Month";
+  if (!buckets.length) {
+    table.innerHTML =
+      '<tbody><tr><td style="color:var(--text-dim);padding:20px">No data</td></tr></tbody>';
+    return;
+  }
+  const headerLabel =
+    tokenBucket === "daily"
+      ? "Day"
+      : tokenBucket === "weekly"
+        ? "Week"
+        : "Month";
   const promptHeader = tokenIncludeCached ? "Prompt" : "Prompt (billed)";
   const cachedHeader = tokenIncludeCached ? "<th>Cached</th>" : "";
   table.innerHTML = `
@@ -1225,12 +1620,19 @@ function renderTokenTable() {
       <th>Top Model</th>
     </tr></thead>
     <tbody>
-      ${buckets.map((b) => {
-        const promptShown = adjPrompt(b.prompt_tokens, b.cached_tokens);
-        const totalShown = adjTotal(b.prompt_tokens, b.cached_tokens, b.completion_tokens);
-        const cachedCell = tokenIncludeCached ? `<td>${formatTokens(b.cached_tokens)}</td>` : "";
-        const cost = bucketCost(b);
-        return `
+      ${buckets
+        .map((b) => {
+          const promptShown = adjPrompt(b.prompt_tokens, b.cached_tokens);
+          const totalShown = adjTotal(
+            b.prompt_tokens,
+            b.cached_tokens,
+            b.completion_tokens
+          );
+          const cachedCell = tokenIncludeCached
+            ? `<td>${formatTokens(b.cached_tokens)}</td>`
+            : "";
+          const cost = bucketCost(b);
+          return `
         <tr>
           <td>${escapeHtml(b.period)}</td>
           <td>${b.calls}</td>
@@ -1241,7 +1643,8 @@ function renderTokenTable() {
           <td>${cost == null ? '<span style="color:var(--text-dim)">—</span>' : formatUSD(cost)}</td>
           <td>${escapeHtml(b.top_model || "—")}</td>
         </tr>`;
-      }).join("")}
+        })
+        .join("")}
     </tbody>
   `;
 }
@@ -1250,7 +1653,9 @@ document.getElementById("tokenBucketFilter").addEventListener("click", (e) => {
   const btn = e.target.closest(".source-btn");
   if (!btn) return;
   tokenBucket = btn.dataset.bucket;
-  document.querySelectorAll("#tokenBucketFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  document
+    .querySelectorAll("#tokenBucketFilter .source-btn")
+    .forEach((b) => b.classList.remove("active"));
   btn.classList.add("active");
   renderTokenCharts();
   renderTokenTable();
@@ -1260,7 +1665,9 @@ document.getElementById("tokenCachedFilter").addEventListener("click", (e) => {
   const btn = e.target.closest(".source-btn");
   if (!btn) return;
   tokenIncludeCached = btn.dataset.cached === "include";
-  document.querySelectorAll("#tokenCachedFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  document
+    .querySelectorAll("#tokenCachedFilter .source-btn")
+    .forEach((b) => b.classList.remove("active"));
   btn.classList.add("active");
   renderTokens();
 });
@@ -1269,7 +1676,9 @@ document.getElementById("tokenSourceFilter").addEventListener("click", (e) => {
   const btn = e.target.closest(".source-btn");
   if (!btn) return;
   tokenSource = btn.dataset.source;
-  document.querySelectorAll("#tokenSourceFilter .source-btn").forEach((b) => b.classList.remove("active"));
+  document
+    .querySelectorAll("#tokenSourceFilter .source-btn")
+    .forEach((b) => b.classList.remove("active"));
   btn.classList.add("active");
   loadTokens();
 });

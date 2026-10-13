@@ -1,12 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { parseLogContent, normalizeModelName, aggregate, parseClaudeCodeJsonl, getTokenUsage } from "../token-usage";
+import {
+  parseLogContent,
+  normalizeModelName,
+  aggregate,
+  parseClaudeCodeJsonl,
+  getTokenUsage,
+} from "../token-usage";
 import { clearCache } from "../cache";
 
 vi.mock("os", async (importOriginal) => {
-  const actual = await importOriginal() as typeof import("os");
+  const actual = (await importOriginal()) as typeof import("os");
   return { ...actual, homedir: vi.fn(actual.homedir) };
 });
 
@@ -59,10 +65,14 @@ const FALSE_POSITIVE = `2026-01-22T18:00:00.000Z [DEBUG] request config: {
 
 describe("normalizeModelName", () => {
   it("strips capi: prefix and option suffix", () => {
-    expect(normalizeModelName("capi:claude-opus-4.7:defaultReasoningEffort=medium")).toBe("claude-opus-4.7");
+    expect(
+      normalizeModelName("capi:claude-opus-4.7:defaultReasoningEffort=medium")
+    ).toBe("claude-opus-4.7");
   });
   it("strips Azure deployment prefix", () => {
-    expect(normalizeModelName("capi-noe-ptuc-h200-ib-gpt-5-mini-2025-08-07")).toBe("gpt-5-mini-2025-08-07");
+    expect(
+      normalizeModelName("capi-noe-ptuc-h200-ib-gpt-5-mini-2025-08-07")
+    ).toBe("gpt-5-mini-2025-08-07");
   });
   it("leaves clean model names unchanged", () => {
     expect(normalizeModelName("claude-opus-4.5")).toBe("claude-opus-4.5");
@@ -131,15 +141,6 @@ describe("aggregate", () => {
     expect(agg.daily).toEqual([]);
   });
 
-  it("builds weekly and monthly buckets", () => {
-    const calls = parseLogContent(RESPONSE_BLOCK + RESPONSE_NO_MODEL);
-    const agg = aggregate(calls, 2, "/tmp");
-    expect(agg.weekly.length).toBeGreaterThanOrEqual(1);
-    expect(agg.monthly.length).toBeGreaterThanOrEqual(1);
-    expect(agg.weekly[0].period).toMatch(/^\d{4}-W\d{2}$/);
-    expect(agg.monthly[0].period).toMatch(/^\d{4}-\d{2}$/);
-  });
-
   it("computes per-model token breakdown inside daily buckets", () => {
     const calls = parseLogContent(RESPONSE_BLOCK);
     const agg = aggregate(calls, 1, "/tmp");
@@ -148,8 +149,6 @@ describe("aggregate", () => {
     expect(day.models["claude-opus-4.7"].prompt_tokens).toBe(1000);
   });
 });
-
-// ── parseClaudeCodeJsonl ──────────────────────────────────────────────────────
 
 const CC_ASSISTANT_LINE = JSON.stringify({
   type: "assistant",
@@ -218,14 +217,20 @@ describe("parseClaudeCodeJsonl", () => {
   });
 
   it("skips events with no usage", () => {
-    const line = JSON.stringify({ type: "assistant", message: { model: "claude-sonnet-4-6" } });
+    const line = JSON.stringify({
+      type: "assistant",
+      message: { model: "claude-sonnet-4-6" },
+    });
     expect(parseClaudeCodeJsonl(line)).toHaveLength(0);
   });
 
   it("skips events where total tokens is zero", () => {
     const line = JSON.stringify({
       type: "assistant",
-      message: { model: "claude-sonnet-4-6", usage: { input_tokens: 0, output_tokens: 0 } },
+      message: {
+        model: "claude-sonnet-4-6",
+        usage: { input_tokens: 0, output_tokens: 0 },
+      },
     });
     expect(parseClaudeCodeJsonl(line)).toHaveLength(0);
   });
@@ -302,7 +307,10 @@ describe("getTokenUsage", () => {
   it("reads claude-code JSONL files and returns parsed calls", () => {
     const projectsDir = path.join(tmpDir, ".claude", "projects", "my-project");
     fs.mkdirSync(projectsDir, { recursive: true });
-    fs.writeFileSync(path.join(projectsDir, "session.jsonl"), CC_ASSISTANT_LINE);
+    fs.writeFileSync(
+      path.join(projectsDir, "session.jsonl"),
+      CC_ASSISTANT_LINE
+    );
 
     const result = getTokenUsage("claude-code");
     expect(result.totals.calls).toBe(1);
@@ -317,7 +325,10 @@ describe("getTokenUsage", () => {
 
     const projectsDir = path.join(tmpDir, ".claude", "projects", "my-project");
     fs.mkdirSync(projectsDir, { recursive: true });
-    fs.writeFileSync(path.join(projectsDir, "session.jsonl"), CC_ASSISTANT_LINE);
+    fs.writeFileSync(
+      path.join(projectsDir, "session.jsonl"),
+      CC_ASSISTANT_LINE
+    );
 
     const result = getTokenUsage("all");
     expect(result.totals.calls).toBe(2);

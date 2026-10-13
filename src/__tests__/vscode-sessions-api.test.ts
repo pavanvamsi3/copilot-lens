@@ -5,7 +5,7 @@ import * as os from "os";
 import { clearCache } from "../cache";
 
 vi.mock("os", async (importOriginal) => {
-  const actual = await importOriginal() as typeof import("os");
+  const actual = (await importOriginal()) as typeof import("os");
   return { ...actual, homedir: vi.fn(actual.homedir) };
 });
 
@@ -22,8 +22,10 @@ import {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function platformVSCodeDir(home: string): string {
-  if (process.platform === "darwin") return path.join(home, "Library", "Application Support", "Code");
-  if (process.platform === "win32") return path.join(home, "AppData", "Roaming", "Code");
+  if (process.platform === "darwin")
+    return path.join(home, "Library", "Application Support", "Code");
+  if (process.platform === "win32")
+    return path.join(home, "AppData", "Roaming", "Code");
   return path.join(home, ".config", "Code");
 }
 
@@ -35,10 +37,22 @@ function makeVSCodeStructure(home: string): string {
   return codeDir;
 }
 
-function makeSessionFile(codeDir: string, sessionId: string, content: object): void {
-  const dir = path.join(codeDir, "User", "globalStorage", "emptyWindowChatSessions");
+function makeSessionFile(
+  codeDir: string,
+  sessionId: string,
+  content: object
+): void {
+  const dir = path.join(
+    codeDir,
+    "User",
+    "globalStorage",
+    "emptyWindowChatSessions"
+  );
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, `${sessionId}.json`), JSON.stringify(content));
+  fs.writeFileSync(
+    path.join(dir, `${sessionId}.json`),
+    JSON.stringify(content)
+  );
 }
 
 function mockDatabase(entries: Record<string, any>): void {
@@ -105,7 +119,11 @@ describe("listVSCodeSessions", () => {
   it("skips sessions marked as empty", () => {
     makeVSCodeStructure(tmpDir);
     mockDatabase({
-      "empty-sess": { sessionId: "empty-sess", lastMessageDate: 1700000000000, isEmpty: true },
+      "empty-sess": {
+        sessionId: "empty-sess",
+        lastMessageDate: 1700000000000,
+        isEmpty: true,
+      },
     });
     expect(listVSCodeSessions()).toHaveLength(0);
   });
@@ -113,7 +131,12 @@ describe("listVSCodeSessions", () => {
   it("skips sessions with no lastMessageDate", () => {
     makeVSCodeStructure(tmpDir);
     mockDatabase({
-      "no-date": { sessionId: "no-date", title: "No Date", lastMessageDate: 0, isEmpty: false },
+      "no-date": {
+        sessionId: "no-date",
+        title: "No Date",
+        lastMessageDate: 0,
+        isEmpty: false,
+      },
     });
     expect(listVSCodeSessions()).toHaveLength(0);
   });
@@ -151,7 +174,11 @@ describe("isVSCodeSession", () => {
   it("returns true for an ID that is in the index", () => {
     makeVSCodeStructure(tmpDir);
     mockDatabase({
-      "known-id": { sessionId: "known-id", lastMessageDate: 1700000000000, isEmpty: false },
+      "known-id": {
+        sessionId: "known-id",
+        lastMessageDate: 1700000000000,
+        isEmpty: false,
+      },
     });
     expect(isVSCodeSession("known-id")).toBe(true);
   });
@@ -167,7 +194,11 @@ describe("getVSCodeSession", () => {
   it("returns null when session file does not exist", () => {
     makeVSCodeStructure(tmpDir);
     mockDatabase({
-      "missing-file": { sessionId: "missing-file", lastMessageDate: 1700000000000, isEmpty: false },
+      "missing-file": {
+        sessionId: "missing-file",
+        lastMessageDate: 1700000000000,
+        isEmpty: false,
+      },
     });
     expect(getVSCodeSession("missing-file")).toBeNull();
   });
@@ -202,7 +233,9 @@ describe("getVSCodeSession", () => {
     expect(detail!.id).toBe(sessionId);
     expect(detail!.source).toBe("vscode");
     expect(detail!.events.some((e) => e.type === "user.message")).toBe(true);
-    expect(detail!.events.some((e) => e.type === "assistant.message")).toBe(true);
+    expect(detail!.events.some((e) => e.type === "assistant.message")).toBe(
+      true
+    );
     expect(detail!.hasSnapshots).toBe(false);
   });
 
@@ -210,14 +243,28 @@ describe("getVSCodeSession", () => {
     const codeDir = makeVSCodeStructure(tmpDir);
     const sessionId = "count-sess";
     mockDatabase({
-      [sessionId]: { sessionId, lastMessageDate: 1700000000000, isEmpty: false },
+      [sessionId]: {
+        sessionId,
+        lastMessageDate: 1700000000000,
+        isEmpty: false,
+      },
     });
 
     makeSessionFile(codeDir, sessionId, {
       sessionId,
       requests: [
-        { requestId: "r1", timestamp: 1700000000000, message: { text: "Q1" }, response: [{ value: "A1" }] },
-        { requestId: "r2", timestamp: 1700000010000, message: { text: "Q2" }, response: [] },
+        {
+          requestId: "r1",
+          timestamp: 1700000000000,
+          message: { text: "Q1" },
+          response: [{ value: "A1" }],
+        },
+        {
+          requestId: "r2",
+          timestamp: 1700000010000,
+          message: { text: "Q2" },
+          response: [],
+        },
       ],
     });
 
@@ -237,7 +284,11 @@ describe("getVSCodeAnalytics", () => {
   it("skips session entries with no session file", () => {
     makeVSCodeStructure(tmpDir);
     mockDatabase({
-      "no-file": { sessionId: "no-file", lastMessageDate: 1700000000000, isEmpty: false },
+      "no-file": {
+        sessionId: "no-file",
+        lastMessageDate: 1700000000000,
+        isEmpty: false,
+      },
     });
     expect(getVSCodeAnalytics()).toHaveLength(0);
   });
@@ -264,7 +315,11 @@ describe("getVSCodeAnalytics", () => {
           modelId: "copilot/claude-sonnet-4-6",
           message: { text: "Tell me about X" },
           response: [
-            { kind: "toolInvocationSerialized", toolCallId: "tc1", originMessage: "bash (Terminal)" },
+            {
+              kind: "toolInvocationSerialized",
+              toolCallId: "tc1",
+              originMessage: "bash (Terminal)",
+            },
             { value: "Here is the answer" },
           ],
         },
@@ -284,14 +339,28 @@ describe("getVSCodeAnalytics", () => {
     const codeDir = makeVSCodeStructure(tmpDir);
     const sessionId = "dur-sess";
     mockDatabase({
-      [sessionId]: { sessionId, lastMessageDate: 1700000000000, isEmpty: false },
+      [sessionId]: {
+        sessionId,
+        lastMessageDate: 1700000000000,
+        isEmpty: false,
+      },
     });
 
     makeSessionFile(codeDir, sessionId, {
       sessionId,
       requests: [
-        { requestId: "r1", timestamp: 1700000000000, message: { text: "Hi" }, response: [] },
-        { requestId: "r2", timestamp: 1700000010000, message: { text: "More" }, response: [] },
+        {
+          requestId: "r1",
+          timestamp: 1700000000000,
+          message: { text: "Hi" },
+          response: [],
+        },
+        {
+          requestId: "r2",
+          timestamp: 1700000010000,
+          message: { text: "More" },
+          response: [],
+        },
       ],
     });
 

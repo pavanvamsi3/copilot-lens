@@ -11,7 +11,13 @@ vi.mock("better-sqlite3", () => {
 });
 
 import { _testing, normalizeVSCodeToolName } from "../vscode-sessions";
-const { requestsToEvents, deriveStatus, msToIso, readSessionContent, scanVSCodeMcpConfig } = _testing;
+const {
+  requestsToEvents,
+  deriveStatus,
+  msToIso,
+  readSessionContent,
+  scanVSCodeMcpConfig,
+} = _testing;
 
 describe("msToIso", () => {
   it("returns empty string for undefined", () => {
@@ -117,7 +123,9 @@ describe("requestsToEvents", () => {
     ]);
 
     const toolStart = events.find((e) => e.type === "tool.execution_start");
-    const toolComplete = events.find((e) => e.type === "tool.execution_complete");
+    const toolComplete = events.find(
+      (e) => e.type === "tool.execution_complete"
+    );
 
     expect(toolStart).toBeDefined();
     expect(toolStart!.data.tool).toBe("bash (Terminal)");
@@ -208,7 +216,9 @@ describe("requestsToEvents", () => {
 
     expect(events.filter((e) => e.type === "user.message")).toHaveLength(0);
     // Still has assistant.turn_start
-    expect(events.filter((e) => e.type === "assistant.turn_start")).toHaveLength(1);
+    expect(
+      events.filter((e) => e.type === "assistant.turn_start")
+    ).toHaveLength(1);
   });
 
   it("handles multiple requests in sequence", () => {
@@ -254,9 +264,7 @@ describe("readSessionContent", () => {
     const session = {
       version: 3,
       sessionId: "test-123",
-      requests: [
-        { requestId: "r1", message: { text: "Hi" }, response: [] },
-      ],
+      requests: [{ requestId: "r1", message: { text: "Hi" }, response: [] }],
     };
     const filePath = path.join(tmpDir, "test.json");
     fs.writeFileSync(filePath, JSON.stringify(session));
@@ -332,7 +340,9 @@ describe("readSessionContent", () => {
     fs.writeFileSync(filePath, JSON.stringify(session));
 
     const result = readSessionContent(filePath);
-    expect(result.requests[0].message.parts[0].text).toContain("...(truncated)");
+    expect(result.requests[0].message.parts[0].text).toContain(
+      "...(truncated)"
+    );
   });
 
   it("returns null for non-existent file", () => {
@@ -356,9 +366,7 @@ describe("readSessionContent", () => {
           message: { text: "icon" },
           response: [],
           variableData: {
-            variables: [
-              { kind: "image", value: "tiny", name: "Small Icon" },
-            ],
+            variables: [{ kind: "image", value: "tiny", name: "Small Icon" }],
           },
         },
       ],
@@ -375,10 +383,25 @@ describe("empty VS Code session filtering", () => {
   it("filters sessions with no lastMessageDate", () => {
     // Mimics the filter in listVSCodeSessions: skip if !entry.lastMessageDate
     const entries = [
-      { sessionId: "a", title: "Active", lastMessageDate: 1700000000000, isEmpty: false },
+      {
+        sessionId: "a",
+        title: "Active",
+        lastMessageDate: 1700000000000,
+        isEmpty: false,
+      },
       { sessionId: "b", title: "Empty", lastMessageDate: 0, isEmpty: false },
-      { sessionId: "c", title: "Also Empty", lastMessageDate: undefined, isEmpty: false },
-      { sessionId: "d", title: "Flagged", lastMessageDate: 1700000000000, isEmpty: true },
+      {
+        sessionId: "c",
+        title: "Also Empty",
+        lastMessageDate: undefined,
+        isEmpty: false,
+      },
+      {
+        sessionId: "d",
+        title: "Flagged",
+        lastMessageDate: 1700000000000,
+        isEmpty: true,
+      },
     ];
 
     const filtered = entries.filter((e) => !e.isEmpty && !!e.lastMessageDate);
@@ -395,7 +418,10 @@ describe("normalizeVSCodeToolName", () => {
 
   it("extracts MCP server name with spaces", () => {
     const result = normalizeVSCodeToolName("Azure MCP Server (MCP Server)");
-    expect(result).toEqual({ tool: "Azure MCP Server", mcpServer: "Azure MCP Server" });
+    expect(result).toEqual({
+      tool: "Azure MCP Server",
+      mcpServer: "Azure MCP Server",
+    });
   });
 
   it("extracts tool name from Running `...` pattern", () => {
@@ -404,12 +430,16 @@ describe("normalizeVSCodeToolName", () => {
   });
 
   it("normalizes Reading file operations", () => {
-    const result = normalizeVSCodeToolName("Reading [](file:///Users/foo/bar.ts#1-1), lines 1 to 100");
+    const result = normalizeVSCodeToolName(
+      "Reading [](file:///Users/foo/bar.ts#1-1), lines 1 to 100"
+    );
     expect(result).toEqual({ tool: "read_file" });
   });
 
   it("normalizes Searching operations", () => {
-    const result = normalizeVSCodeToolName("Searching for regex `pattern` (`**/file.ts`)");
+    const result = normalizeVSCodeToolName(
+      "Searching for regex `pattern` (`**/file.ts`)"
+    );
     expect(result).toEqual({ tool: "search" });
   });
 
@@ -419,12 +449,16 @@ describe("normalizeVSCodeToolName", () => {
   });
 
   it("normalizes Creating file operations", () => {
-    const result = normalizeVSCodeToolName("Creating [](file:///Users/foo/new.md)");
+    const result = normalizeVSCodeToolName(
+      "Creating [](file:///Users/foo/new.md)"
+    );
     expect(result).toEqual({ tool: "create_file" });
   });
 
   it("normalizes Editing file operations", () => {
-    const result = normalizeVSCodeToolName("Editing [](file:///Users/foo/bar.ts)");
+    const result = normalizeVSCodeToolName(
+      "Editing [](file:///Users/foo/bar.ts)"
+    );
     expect(result).toEqual({ tool: "edit_file" });
   });
 
@@ -449,7 +483,13 @@ describe("scanVSCodeMcpConfig", () => {
   // Helper to create platform-appropriate VS Code data directory
   function getVSCodeTestDir(baseDir: string): string {
     if (process.platform === "darwin") {
-      return path.join(baseDir, "Library", "Application Support", "Code", "User");
+      return path.join(
+        baseDir,
+        "Library",
+        "Application Support",
+        "Code",
+        "User"
+      );
     } else if (process.platform === "win32") {
       return path.join(baseDir, "AppData", "Roaming", "Code", "User");
     } else {
