@@ -10,6 +10,17 @@ describe("parseDashboardArgs", () => {
     });
   });
 
+  it.each([
+    ["--open", "--no-open"],
+    ["--no-open", "--open"],
+  ])("lets --no-open override --open in either order %j", (...args) => {
+    expect(parseDashboardArgs(args).shouldOpen).toBe(false);
+  });
+
+  it("opens the browser when --open is supplied without --no-open", () => {
+    expect(parseDashboardArgs(["--open"]).shouldOpen).toBe(true);
+  });
+
   it("accepts the minimum and maximum valid ports", () => {
     expect(parseDashboardArgs(["--port", "1"]).port).toBe(1);
     expect(parseDashboardArgs(["--port", "65535"]).port).toBe(65535);
