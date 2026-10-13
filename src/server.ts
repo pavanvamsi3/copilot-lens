@@ -134,6 +134,18 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 
+  // API: Download all session metadata independently of dashboard filters.
+  // Register before /:id so "export" is not treated as a session identifier.
+  app.get("/api/sessions/export", (_req, res) => {
+    try {
+      const sessions = listSessions();
+      res.attachment("sessions.json");
+      res.json(sessions);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API: Get session detail
   app.get("/api/sessions/:id", (req, res) => {
     try {

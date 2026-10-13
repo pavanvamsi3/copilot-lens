@@ -892,6 +892,42 @@ async function loadSessions() {
   }
 }
 
+// Download all session metadata without changing the displayed sessions.
+async function exportAllSessions() {
+  const button = document.getElementById("exportSessionsBtn");
+  const status = document.getElementById("sessionExportStatus");
+  button.disabled = true;
+  status.hidden = true;
+  status.textContent = "";
+  try {
+    const response = await fetch("/api/sessions/export");
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status}`);
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sessions.json";
+    link.hidden = true;
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+  } catch (error) {
+    status.textContent = `Export failed: ${error.message}`;
+    status.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document
+  .getElementById("exportSessionsBtn")
+  .addEventListener("click", exportAllSessions);
+
 // Search kbd visibility
 function updateSearchKbd() {
   if (!searchKbd) return;

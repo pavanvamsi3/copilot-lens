@@ -62,7 +62,7 @@ integers. Invalid or repeated pagination parameters return HTTP 400 with an
 - **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
 - **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
 - **Effectiveness Score**: 0 to 100 score per repo with improvement tips
-- **Export**: single-session OpenAI-style chat JSONL, suitable as SFT data
+- **Export**: single-session OpenAI-style chat JSONL for SFT, or all session metadata as JSON for a local backup
 
 For case-sensitive API queries, use `/api/search?q=HTTPServer&caseSensitive=true`.
 This preserves case when matching query tokens against message content, titles,
@@ -108,6 +108,15 @@ Cached input is charged separately from other prompt tokens. Cache-write
 premiums, long-context surcharges, service tiers, and other fees are excluded,
 so this is an approximate API reference cost, not a Copilot bill. The dashboard
 has a separate, broader pricing table and can show a partially priced estimate.
+
+### Sessions metadata backup
+
+Use **Export All (JSON)** on the Sessions page to download `sessions.json`.
+The file contains all parsed session metadata across sources, including IDs,
+titles, working directories, timestamps, and status, regardless of the current
+display filters. Conversation messages remain available through the existing
+per-session JSONL export. The metadata download is also available at
+`GET /api/sessions/export`.
 
 ### Token usage CSV export
 
