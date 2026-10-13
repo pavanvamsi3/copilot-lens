@@ -11,14 +11,16 @@
   },
   "scripts": {
     "build": "tsc",
+    "coverage": "npm run test:coverage",
     "dev": "tsx src/cli.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "prepublishOnly": "npm run build",
     "start": "node dist/cli.js",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build",
     "lint": "eslint src/"
   },
   "keywords": [
@@ -53,6 +55,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.2",
     "@types/react": "^17.0.91",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.7.0",
     "prettier": "^3.8.4",
     "tsx": "^4.21.0",
