@@ -30,5 +30,4 @@ describe("duration percentiles", () => {
     expect(durationPercentile(durations, 0.99)).toBe(100);
     expect(durations).toEqual([100, 10, 90, 20, 80, 30, 70, 40, 60, 50]);
   });
-
 });

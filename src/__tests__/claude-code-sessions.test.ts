@@ -3,9 +3,16 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-import { _testing, listClaudeCodeSessions, getClaudeCodeSession, isClaudeCodeSession, getClaudeCodeAnalytics } from "../claude-code-sessions";
+import {
+  _testing,
+  listClaudeCodeSessions,
+  getClaudeCodeSession,
+  isClaudeCodeSession,
+  getClaudeCodeAnalytics,
+} from "../claude-code-sessions";
 import { clearCache } from "../cache";
-const { extractTextContent, extractToolUseBlocks, deriveStatus, readAllLines } = _testing;
+const { extractTextContent, extractToolUseBlocks, deriveStatus, readAllLines } =
+  _testing;
 
 // ============ Unit tests for pure helpers ============
 
@@ -140,22 +147,58 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
 
   it("skips sessions with no user events", () => {
     writeSession("sess-no-user", [
-      makeEvent({ type: "assistant", sessionId: "sess-no-user", cwd: "/foo", gitBranch: "main", slug: "my-slug", message: { model: "claude-sonnet-4-6", content: [{ type: "text", text: "hi" }] } }),
+      makeEvent({
+        type: "assistant",
+        sessionId: "sess-no-user",
+        cwd: "/foo",
+        gitBranch: "main",
+        slug: "my-slug",
+        message: {
+          model: "claude-sonnet-4-6",
+          content: [{ type: "text", text: "hi" }],
+        },
+      }),
     ]);
     expect(listClaudeCodeSessions()).toHaveLength(0);
   });
 
   it("skips isSidechain user events when checking for user presence", () => {
     writeSession("sess-sidechain", [
-      makeEvent({ type: "user", isSidechain: true, sessionId: "sess-sidechain", cwd: "/foo", gitBranch: "main", slug: "slug", message: { content: "warmup" } }),
+      makeEvent({
+        type: "user",
+        isSidechain: true,
+        sessionId: "sess-sidechain",
+        cwd: "/foo",
+        gitBranch: "main",
+        slug: "slug",
+        message: { content: "warmup" },
+      }),
     ]);
     expect(listClaudeCodeSessions()).toHaveLength(0);
   });
 
   it("lists a valid session with correct metadata", () => {
     writeSession("abc-123", [
-      makeEvent({ type: "user", isSidechain: false, sessionId: "abc-123", cwd: "/Users/test/myproject", gitBranch: "main", slug: "happy-slug", timestamp: "2024-01-15T10:00:00Z", message: { content: "Hello" } }),
-      makeEvent({ type: "assistant", isSidechain: false, sessionId: "abc-123", timestamp: "2024-01-15T10:01:00Z", message: { model: "claude-sonnet-4-6", content: [{ type: "text", text: "Hi there" }] } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "abc-123",
+        cwd: "/Users/test/myproject",
+        gitBranch: "main",
+        slug: "happy-slug",
+        timestamp: "2024-01-15T10:00:00Z",
+        message: { content: "Hello" },
+      }),
+      makeEvent({
+        type: "assistant",
+        isSidechain: false,
+        sessionId: "abc-123",
+        timestamp: "2024-01-15T10:01:00Z",
+        message: {
+          model: "claude-sonnet-4-6",
+          content: [{ type: "text", text: "Hi there" }],
+        },
+      }),
     ]);
 
     const sessions = listClaudeCodeSessions();
@@ -174,7 +217,13 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
     fs.mkdirSync(subagentsDir, { recursive: true });
     fs.writeFileSync(
       path.join(subagentsDir, "agent-abc.jsonl"),
-      makeEvent({ type: "user", sessionId: "agent-abc", cwd: "/foo", slug: "s", message: { content: "hi" } }) + "\n"
+      makeEvent({
+        type: "user",
+        sessionId: "agent-abc",
+        cwd: "/foo",
+        slug: "s",
+        message: { content: "hi" },
+      }) + "\n"
     );
     // subagentsDir is a subdir of projectDir, not a .jsonl at top level — should be ignored
     expect(listClaudeCodeSessions()).toHaveLength(0);
@@ -182,7 +231,13 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
 
   it("isClaudeCodeSession returns true for existing session", () => {
     writeSession("my-session-id", [
-      makeEvent({ type: "user", sessionId: "my-session-id", cwd: "/foo", slug: "s", message: { content: "hi" } }),
+      makeEvent({
+        type: "user",
+        sessionId: "my-session-id",
+        cwd: "/foo",
+        slug: "s",
+        message: { content: "hi" },
+      }),
     ]);
     expect(isClaudeCodeSession("my-session-id")).toBe(true);
   });
@@ -197,7 +252,16 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
 
   it("getClaudeCodeSession converts user events to user.message", () => {
     writeSession("sess-1", [
-      makeEvent({ type: "user", isSidechain: false, sessionId: "sess-1", cwd: "/proj", gitBranch: "main", slug: "test-slug", timestamp: "2024-01-15T10:00:00Z", message: { content: "What is 2+2?" } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "sess-1",
+        cwd: "/proj",
+        gitBranch: "main",
+        slug: "test-slug",
+        timestamp: "2024-01-15T10:00:00Z",
+        message: { content: "What is 2+2?" },
+      }),
     ]);
 
     const detail = getClaudeCodeSession("sess-1");
@@ -211,33 +275,86 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
 
   it("getClaudeCodeSession converts assistant text to assistant.message and emits thinking events", () => {
     writeSession("sess-2", [
-      makeEvent({ type: "user", isSidechain: false, sessionId: "sess-2", cwd: "/proj", slug: "s", timestamp: "2024-01-15T10:00:00Z", message: { content: "Hello" } }),
-      makeEvent({ type: "assistant", isSidechain: false, sessionId: "sess-2", timestamp: "2024-01-15T10:00:05Z", message: { model: "claude-sonnet-4-6", content: [{ type: "thinking", thinking: "let me think" }, { type: "text", text: "World" }] } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "sess-2",
+        cwd: "/proj",
+        slug: "s",
+        timestamp: "2024-01-15T10:00:00Z",
+        message: { content: "Hello" },
+      }),
+      makeEvent({
+        type: "assistant",
+        isSidechain: false,
+        sessionId: "sess-2",
+        timestamp: "2024-01-15T10:00:05Z",
+        message: {
+          model: "claude-sonnet-4-6",
+          content: [
+            { type: "thinking", thinking: "let me think" },
+            { type: "text", text: "World" },
+          ],
+        },
+      }),
     ]);
 
     const detail = getClaudeCodeSession("sess-2");
-    const assistantEvents = detail!.events.filter((e) => e.type === "assistant.message");
+    const assistantEvents = detail!.events.filter(
+      (e) => e.type === "assistant.message"
+    );
     expect(assistantEvents).toHaveLength(1);
     expect(assistantEvents[0].data.content).toBe("World");
     expect(assistantEvents[0].data.model).toBe("claude-sonnet-4-6");
 
-    const thinkingEvents = detail!.events.filter((e) => e.type === "assistant.thinking");
+    const thinkingEvents = detail!.events.filter(
+      (e) => e.type === "assistant.thinking"
+    );
     expect(thinkingEvents).toHaveLength(1);
     expect(thinkingEvents[0].data.content).toBe("let me think");
   });
 
   it("getClaudeCodeSession emits tool.execution_start for each tool_use block", () => {
     writeSession("sess-3", [
-      makeEvent({ type: "user", isSidechain: false, sessionId: "sess-3", cwd: "/proj", slug: "s", timestamp: "2024-01-15T10:00:00Z", message: { content: "run something" } }),
-      makeEvent({ type: "assistant", isSidechain: false, sessionId: "sess-3", timestamp: "2024-01-15T10:00:05Z", message: { model: "claude-sonnet-4-6", content: [
-        { type: "tool_use", id: "tool-1", name: "bash", input: { cmd: "ls" } },
-        { type: "tool_use", id: "tool-2", name: "read", input: { path: "/foo" } },
-        { type: "text", text: "Done" },
-      ] } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "sess-3",
+        cwd: "/proj",
+        slug: "s",
+        timestamp: "2024-01-15T10:00:00Z",
+        message: { content: "run something" },
+      }),
+      makeEvent({
+        type: "assistant",
+        isSidechain: false,
+        sessionId: "sess-3",
+        timestamp: "2024-01-15T10:00:05Z",
+        message: {
+          model: "claude-sonnet-4-6",
+          content: [
+            {
+              type: "tool_use",
+              id: "tool-1",
+              name: "bash",
+              input: { cmd: "ls" },
+            },
+            {
+              type: "tool_use",
+              id: "tool-2",
+              name: "read",
+              input: { path: "/foo" },
+            },
+            { type: "text", text: "Done" },
+          ],
+        },
+      }),
     ]);
 
     const detail = getClaudeCodeSession("sess-3");
-    const toolEvents = detail!.events.filter((e) => e.type === "tool.execution_start");
+    const toolEvents = detail!.events.filter(
+      (e) => e.type === "tool.execution_start"
+    );
     expect(toolEvents).toHaveLength(2);
     expect(toolEvents[0].data.tool).toBe("bash");
     expect(toolEvents[1].data.tool).toBe("read");
@@ -245,8 +362,22 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
 
   it("getClaudeCodeSession skips isSidechain events", () => {
     writeSession("sess-4", [
-      makeEvent({ type: "user", isSidechain: false, sessionId: "sess-4", cwd: "/proj", slug: "s", timestamp: "2024-01-15T10:00:00Z", message: { content: "real message" } }),
-      makeEvent({ type: "user", isSidechain: true, sessionId: "sess-4", timestamp: "2024-01-15T10:00:01Z", message: { content: "warmup noise" } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "sess-4",
+        cwd: "/proj",
+        slug: "s",
+        timestamp: "2024-01-15T10:00:00Z",
+        message: { content: "real message" },
+      }),
+      makeEvent({
+        type: "user",
+        isSidechain: true,
+        sessionId: "sess-4",
+        timestamp: "2024-01-15T10:00:01Z",
+        message: { content: "warmup noise" },
+      }),
     ]);
 
     const detail = getClaudeCodeSession("sess-4");
@@ -257,10 +388,30 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
 
   it("getClaudeCodeSession computes gap-capped duration", () => {
     writeSession("sess-5", [
-      makeEvent({ type: "user", isSidechain: false, sessionId: "sess-5", cwd: "/proj", slug: "s", timestamp: "2024-01-15T10:00:00Z", message: { content: "start" } }),
-      makeEvent({ type: "assistant", isSidechain: false, sessionId: "sess-5", timestamp: "2024-01-15T10:01:00Z", message: { model: "m", content: [{ type: "text", text: "ok" }] } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "sess-5",
+        cwd: "/proj",
+        slug: "s",
+        timestamp: "2024-01-15T10:00:00Z",
+        message: { content: "start" },
+      }),
+      makeEvent({
+        type: "assistant",
+        isSidechain: false,
+        sessionId: "sess-5",
+        timestamp: "2024-01-15T10:01:00Z",
+        message: { model: "m", content: [{ type: "text", text: "ok" }] },
+      }),
       // 2-hour gap — should be capped at 5 min
-      makeEvent({ type: "user", isSidechain: false, sessionId: "sess-5", timestamp: "2024-01-15T12:01:00Z", message: { content: "later" } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "sess-5",
+        timestamp: "2024-01-15T12:01:00Z",
+        message: { content: "later" },
+      }),
     ]);
 
     const detail = getClaudeCodeSession("sess-5");
@@ -316,13 +467,30 @@ describe("getClaudeCodeAnalytics", () => {
 
   it("aggregates tool and model usage per session", () => {
     writeSession("a1", [
-      makeEvent({ type: "user", isSidechain: false, sessionId: "a1", cwd: "/x", slug: "test-slug", timestamp: "2024-01-15T10:00:00Z", message: { content: "go" } }),
-      makeEvent({ type: "assistant", isSidechain: false, sessionId: "a1", timestamp: "2024-01-15T10:00:05Z", message: { model: "claude-sonnet-4-6", content: [
-        { type: "tool_use", id: "t1", name: "bash", input: {} },
-        { type: "tool_use", id: "t2", name: "bash", input: {} },
-        { type: "tool_use", id: "t3", name: "read", input: {} },
-        { type: "text", text: "done" },
-      ] } }),
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "a1",
+        cwd: "/x",
+        slug: "test-slug",
+        timestamp: "2024-01-15T10:00:00Z",
+        message: { content: "go" },
+      }),
+      makeEvent({
+        type: "assistant",
+        isSidechain: false,
+        sessionId: "a1",
+        timestamp: "2024-01-15T10:00:05Z",
+        message: {
+          model: "claude-sonnet-4-6",
+          content: [
+            { type: "tool_use", id: "t1", name: "bash", input: {} },
+            { type: "tool_use", id: "t2", name: "bash", input: {} },
+            { type: "tool_use", id: "t3", name: "read", input: {} },
+            { type: "text", text: "done" },
+          ],
+        },
+      }),
     ]);
 
     const entries = getClaudeCodeAnalytics();

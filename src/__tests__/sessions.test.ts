@@ -5,7 +5,7 @@ import * as os from "os";
 import { clearCache } from "../cache";
 
 vi.mock("os", async (importOriginal) => {
-  const actual = await importOriginal() as typeof import("os");
+  const actual = (await importOriginal()) as typeof import("os");
   return { ...actual, homedir: vi.fn(actual.homedir) };
 });
 
@@ -60,12 +60,42 @@ summary_count: 1
   fs.writeFileSync(path.join(dir, "workspace.yaml"), yaml);
 
   const events = opts.events ?? [
-    JSON.stringify({ type: "session.start", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { copilotVersion: "0.400" } }),
-    JSON.stringify({ type: "user.message", id: "e1", timestamp: "2024-01-15T10:00:05Z", data: { content: "Hello" } }),
-    JSON.stringify({ type: "tool.execution_start", id: "e2", timestamp: "2024-01-15T10:00:06Z", data: { tool: "bash" } }),
-    JSON.stringify({ type: "tool.execution_complete", id: "e3", timestamp: "2024-01-15T10:00:10Z", data: { tool: "bash", success: true } }),
-    JSON.stringify({ type: "assistant.turn_start", id: "e4", timestamp: "2024-01-15T10:00:10Z", data: {} }),
-    JSON.stringify({ type: "assistant.message", id: "e5", timestamp: "2024-01-15T10:00:15Z", data: { content: "Done!" } }),
+    JSON.stringify({
+      type: "session.start",
+      id: "e0",
+      timestamp: "2024-01-15T10:00:00Z",
+      data: { copilotVersion: "0.400" },
+    }),
+    JSON.stringify({
+      type: "user.message",
+      id: "e1",
+      timestamp: "2024-01-15T10:00:05Z",
+      data: { content: "Hello" },
+    }),
+    JSON.stringify({
+      type: "tool.execution_start",
+      id: "e2",
+      timestamp: "2024-01-15T10:00:06Z",
+      data: { tool: "bash" },
+    }),
+    JSON.stringify({
+      type: "tool.execution_complete",
+      id: "e3",
+      timestamp: "2024-01-15T10:00:10Z",
+      data: { tool: "bash", success: true },
+    }),
+    JSON.stringify({
+      type: "assistant.turn_start",
+      id: "e4",
+      timestamp: "2024-01-15T10:00:10Z",
+      data: {},
+    }),
+    JSON.stringify({
+      type: "assistant.message",
+      id: "e5",
+      timestamp: "2024-01-15T10:00:15Z",
+      data: { content: "Done!" },
+    }),
   ];
   fs.writeFileSync(path.join(dir, "events.jsonl"), events.join("\n"));
 
@@ -118,7 +148,12 @@ describe("listSessions", () => {
   it("skips a session whose events.jsonl has no user.message", () => {
     makeSessionDir(tmpDir, "session-no-user", {
       events: [
-        JSON.stringify({ type: "session.start", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: {} }),
+        JSON.stringify({
+          type: "session.start",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: {},
+        }),
       ],
     });
     expect(listSessions()).toHaveLength(0);
@@ -128,7 +163,10 @@ describe("listSessions", () => {
     const id = "session-no-events";
     const dir = path.join(tmpDir, ".copilot", "session-state", id);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "workspace.yaml"), `id: ${id}\ncwd: /tmp\n`);
+    fs.writeFileSync(
+      path.join(dir, "workspace.yaml"),
+      `id: ${id}\ncwd: /tmp\n`
+    );
     expect(listSessions()).toHaveLength(0);
   });
 
@@ -193,9 +231,19 @@ describe("getSession", () => {
   it("caps individual gaps at 5 minutes in duration calculation", () => {
     makeSessionDir(tmpDir, "gap-session", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e1", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
         // 20 minute gap — should be capped at 300_000 ms
-        JSON.stringify({ type: "assistant.message", id: "e2", timestamp: "2024-01-15T10:20:00Z", data: { content: "Done" } }),
+        JSON.stringify({
+          type: "assistant.message",
+          id: "e2",
+          timestamp: "2024-01-15T10:20:00Z",
+          data: { content: "Done" },
+        }),
       ],
     });
     const detail = getSession("gap-session");
@@ -227,7 +275,12 @@ describe("getSession", () => {
     makeSessionDir(tmpDir, "bad-lines-session", {
       events: [
         "not valid json",
-        JSON.stringify({ type: "user.message", id: "e1", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
       ],
     });
     const detail = getSession("bad-lines-session");
@@ -240,6 +293,62 @@ describe("getSession", () => {
     const dir = path.join(tmpDir, ".copilot", "session-state", id);
     fs.mkdirSync(dir, { recursive: true });
     expect(getSession(id)).toBeNull();
+  });
+
+  it("calculates tool success rate", () => {
+    const toolSuccessRate: Record<
+      string,
+      { success: number; failure: number }
+    > = {};
+    const events = [
+      {
+        type: "tool.execution_complete",
+        data: { tool: "bash", success: true },
+      },
+      {
+        type: "tool.execution_complete",
+        data: { tool: "bash", success: true },
+      },
+      {
+        type: "tool.execution_complete",
+        data: { tool: "bash", success: false },
+      },
+      {
+        type: "tool.execution_complete",
+        data: { tool: "edit", success: true },
+      },
+    ];
+
+    for (const event of events) {
+      if (event.type === "tool.execution_complete") {
+        const tool = event.data.tool;
+        if (!toolSuccessRate[tool])
+          toolSuccessRate[tool] = { success: 0, failure: 0 };
+        if (event.data.success) toolSuccessRate[tool].success++;
+        else toolSuccessRate[tool].failure++;
+      }
+    }
+
+    expect(toolSuccessRate.bash).toEqual({ success: 2, failure: 1 });
+    expect(toolSuccessRate.edit).toEqual({ success: 1, failure: 0 });
+  });
+
+  it("counts hours of day from ISO timestamps", () => {
+    const hourOfDay: Record<string, number> = {};
+    const timestamps = [
+      "2024-01-15T08:30:00Z",
+      "2024-01-15T08:45:00Z",
+      "2024-01-15T14:00:00Z",
+    ];
+
+    for (const ts of timestamps) {
+      const hour =
+        new Date(ts).getUTCHours().toString().padStart(2, "0") + ":00";
+      hourOfDay[hour] = (hourOfDay[hour] || 0) + 1;
+    }
+
+    expect(hourOfDay["08:00"]).toBe(2);
+    expect(hourOfDay["14:00"]).toBe(1);
   });
 });
 
@@ -269,10 +378,30 @@ describe("getAnalytics", () => {
   it("aggregates tool usage from events.jsonl", () => {
     makeSessionDir(tmpDir, "tool-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "tool.execution_start", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: { tool: "bash" } }),
-        JSON.stringify({ type: "tool.execution_start", id: "e2", timestamp: "2024-01-15T10:00:02Z", data: { tool: "bash" } }),
-        JSON.stringify({ type: "tool.execution_start", id: "e3", timestamp: "2024-01-15T10:00:03Z", data: { tool: "edit" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "tool.execution_start",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: { tool: "bash" },
+        }),
+        JSON.stringify({
+          type: "tool.execution_start",
+          id: "e2",
+          timestamp: "2024-01-15T10:00:02Z",
+          data: { tool: "bash" },
+        }),
+        JSON.stringify({
+          type: "tool.execution_start",
+          id: "e3",
+          timestamp: "2024-01-15T10:00:03Z",
+          data: { tool: "edit" },
+        }),
       ],
     });
     const analytics = getAnalytics();
@@ -283,8 +412,18 @@ describe("getAnalytics", () => {
   it("records model usage from session.model_change events", () => {
     makeSessionDir(tmpDir, "model-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "session.model_change", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: { newModel: "claude-sonnet-4" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "session.model_change",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: { newModel: "claude-sonnet-4" },
+        }),
       ],
     });
     const analytics = getAnalytics();
@@ -294,21 +433,54 @@ describe("getAnalytics", () => {
   it("records tool success/failure rates", () => {
     makeSessionDir(tmpDir, "rate-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "tool.execution_complete", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: { tool: "bash", success: true } }),
-        JSON.stringify({ type: "tool.execution_complete", id: "e2", timestamp: "2024-01-15T10:00:02Z", data: { tool: "bash", success: false } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "tool.execution_complete",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: { tool: "bash", success: true },
+        }),
+        JSON.stringify({
+          type: "tool.execution_complete",
+          id: "e2",
+          timestamp: "2024-01-15T10:00:02Z",
+          data: { tool: "bash", success: false },
+        }),
       ],
     });
     const analytics = getAnalytics();
-    expect(analytics.toolSuccessRate["bash"]).toEqual({ success: 1, failure: 1 });
+    expect(analytics.toolSuccessRate["bash"]).toEqual({
+      success: 1,
+      failure: 1,
+    });
   });
 
   it("counts turns per session", () => {
     makeSessionDir(tmpDir, "turns-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "assistant.turn_start", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: {} }),
-        JSON.stringify({ type: "assistant.turn_start", id: "e2", timestamp: "2024-01-15T10:00:02Z", data: {} }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "assistant.turn_start",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: {},
+        }),
+        JSON.stringify({
+          type: "assistant.turn_start",
+          id: "e2",
+          timestamp: "2024-01-15T10:00:02Z",
+          data: {},
+        }),
       ],
     });
     const analytics = getAnalytics();
@@ -318,8 +490,18 @@ describe("getAnalytics", () => {
   it("records error types", () => {
     makeSessionDir(tmpDir, "err-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "session.error", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: { errorType: "timeout" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "session.error",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: { errorType: "timeout" },
+        }),
       ],
     });
     const analytics = getAnalytics();
@@ -341,8 +523,21 @@ describe("getAnalytics", () => {
   it("parses MCP server names from session.info events", () => {
     makeSessionDir(tmpDir, "mcp-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "session.info", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: { infoType: "mcp", message: "Configured MCP servers: github-mcp, local-mcp" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "session.info",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: {
+            infoType: "mcp",
+            message: "Configured MCP servers: github-mcp, local-mcp",
+          },
+        }),
       ],
     });
     const analytics = getAnalytics();
@@ -374,11 +569,36 @@ describe("getRepoScore", () => {
       makeSessionDir(tmpDir, `rich-sess-${i}`, {
         yaml: `id: rich-sess-${i}\ncwd: ${repoPath}\ngit_root: ${repoPath}\nbranch: main\ncreated_at: "2024-01-${String(10 + i).padStart(2, "0")}T10:00:00Z"\nupdated_at: "2024-01-${String(10 + i).padStart(2, "0")}T11:00:00Z"\n`,
         events: [
-          JSON.stringify({ type: "user.message", id: "e0", timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:00:00Z`, data: { content: "A".repeat(120) } }),
-          JSON.stringify({ type: "tool.execution_start", id: "e1", timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:01:00Z`, data: { tool: `tool${i}` } }),
-          JSON.stringify({ type: "tool.execution_complete", id: "e2", timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:01:05Z`, data: { tool: `tool${i}`, success: true } }),
-          JSON.stringify({ type: "assistant.turn_start", id: "e3", timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:02:00Z`, data: {} }),
-          JSON.stringify({ type: "assistant.message", id: "e4", timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:10:00Z`, data: { content: "Done" } }),
+          JSON.stringify({
+            type: "user.message",
+            id: "e0",
+            timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:00:00Z`,
+            data: { content: "A".repeat(120) },
+          }),
+          JSON.stringify({
+            type: "tool.execution_start",
+            id: "e1",
+            timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:01:00Z`,
+            data: { tool: `tool${i}` },
+          }),
+          JSON.stringify({
+            type: "tool.execution_complete",
+            id: "e2",
+            timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:01:05Z`,
+            data: { tool: `tool${i}`, success: true },
+          }),
+          JSON.stringify({
+            type: "assistant.turn_start",
+            id: "e3",
+            timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:02:00Z`,
+            data: {},
+          }),
+          JSON.stringify({
+            type: "assistant.message",
+            id: "e4",
+            timestamp: `2024-01-${String(10 + i).padStart(2, "0")}T10:10:00Z`,
+            data: { content: "Done" },
+          }),
         ],
       });
     }
@@ -425,8 +645,18 @@ describe("detectStatus via getSession", () => {
   it("returns completed when events.jsonl ends with user-initiated abort", () => {
     makeSessionDir(tmpDir, "abort-user-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "abort", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: { reason: "user initiated" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "abort",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: { reason: "user initiated" },
+        }),
       ],
     });
     const detail = getSession("abort-user-sess");
@@ -436,8 +666,18 @@ describe("detectStatus via getSession", () => {
   it("returns error when events.jsonl ends with non-user abort", () => {
     makeSessionDir(tmpDir, "abort-err-sess", {
       events: [
-        JSON.stringify({ type: "user.message", id: "e0", timestamp: "2024-01-15T10:00:00Z", data: { content: "Hi" } }),
-        JSON.stringify({ type: "abort", id: "e1", timestamp: "2024-01-15T10:00:01Z", data: { reason: "crash" } }),
+        JSON.stringify({
+          type: "user.message",
+          id: "e0",
+          timestamp: "2024-01-15T10:00:00Z",
+          data: { content: "Hi" },
+        }),
+        JSON.stringify({
+          type: "abort",
+          id: "e1",
+          timestamp: "2024-01-15T10:00:01Z",
+          data: { reason: "crash" },
+        }),
       ],
     });
     const detail = getSession("abort-err-sess");
