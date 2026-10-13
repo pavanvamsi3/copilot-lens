@@ -431,33 +431,39 @@ function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
  */
 export function normalizeVSCodeToolName(raw: string): { tool: string; mcpServer?: string } {
   // MCP server pattern: "xxx (MCP Server)"
+  // Matches tool name suffix "(MCP Server)" and captures the preceding tool/server name.
   const mcpMatch = raw.match(/^(.+?)\s*\(MCP Server\)$/);
   if (mcpMatch) {
     return { tool: mcpMatch[1].trim(), mcpServer: mcpMatch[1].trim() };
   }
 
   // Running `tool_name` — MCP tool invocation
+  // Matches "Running `tool`" pattern and captures the inner tool name.
   const runMatch = raw.match(/^Running `(.+?)`$/);
   if (runMatch) {
     return { tool: runMatch[1] };
   }
 
   // Reading file
+  // Detects file reads by matching starting pattern "Reading [" followed by brackets/metadata.
   if (/^Reading\s+\[/.test(raw)) {
     return { tool: "read_file" };
   }
 
   // Searching
+  // Detects searches by matching "Searching for" or "Searching text" (word boundary).
   if (/^Searching\s+(for|text)\b/.test(raw)) {
     return { tool: "search" };
   }
 
   // Creating file
+  // Detects file creations by matching starting pattern "Creating [" followed by metadata.
   if (/^Creating\s+\[/.test(raw)) {
     return { tool: "create_file" };
   }
 
   // Editing file
+  // Detects file edits/modifications by matching starting pattern "Editing [" followed by metadata.
   if (/^Editing\s+\[/.test(raw)) {
     return { tool: "edit_file" };
   }
@@ -482,7 +488,7 @@ export function scanVSCodeMcpConfig(): string[] {
     try {
       if (!fs.existsSync(configPath)) continue;
       let raw = fs.readFileSync(configPath, "utf-8");
-      // Strip trailing commas (JSONC)
+      // Strip trailing commas to parse JSONC / VS Code style files as valid JSON.
       raw = raw.replace(/,\s*([\]}])/g, "$1");
       const config = JSON.parse(raw);
       const servers = config.servers || config.mcpServers || {};
