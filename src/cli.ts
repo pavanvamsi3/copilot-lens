@@ -36,6 +36,9 @@ if (process.env.VITEST !== "true") {
   } else if (args[0] === "tokens") {
     const { runTokensTUI } = require("./cli-tokens");
     runTokensTUI(args.slice(1));
+  } else if (args[0] === "export") {
+    const { runExportCLI } = require("./cli-export");
+    runExportCLI(args.slice(1));
   } else if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
     process.stdout.write(`
   Usage: copilot-lens [command] [options]
@@ -44,6 +47,7 @@ if (process.env.VITEST !== "true") {
     (default)   Start the web dashboard
     serve       Start the web dashboard
     tokens      Show token usage in the terminal (Ink TUI)
+    export      Bulk-export sessions as NDJSON for SFT / fine-tuning
 
   Options:
     --version   Print the installed version (alias: -v)
@@ -53,6 +57,7 @@ if (process.env.VITEST !== "true") {
     --no-open   Suppress browser launch, overriding --open
 
   Run "copilot-lens tokens --help" for tokens command options.
+  Run "copilot-lens export --help" for export command options.
 `);
   } else {
     const { createApp } = require("./server");

@@ -62,7 +62,7 @@ integers. Invalid or repeated pagination parameters return HTTP 400 with an
 - **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
 - **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
 - **Effectiveness Score**: 0 to 100 score per repo with improvement tips
-- **Export**: single-session OpenAI-style chat JSONL, suitable as SFT data
+- **Export**: single-session or bulk NDJSON export in OpenAI or ShareGPT format with date/source/repo/turn filters and a per-session quality score — ready for SFT with TRL, Axolotl, or OpenAI fine-tuning API
 
 For case-sensitive API queries, use `/api/search?q=HTTPServer&caseSensitive=true`.
 This preserves case when matching query tokens against message content, titles,
@@ -146,3 +146,5 @@ Stack: Node + Express + TypeScript, vanilla frontend, Chart.js, Ink for the TUI,
 ## License
 
 MIT
+
+With bulk export, `--include-tools` preserves tool start/completion data as labeled `[tool event]` assistant-text traces in both formats. It does not generate native function-call training records or include private thinking events.
