@@ -62,11 +62,23 @@ export interface TokenUsageAnalytics {
   sources: Array<{ source: TokenSource; logsDir: string; logsScanned: number; calls: number }>;
 }
 
+// Matches ISO-8601 timestamps at the beginning of log lines, e.g. "2026-06-10T22:36:57.123Z ".
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z /;
+
+// Matches the beginning of debug log response entries.
+// Captures the timestamp (group 1) and the Request-ID (group 2).
 const RESPONSE_LINE_RE =
   /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) \[DEBUG\] response \(Request-ID ([^)]+)\):\s*$/;
+
+// Matches log lines indicating that the raw data payload starts on the next line.
 const DATA_LINE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z \[DEBUG\] data:\s*$/;
+
+// Matches the line where JSON data starts (which is always an opening brace '{').
+// Captures the brace '{' (group 1) to confirm JSON start.
 const JSON_OPEN_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z \[DEBUG\] (\{)\s*$/;
+
+// Fallback pattern used when parsing JSON fails.
+// Locates the `"model": "..."` field in raw log lines and captures the model name (group 1).
 const MODEL_LOOKBACK_RE = /"model"\s*:\s*"([^"]+)"/;
 
 export function getLogsDir(): string {
@@ -89,6 +101,8 @@ export function normalizeModelName(raw: string): string {
   }
 
   if (m.startsWith("capi-")) {
+    // Matches standard model prefixes (gpt-, claude-, gemini-, grok-, llama-, mistral-, or o-series like o1/o3)
+    // at the end of Azure/CAPI deployment strings case-insensitively, and captures the normalized model name (group 1).
     const known = m.match(
       /(gpt-[\w.-]+|claude-[\w.-]+|gemini-[\w.-]+|grok-[\w.-]+|llama-[\w.-]+|mistral-[\w.-]+|o\d+[\w.-]*)$/i
     );

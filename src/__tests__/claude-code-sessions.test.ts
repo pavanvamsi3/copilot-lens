@@ -95,6 +95,8 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
   let tmpDir: string;
   let projectsDir: string;
   let projectDir: string;
+  let origHome: string | undefined;
+  let origUserProfile: string | undefined;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-lens-test-"));
@@ -103,12 +105,24 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
     fs.mkdirSync(projectDir, { recursive: true });
 
     // Override home dir so getClaudeCodeProjectsDir() points to tmpDir
+    origHome = process.env.HOME;
+    origUserProfile = process.env.USERPROFILE;
     process.env.HOME = tmpDir;
+    process.env.USERPROFILE = tmpDir;
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    delete process.env.HOME;
+    if (origHome !== undefined) {
+      process.env.HOME = origHome;
+    } else {
+      delete process.env.HOME;
+    }
+    if (origUserProfile !== undefined) {
+      process.env.USERPROFILE = origUserProfile;
+    } else {
+      delete process.env.USERPROFILE;
+    }
   });
 
   function writeSession(sessionId: string, lines: string[]): void {
@@ -260,18 +274,32 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
 describe("getClaudeCodeAnalytics", () => {
   let tmpDir: string;
   let projectDir: string;
+  let origHome: string | undefined;
+  let origUserProfile: string | undefined;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-lens-analytics-"));
     projectDir = path.join(tmpDir, ".claude", "projects", "-Users-test-proj");
     fs.mkdirSync(projectDir, { recursive: true });
+    origHome = process.env.HOME;
+    origUserProfile = process.env.USERPROFILE;
     process.env.HOME = tmpDir;
+    process.env.USERPROFILE = tmpDir;
     clearCache();
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    delete process.env.HOME;
+    if (origHome !== undefined) {
+      process.env.HOME = origHome;
+    } else {
+      delete process.env.HOME;
+    }
+    if (origUserProfile !== undefined) {
+      process.env.USERPROFILE = origUserProfile;
+    } else {
+      delete process.env.USERPROFILE;
+    }
     clearCache();
   });
 

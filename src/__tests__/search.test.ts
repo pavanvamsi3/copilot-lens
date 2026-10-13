@@ -230,6 +230,47 @@ describe("SearchIndex.clear()", () => {
   });
 });
 
+// ─── Test 9b: rebuild when the session set changes ──────────────────────────
+
+describe("SearchIndex.buildIndex — staleness", () => {
+  it("reflects a newly added session on the next search without an explicit clear", () => {
+    const index = new SearchIndex();
+    const first = makeMeta({ id: "sess-a", title: "first", updatedAt: "2024-01-15T11:00:00Z" });
+
+    mockGetSession.mockImplementation((id) =>
+      id === "sess-a"
+        ? makeDetail(first, [{ type: "user.message", content: "apple pie recipe" }])
+        : makeDetail(makeMeta({ id: "sess-b", title: "second", updatedAt: "2024-01-16T11:00:00Z" }), [
+            { type: "user.message", content: "mango smoothie recipe" },
+          ])
+    );
+
+    index.buildIndex([first]);
+    expect(index.search("apple")).toHaveLength(1);
+    expect(index.search("mango")).toHaveLength(0);
+
+    // A new session appears (different count + later updatedAt) — the index
+    // must rebuild even though it was already populated.
+    const second = makeMeta({ id: "sess-b", title: "second", updatedAt: "2024-01-16T11:00:00Z" });
+    index.buildIndex([first, second]);
+    expect(index.search("mango")).toHaveLength(1);
+    expect(index.search("apple")).toHaveLength(1);
+  });
+
+  it("does not rebuild when the session set is unchanged", () => {
+    const index = new SearchIndex();
+    const meta = makeMeta({ id: "sess-a" });
+    mockGetSession.mockReturnValue(
+      makeDetail(meta, [{ type: "user.message", content: "stable content" }])
+    );
+
+    index.buildIndex([meta]);
+    const callsAfterFirst = mockGetSession.mock.calls.length;
+    index.buildIndex([meta]); // same signature → no-op
+    expect(mockGetSession.mock.calls.length).toBe(callsAfterFirst);
+  });
+});
+
 // ─── Test 10: limit option ───────────────────────────────────────────────────
 
 describe("SearchIndex.search — limit option", () => {
