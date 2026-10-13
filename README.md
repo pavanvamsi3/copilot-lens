@@ -55,6 +55,13 @@ to `0` and accepts non-negative safe integers. Query values must be decimal
 integers. Invalid or repeated pagination parameters return HTTP 400 with an
 `error` message. Offsets beyond the last match return an empty array.
 
+Add `includeTotal=true` to receive `{ "results": [...], "totalMatches": N }`.
+The total counts all query/source/case-sensitive matches before `offset` and
+`limit` are applied, so an offset beyond the last match can have empty results
+with a positive total. Individual result objects keep their existing shape.
+Requests without this option retain the array response. The dashboard requests
+the total and displays how many matching results are currently shown.
+
 ## Features
 
 - **Search**: full-text across every session, with source/date/directory filters

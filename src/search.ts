@@ -15,6 +15,11 @@ export interface SearchResult {
   highlights: string[]; // up to 3 snippets, ±60 chars around match, trimmed to word boundaries
 }
 
+export interface SearchPage {
+  results: SearchResult[];
+  totalMatches: number;
+}
+
 export interface SearchOptions {
   limit?: number; // default 20
   offset?: number; // default 0, applied after ranking and source filtering
@@ -142,20 +147,24 @@ export class SearchIndex {
   }
 
   search(query: string, options?: SearchOptions): SearchResult[] {
-    if (!query || !query.trim()) return [];
+    return this.searchPage(query, options).results;
+  }
+
+  searchPage(query: string, options?: SearchOptions): SearchPage {
+    if (!query || !query.trim()) return { results: [], totalMatches: 0 };
 
     // Lazy build: only build if entries is empty
     if (this.entries.length === 0) {
       if (this.storedSessions) {
         this.buildIndex(this.storedSessions);
       } else {
-        return [];
+        return { results: [], totalMatches: 0 };
       }
     }
 
     const caseSensitive = options?.caseSensitive ?? false;
     const tokens = tokenize(query, caseSensitive);
-    if (tokens.length === 0) return [];
+    if (tokens.length === 0) return { results: [], totalMatches: 0 };
 
     const limit = options?.limit ?? 20;
     const offset = options?.offset ?? 0;
@@ -211,7 +220,10 @@ export class SearchIndex {
     }
 
     results.sort((a, b) => b.score - a.score);
-    return results.slice(offset, offset + limit);
+    return {
+      results: results.slice(offset, offset + limit),
+      totalMatches: results.length,
+    };
   }
 
   private extractHighlights(
