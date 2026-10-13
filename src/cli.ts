@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+import { getDashboardUrl } from "./cli-url";
+
 export function meetsNodeRequirement(versionString: string): boolean {
-  const [major] = versionString.split('.').map(Number);
+  const [major] = versionString.split(".").map(Number);
   return major >= 20;
 }
 
@@ -64,7 +66,7 @@ if (process.env.VITEST !== "true") {
     const app = createApp({ host });
 
     app.listen(port, host, async () => {
-      const url = `http://${host}:${port}`;
+      const url = getDashboardUrl(host, port);
       console.log(`\n  👓 Copilot Lens is running at ${url}\n`);
 
       if (shouldOpen) {

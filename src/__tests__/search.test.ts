@@ -31,7 +31,10 @@ function makeMeta(overrides: Partial<SessionMeta> = {}): SessionMeta {
 
 function makeDetail(
   meta: SessionMeta,
-  messages: Array<{ type: "user.message" | "assistant.message"; content: string }>
+  messages: Array<{
+    type: "user.message" | "assistant.message";
+    content: string;
+  }>
 ): SessionDetail {
   return {
     ...meta,
@@ -93,17 +96,31 @@ describe("SearchIndex.search — empty/blank query", () => {
 describe("SearchIndex.search — scoring", () => {
   it("session with query token in title scores higher than content-only match", () => {
     const index = new SearchIndex();
-    const metaTitle = makeMeta({ id: "title-sess", title: "typescript refactor", cwd: "/a/b" });
-    const metaContent = makeMeta({ id: "content-sess", title: "random session", cwd: "/c/d" });
+    const metaTitle = makeMeta({
+      id: "title-sess",
+      title: "typescript refactor",
+      cwd: "/a/b",
+    });
+    const metaContent = makeMeta({
+      id: "content-sess",
+      title: "random session",
+      cwd: "/c/d",
+    });
 
     mockGetSession.mockImplementation((id) => {
       if (id === "title-sess") {
         return makeDetail(metaTitle, [
-          { type: "user.message", content: "please help me with typescript refactor here" },
+          {
+            type: "user.message",
+            content: "please help me with typescript refactor here",
+          },
         ]);
       }
       return makeDetail(metaContent, [
-        { type: "user.message", content: "please help me with typescript refactor here" },
+        {
+          type: "user.message",
+          content: "please help me with typescript refactor here",
+        },
       ]);
     });
 
@@ -116,12 +133,20 @@ describe("SearchIndex.search — scoring", () => {
     expect(titleResult.score).toBeGreaterThan(contentResult.score);
   });
 
-// ─── Test 5: cwd match scores higher than content-only ────────────────────
+  // ─── Test 5: cwd match scores higher than content-only ────────────────────
 
   it("cwd match scores higher than content-only match", () => {
     const index = new SearchIndex();
-    const metaCwd = makeMeta({ id: "cwd-sess", cwd: "/home/user/typescript-project", title: "sess1" });
-    const metaContent = makeMeta({ id: "plain-sess", cwd: "/home/user/other", title: "sess2" });
+    const metaCwd = makeMeta({
+      id: "cwd-sess",
+      cwd: "/home/user/typescript-project",
+      title: "sess1",
+    });
+    const metaContent = makeMeta({
+      id: "plain-sess",
+      cwd: "/home/user/other",
+      title: "sess2",
+    });
 
     mockGetSession.mockImplementation((id) => {
       if (id === "cwd-sess") {
@@ -172,15 +197,23 @@ describe("SearchIndex.search — highlights", () => {
 describe("SearchIndex.search — source filter", () => {
   let index: SearchIndex;
   const metaCli = makeMeta({ id: "cli-sess", source: "cli", cwd: "/cli/proj" });
-  const metaVscode = makeMeta({ id: "vscode-sess", source: "vscode", cwd: "/vscode/proj" });
+  const metaVscode = makeMeta({
+    id: "vscode-sess",
+    source: "vscode",
+    cwd: "/vscode/proj",
+  });
 
   beforeEach(() => {
     index = new SearchIndex();
     mockGetSession.mockImplementation((id) => {
       if (id === "cli-sess") {
-        return makeDetail(metaCli, [{ type: "user.message", content: "hello from cli session" }]);
+        return makeDetail(metaCli, [
+          { type: "user.message", content: "hello from cli session" },
+        ]);
       }
-      return makeDetail(metaVscode, [{ type: "user.message", content: "hello from vscode session" }]);
+      return makeDetail(metaVscode, [
+        { type: "user.message", content: "hello from vscode session" },
+      ]);
     });
     index.buildIndex([metaCli, metaVscode]);
   });
@@ -218,7 +251,9 @@ describe("SearchIndex.clear()", () => {
     // Clear and update the mock to return different content
     index.clear();
     mockGetSession.mockReturnValue(
-      makeDetail(meta, [{ type: "user.message", content: "I love mango juice" }])
+      makeDetail(meta, [
+        { type: "user.message", content: "I love mango juice" },
+      ])
     );
 
     // Next search() should lazy-rebuild from storedSessions
@@ -235,14 +270,25 @@ describe("SearchIndex.clear()", () => {
 describe("SearchIndex.buildIndex — staleness", () => {
   it("reflects a newly added session on the next search without an explicit clear", () => {
     const index = new SearchIndex();
-    const first = makeMeta({ id: "sess-a", title: "first", updatedAt: "2024-01-15T11:00:00Z" });
+    const first = makeMeta({
+      id: "sess-a",
+      title: "first",
+      updatedAt: "2024-01-15T11:00:00Z",
+    });
 
     mockGetSession.mockImplementation((id) =>
       id === "sess-a"
-        ? makeDetail(first, [{ type: "user.message", content: "apple pie recipe" }])
-        : makeDetail(makeMeta({ id: "sess-b", title: "second", updatedAt: "2024-01-16T11:00:00Z" }), [
-            { type: "user.message", content: "mango smoothie recipe" },
+        ? makeDetail(first, [
+            { type: "user.message", content: "apple pie recipe" },
           ])
+        : makeDetail(
+            makeMeta({
+              id: "sess-b",
+              title: "second",
+              updatedAt: "2024-01-16T11:00:00Z",
+            }),
+            [{ type: "user.message", content: "mango smoothie recipe" }]
+          )
     );
 
     index.buildIndex([first]);
@@ -251,7 +297,11 @@ describe("SearchIndex.buildIndex — staleness", () => {
 
     // A new session appears (different count + later updatedAt) — the index
     // must rebuild even though it was already populated.
-    const second = makeMeta({ id: "sess-b", title: "second", updatedAt: "2024-01-16T11:00:00Z" });
+    const second = makeMeta({
+      id: "sess-b",
+      title: "second",
+      updatedAt: "2024-01-16T11:00:00Z",
+    });
     index.buildIndex([first, second]);
     expect(index.search("mango")).toHaveLength(1);
     expect(index.search("apple")).toHaveLength(1);
@@ -293,36 +343,51 @@ describe("SearchIndex.search — limit option", () => {
   });
 });
 
-
 describe("SearchIndex.search — code stripping", () => {
   it.each([
-    ["backtick fences closed by a longer delimiter", "```ts\nsecretcode()\n````"],
+    [
+      "backtick fences closed by a longer delimiter",
+      "```ts\nsecretcode()\n````",
+    ],
     ["tilde fences closed by a longer delimiter", "~~~ts\nsecretcode()\n~~~~"],
     ["triple backtick fences", "```ts\nsecretcode()\n```"],
     ["tilde fences", "~~~ts\nsecretcode()\n~~~"],
     ["single backtick inline code", "`secretcode`"],
     ["double backtick inline code", "``secretcode `nested` value``"],
     ["longer backtick fences", "````md\n```secretcode```\n````"],
-    ["mixed code spans", "`secretcode` and ~~~\nsecretcode\n~~~ and ``secretcode``"],
+    [
+      "mixed code spans",
+      "`secretcode` and ~~~\nsecretcode\n~~~ and ``secretcode``",
+    ],
   ])("excludes %s while preserving surrounding prose", (_name, code) => {
     const index = new SearchIndex();
     const meta = makeMeta();
     mockGetSession.mockReturnValue(
       makeDetail(meta, [
         { type: "user.message", content: `beforeword${code}afterword` },
-        { type: "assistant.message", content: `explanation ${code} conclusion` },
+        {
+          type: "assistant.message",
+          content: `explanation ${code} conclusion`,
+        },
       ])
     );
     index.buildIndex([meta]);
 
     expect(index.search("secretcode")).toEqual([]);
-    for (const word of ["beforeword", "afterword", "explanation", "conclusion"]) {
+    for (const word of [
+      "beforeword",
+      "afterword",
+      "explanation",
+      "conclusion",
+    ]) {
       const results = index.search(word);
       expect(results).toHaveLength(1);
       expect(results[0].highlights.join(" ")).toContain(word);
       expect(results[0].highlights.join(" ")).not.toContain("secretcode");
     }
-    expect(index.search("beforeword")[0].entry.content[0]).toContain("beforeword ");
+    expect(index.search("beforeword")[0].entry.content[0]).toContain(
+      "beforeword "
+    );
   });
 
   it.each([
@@ -332,8 +397,14 @@ describe("SearchIndex.search — code stripping", () => {
     ["tilde fence", "beforeword\n~~~ts\nafterword"],
     ["mismatched backtick runs", "beforeword `` middleword ` afterword"],
     ["mismatched fence types", "beforeword\n```\nmiddleword\n~~~\nafterword"],
-    ["unmatched fence around inline code", "beforeword\n```\n`secretcode`\nafterword"],
-    ["unmatched inline delimiter around a fence", "beforeword `\n```\nsecretcode\n```\nafterword"],
+    [
+      "unmatched fence around inline code",
+      "beforeword\n```\n`secretcode`\nafterword",
+    ],
+    [
+      "unmatched inline delimiter around a fence",
+      "beforeword `\n```\nsecretcode\n```\nafterword",
+    ],
   ])("preserves prose with %s", (_name, content) => {
     const index = new SearchIndex();
     const meta = makeMeta();
