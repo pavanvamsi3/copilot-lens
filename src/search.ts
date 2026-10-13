@@ -21,12 +21,12 @@ export interface SearchOptions {
 }
 
 function stripCodeBlocks(text: string): string {
-  // Require matching delimiter runs so unmatched backticks cannot pair with
-  // part of a longer fence and swallow prose. Leave unmatched delimiters intact.
-  return text.replace(
-    /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)|(?<!~)(~{3,})(?!~)[\s\S]*?(?<!~)\2(?!~)/g,
-    " "
-  );
+  // Markdown fences may close with an equal or longer run of the same
+  // delimiter. Inline spans require an exact run; do not pair with a
+  // substring of a longer delimiter and accidentally swallow surrounding prose.
+  return text
+    .replace(/(?<!`)(`{3,})(?!`)[\s\S]*?(?<!`)\1`*(?!`)|(?<!~)(~{3,})(?!~)[\s\S]*?(?<!~)\2~*(?!~)/g, " ")
+    .replace(/(?<!`)(`{1,2})(?!`)[\s\S]*?(?<!`)\1(?!`)/g, " ");
 }
 
 export function tokenize(query: string): string[] {
