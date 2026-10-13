@@ -21,6 +21,7 @@ Or `npm install -g copilot-lens` for a permanent install.
 ```bash
 copilot-lens                  # Web dashboard at localhost:3000
 copilot-lens --open           # Open browser automatically
+copilot-lens serve --no-open  # Suppress browser launch, even with --open
 copilot-lens --port 8080
 copilot-lens --version        # Print the installed version (or use -v)
 copilot-lens tokens           # Token usage in the terminal (Ink TUI)
