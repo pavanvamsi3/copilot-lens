@@ -3,7 +3,12 @@ import { parseDigestArgs } from "../cli-digest";
 
 describe("parseDigestArgs", () => {
   it("defaults to week period, no flags", () => {
-    expect(parseDigestArgs([])).toEqual({ period: "week", save: false, json: false, help: false });
+    expect(parseDigestArgs([])).toEqual({
+      period: "week",
+      save: false,
+      json: false,
+      help: false,
+    });
   });
 
   it("parses --last-week", () => {
@@ -37,7 +42,8 @@ describe("parseDigestArgs", () => {
   });
 
   it("last flag wins for period", () => {
-    expect(parseDigestArgs(["--month", "--last-week"]).period).toBe("last-week");
+    expect(parseDigestArgs(["--month", "--last-week"]).period).toBe(
+      "last-week"
+    );
   });
 });
-

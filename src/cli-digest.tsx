@@ -19,7 +19,7 @@ function fmtMs(ms: number): string {
 
 function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `${Math.round(n / 1_000)}k`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
   return n.toString();
 }
 
@@ -34,7 +34,13 @@ function changeBadge(current: number, prior: number | null): string | null {
 
 type Row = { icon: string; label: string; value: string; badge?: string };
 
-function DigestApp({ period, precomputed }: { period: DigestPeriod; precomputed?: DigestData }) {
+function DigestApp({
+  period,
+  precomputed,
+}: {
+  period: DigestPeriod;
+  precomputed?: DigestData;
+}) {
   const [data, setData] = useState<DigestData | null>(precomputed ?? null);
 
   useEffect(() => {
@@ -46,7 +52,9 @@ function DigestApp({ period, precomputed }: { period: DigestPeriod; precomputed?
   if (data.sessions === 0 && data.totalTokens === 0) {
     return (
       <Box flexDirection="column">
-        <Text bold color="cyan">{data.rangeLabel}</Text>
+        <Text bold color="cyan">
+          {data.rangeLabel}
+        </Text>
         <Text dimColor>No activity found for this period.</Text>
         <Text>{""}</Text>
       </Box>
@@ -56,39 +64,73 @@ function DigestApp({ period, precomputed }: { period: DigestPeriod; precomputed?
   const SEP = "────────────────────────────────────";
 
   const rows: Row[] = [
-    { icon: "📅", label: "Active days",     value: `${data.activeDays} / ${data.totalDays}` },
     {
-      icon: "💬", label: "Sessions",
+      icon: "📅",
+      label: "Active days",
+      value: `${data.activeDays} / ${data.totalDays}`,
+    },
+    {
+      icon: "💬",
+      label: "Sessions",
       value: String(data.sessions),
       badge: changeBadge(data.sessions, data.priorSessions) ?? undefined,
     },
-    { icon: "⏱ ", label: "Total time",      value: fmtMs(data.totalDurationMs) },
+    { icon: "⏱ ", label: "Total time", value: fmtMs(data.totalDurationMs) },
     {
-      icon: "🔤", label: "Tokens used",
+      icon: "🔤",
+      label: "Tokens used",
       value: fmtTokens(data.totalTokens),
       badge: changeBadge(data.totalTokens, data.priorTokens) ?? undefined,
     },
-    ...(data.mostActiveRepo ? [{ icon: "🏆", label: "Most active repo", value: data.mostActiveRepo }] : []),
-    ...(data.peakHour       ? [{ icon: "🕐", label: "Peak hour",         value: data.peakHour }]       : []),
-    ...(data.topTool        ? [{
-      icon: "🔧", label: "Top tool",
-      value: data.topToolCalls > 0 ? `${data.topTool} (${data.topToolCalls} calls)` : data.topTool,
-    }] : []),
-    ...(data.topModel ? [{ icon: "🤖", label: "Top model", value: data.topModel }] : []),
+    ...(data.mostActiveRepo
+      ? [{ icon: "🏆", label: "Most active repo", value: data.mostActiveRepo }]
+      : []),
+    ...(data.peakHour
+      ? [{ icon: "🕐", label: "Peak hour", value: data.peakHour }]
+      : []),
+    ...(data.topTool
+      ? [
+          {
+            icon: "🔧",
+            label: "Top tool",
+            value:
+              data.topToolCalls > 0
+                ? `${data.topTool} (${data.topToolCalls} calls)`
+                : data.topTool,
+          },
+        ]
+      : []),
+    ...(data.topModel
+      ? [{ icon: "🤖", label: "Top model", value: data.topModel }]
+      : []),
   ];
 
   const labelW = Math.max(...rows.map((r) => r.label.length));
 
   return (
     <Box flexDirection="column">
-      <Text bold color="cyan">{data.rangeLabel}</Text>
+      <Text bold color="cyan">
+        {data.rangeLabel}
+      </Text>
       <Text dimColor>{SEP}</Text>
       {rows.map((row) => (
         <Text key={row.label}>
-          <Text>{"  "}{row.icon}{"  "}</Text>
+          <Text>
+            {"  "}
+            {row.icon}
+            {"  "}
+          </Text>
           <Text dimColor>{row.label.padEnd(labelW)}</Text>
-          <Text>{"  "}{row.value}</Text>
-          {row.badge ? <Text dimColor>{"     "}{row.badge}</Text> : null}
+          <Text>
+            {"  "}
+            {row.value}
+          </Text>
+          {row.badge ? (
+            <Text dimColor>
+              {"     "}
+              {row.badge}
+            </Text>
+          ) : null}
         </Text>
       ))}
       {data.longestSession && (
@@ -99,7 +141,9 @@ function DigestApp({ period, precomputed }: { period: DigestPeriod; precomputed?
               ? `"${data.longestSession.title.length > 40 ? data.longestSession.title.slice(0, 40) + "…" : data.longestSession.title}" — `
               : ""}
             {fmtMs(data.longestSession.durationMs)}
-            {data.longestSession.turns > 0 ? `, ${data.longestSession.turns} turns` : ""}
+            {data.longestSession.turns > 0
+              ? `, ${data.longestSession.turns} turns`
+              : ""}
           </Text>
         </Box>
       )}
@@ -128,10 +172,14 @@ function toMarkdown(data: DigestData): string {
     `| Total time | ${fmtMs(data.totalDurationMs)} |`,
     `| Tokens used | ${fmtTokens(data.totalTokens)}${change(data.totalTokens, data.priorTokens)} |`,
   ];
-  if (data.mostActiveRepo) lines.push(`| Most active repo | ${data.mostActiveRepo} |`);
+  if (data.mostActiveRepo)
+    lines.push(`| Most active repo | ${data.mostActiveRepo} |`);
   if (data.peakHour) lines.push(`| Peak hour | ${data.peakHour} |`);
   if (data.topTool) {
-    const v = data.topToolCalls > 0 ? `${data.topTool} (${data.topToolCalls} calls)` : data.topTool;
+    const v =
+      data.topToolCalls > 0
+        ? `${data.topTool} (${data.topToolCalls} calls)`
+        : data.topTool;
     lines.push(`| Top tool | ${v} |`);
   }
   if (data.topModel) lines.push(`| Top model | ${data.topModel} |`);
@@ -139,8 +187,16 @@ function toMarkdown(data: DigestData): string {
   if (data.longestSession) {
     const title = data.longestSession.title ?? "Untitled";
     const dur = fmtMs(data.longestSession.durationMs);
-    const turns = data.longestSession.turns > 0 ? `, ${data.longestSession.turns} turns` : "";
-    lines.push("", "---", "", `**Longest session:** "${title}" — ${dur}${turns}`);
+    const turns =
+      data.longestSession.turns > 0
+        ? `, ${data.longestSession.turns} turns`
+        : "";
+    lines.push(
+      "",
+      "---",
+      "",
+      `**Longest session:** "${title}" — ${dur}${turns}`
+    );
   }
 
   lines.push("", "---", "", "_Generated by copilot-lens_");
@@ -206,7 +262,9 @@ export function runDigestTUI(argv: string[]): void {
       fs.writeFileSync(outPath, md, "utf-8");
       process.stderr.write(`Saved digest to ${outPath}\n`);
     } catch (err: any) {
-      process.stderr.write(`Error: could not save digest to ${outPath}: ${err?.message || err}\n`);
+      process.stderr.write(
+        `Error: could not save digest to ${outPath}: ${err?.message || err}\n`
+      );
       process.exitCode = 1;
     }
     render(<DigestApp period={opts.period} precomputed={data} />);

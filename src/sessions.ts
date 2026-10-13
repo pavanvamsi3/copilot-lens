@@ -2,9 +2,21 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { parse as parseYaml } from "yaml";
-import { listVSCodeSessions, getVSCodeSession, isVSCodeSession, getVSCodeAnalytics, normalizeVSCodeToolName, scanVSCodeMcpConfig } from "./vscode-sessions";
-import { listClaudeCodeSessions, getClaudeCodeSession, isClaudeCodeSession, getClaudeCodeAnalytics } from "./claude-code-sessions";
-import { cachedCall } from "./cache";
+import {
+  listVSCodeSessions,
+  getVSCodeSession,
+  isVSCodeSession,
+  getVSCodeAnalytics,
+  normalizeVSCodeToolName,
+  scanVSCodeMcpConfig,
+} from "./vscode-sessions";
+import {
+  listClaudeCodeSessions,
+  getClaudeCodeSession,
+  isClaudeCodeSession,
+  getClaudeCodeAnalytics,
+} from "./claude-code-sessions";
+import { cachedCall, getCacheTtlMs } from "./cache";
 import { isValidSessionId } from "./validation";
 
 export type SessionStatus = "running" | "completed" | "error";
@@ -101,7 +113,9 @@ function detectStatus(sessionDir: string, _updatedAt: string): SessionStatus {
       try {
         const event = JSON.parse(line);
         if (event.type === "abort") {
-          return event.data?.reason === "user initiated" ? "completed" : "error";
+          return event.data?.reason === "user initiated"
+            ? "completed"
+            : "error";
         }
       } catch {}
     }
@@ -161,10 +175,8 @@ function listCliSessions(): SessionMeta[] {
   return sessions;
 }
 
-const CACHE_TTL = 30_000; // 30 seconds
-
 export function listSessions(): SessionMeta[] {
-  return cachedCall("listSessions", CACHE_TTL, () => {
+  return cachedCall("listSessions", getCacheTtlMs(), () => {
     const cli = listCliSessions();
     let vscode: SessionMeta[] = [];
     try {
@@ -181,7 +193,8 @@ export function listSessions(): SessionMeta[] {
 
     const sessions = [...cli, ...vscode, ...claudeCode];
     sessions.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
     return sessions;
   });
@@ -294,8 +307,12 @@ export function getSession(sessionId: string): SessionDetail | null {
 
 export type AnalyticsSourceFilter = "all" | "cli" | "vscode" | "claude-code";
 
-export function getAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData {
-  return cachedCall(`getAnalytics:${source}`, CACHE_TTL, () => _computeAnalytics(source));
+export function getAnalytics(
+  source: AnalyticsSourceFilter = "all"
+): AnalyticsData {
+  return cachedCall(`getAnalytics:${source}`, getCacheTtlMs(), () =>
+    _computeAnalytics(source)
+  );
 }
 
 /** Return the nearest-rank percentile without changing the caller's samples. */
@@ -320,9 +337,14 @@ function summarizeDurations(durations: number[]) {
   };
 }
 
-function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData {
+function _computeAnalytics(
+  source: AnalyticsSourceFilter = "all"
+): AnalyticsData {
   const allSessions = listSessions();
-  const sessions = source === "all" ? allSessions : allSessions.filter((s) => s.source === source);
+  const sessions =
+    source === "all"
+      ? allSessions
+      : allSessions.filter((s) => s.source === source);
   const sessionsPerDay: Record<string, number> = {};
   const toolUsage: Record<string, number> = {};
   const topDirectories: Record<string, number> = {};
@@ -330,7 +352,8 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
   const repoTime: Record<string, number> = {};
   const modelUsage: Record<string, number> = {};
   const mcpServers: Record<string, number> = {};
-  const toolSuccessRate: Record<string, { success: number; failure: number }> = {};
+  const toolSuccessRate: Record<string, { success: number; failure: number }> =
+    {};
   const turnsPerSession: number[] = [];
   const hourOfDay: Record<string, number> = {};
   const errorTypes: Record<string, number> = {};
@@ -344,12 +367,18 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
 
     // Hour of day
     try {
-      const hour = new Date(s.createdAt).getHours().toString().padStart(2, "0") + ":00";
+      const hour =
+        new Date(s.createdAt).getHours().toString().padStart(2, "0") + ":00";
       hourOfDay[hour] = (hourOfDay[hour] || 0) + 1;
     } catch {}
 
     // Top directories
-    const dirName = s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? (s.cwd || "Claude Code") : (s.cwd || "unknown");
+    const dirName =
+      s.source === "vscode"
+        ? "VS Code"
+        : s.source === "claude-code"
+          ? s.cwd || "Claude Code"
+          : s.cwd || "unknown";
     topDirectories[dirName] = (topDirectories[dirName] || 0) + 1;
 
     // Branch activity
@@ -378,27 +407,36 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
 
             // Tool usage
             if (event.type === "tool.execution_start") {
-              const tool = event.data?.tool || event.data?.toolName || "unknown";
+              const tool =
+                event.data?.tool || event.data?.toolName || "unknown";
               toolUsage[tool] = (toolUsage[tool] || 0) + 1;
             }
 
             // Tool success rate
             if (event.type === "tool.execution_complete") {
-              const tool = event.data?.tool || event.data?.toolName || "unknown";
-              if (!toolSuccessRate[tool]) toolSuccessRate[tool] = { success: 0, failure: 0 };
+              const tool =
+                event.data?.tool || event.data?.toolName || "unknown";
+              if (!toolSuccessRate[tool])
+                toolSuccessRate[tool] = { success: 0, failure: 0 };
               if (event.data?.success) toolSuccessRate[tool].success++;
               else toolSuccessRate[tool].failure++;
             }
 
             // MCP servers
-            if (event.type === "session.info" && event.data?.infoType === "mcp") {
+            if (
+              event.type === "session.info" &&
+              event.data?.infoType === "mcp"
+            ) {
               const msg = event.data?.message || "";
               // Match "Configured MCP server(s): <comma-separated server list>" case-insensitively.
               // \s*(.+) captures everything after the colon (and optional spaces).
               const match = msg.match(/Configured MCP servers?:\s*(.+)/i);
               if (match) {
-                for (const server of match[1].split(",").map((s: string) => s.trim())) {
-                  if (server) mcpServers[server] = (mcpServers[server] || 0) + 1;
+                for (const server of match[1]
+                  .split(",")
+                  .map((s: string) => s.trim())) {
+                  if (server)
+                    mcpServers[server] = (mcpServers[server] || 0) + 1;
                 }
               }
             }
@@ -408,13 +446,18 @@ function _computeAnalytics(source: AnalyticsSourceFilter = "all"): AnalyticsData
               const model = event.data.newModel;
               modelUsage[model] = (modelUsage[model] || 0) + 1;
             }
-            if (event.type === "session.info" && event.data?.infoType === "model") {
+            if (
+              event.type === "session.info" &&
+              event.data?.infoType === "model"
+            ) {
               const msg = event.data?.message || "";
               // Match "Model changed to: <model-name>" case-insensitively.
               // [^\s.]+(?:[-.][^\s.]+)* matches a string of non-space, non-dot characters,
               // optionally followed by separators (hyphens/dots) and more non-space, non-dot characters,
               // capturing the model name without trailing punctuation.
-              const match = msg.match(/Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i);
+              const match = msg.match(
+                /Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i
+              );
               if (match) modelUsage[match[1]] = (modelUsage[match[1]] || 0) + 1;
             }
 
@@ -560,7 +603,10 @@ interface RepoSessionData {
   sessionCount: number;
 }
 
-function collectRepoData(repoPath: string, allSessions?: SessionMeta[]): RepoSessionData {
+function collectRepoData(
+  repoPath: string,
+  allSessions?: SessionMeta[]
+): RepoSessionData {
   const sessions = allSessions || listSessions();
   const repoSessions = sessions.filter(
     (s) => (s.gitRoot || s.cwd) === repoPath
@@ -603,7 +649,8 @@ function collectRepoData(repoPath: string, allSessions?: SessionMeta[]): RepoSes
           }
 
           if (event.type === "user.message") {
-            const msg = event.data?.content || event.data?.transformedContent || "";
+            const msg =
+              event.data?.content || event.data?.transformedContent || "";
             data.msgLengths.push(msg.length);
             data.totalUserMsgs++;
           }
@@ -627,7 +674,9 @@ function collectRepoData(repoPath: string, allSessions?: SessionMeta[]): RepoSes
             // \s*(.+) captures everything after the colon (and optional spaces).
             const match = msg.match(/Configured MCP servers?:\s*(.+)/i);
             if (match) {
-              for (const server of match[1].split(",").map((s: string) => s.trim())) {
+              for (const server of match[1]
+                .split(",")
+                .map((s: string) => s.trim())) {
                 if (server) data.mcpServersUsed.add(server);
               }
             }
@@ -655,20 +704,31 @@ function scorePromptQuality(data: RepoSessionData): CategoryScore {
   const avgLen = data.msgLengths.length
     ? data.msgLengths.reduce((a, b) => a + b, 0) / data.msgLengths.length
     : 0;
-  const askRatio = data.totalUserMsgs > 0 ? data.askUserCount / data.totalUserMsgs : 0;
+  const askRatio =
+    data.totalUserMsgs > 0 ? data.askUserCount / data.totalUserMsgs : 0;
 
   let score = 0;
   let detail = "";
 
-  if (avgLen >= 100) { score = 20; detail = `Avg prompt length: ${Math.round(avgLen)} chars (excellent)`; }
-  else if (avgLen >= 50) { score = 15; detail = `Avg prompt length: ${Math.round(avgLen)} chars (good)`; }
-  else if (avgLen >= 20) { score = 10; detail = `Avg prompt length: ${Math.round(avgLen)} chars (fair)`; }
-  else { score = 5; detail = `Avg prompt length: ${Math.round(avgLen)} chars (short)`; }
+  if (avgLen >= 100) {
+    score = 20;
+    detail = `Avg prompt length: ${Math.round(avgLen)} chars (excellent)`;
+  } else if (avgLen >= 50) {
+    score = 15;
+    detail = `Avg prompt length: ${Math.round(avgLen)} chars (good)`;
+  } else if (avgLen >= 20) {
+    score = 10;
+    detail = `Avg prompt length: ${Math.round(avgLen)} chars (fair)`;
+  } else {
+    score = 5;
+    detail = `Avg prompt length: ${Math.round(avgLen)} chars (short)`;
+  }
 
   // Penalty for high ask_user ratio (copilot needing clarification)
   const penalty = Math.floor(askRatio * 30);
   score = Math.max(0, score - penalty);
-  if (penalty > 0) detail += ` | ${Math.round(askRatio * 100)}% needed clarification`;
+  if (penalty > 0)
+    detail += ` | ${Math.round(askRatio * 100)}% needed clarification`;
 
   return { score, maxScore: 20, label: "Prompt Quality", detail };
 }
@@ -678,16 +738,26 @@ function scoreToolUtilization(data: RepoSessionData): CategoryScore {
   let score = 0;
   let detail = `${count} distinct tools used`;
 
-  if (count >= 7) { score = 20; detail += " (excellent diversity)"; }
-  else if (count >= 5) { score = 15; detail += " (good diversity)"; }
-  else if (count >= 3) { score = 10; detail += " (moderate)"; }
-  else { score = 5; detail += " (limited)"; }
+  if (count >= 7) {
+    score = 20;
+    detail += " (excellent diversity)";
+  } else if (count >= 5) {
+    score = 15;
+    detail += " (good diversity)";
+  } else if (count >= 3) {
+    score = 10;
+    detail += " (moderate)";
+  } else {
+    score = 5;
+    detail += " (limited)";
+  }
 
   return { score, maxScore: 20, label: "Tool Utilization", detail };
 }
 
 function scoreEfficiency(data: RepoSessionData): CategoryScore {
-  const successRate = data.toolTotal > 0 ? data.toolSuccess / data.toolTotal : 1;
+  const successRate =
+    data.toolTotal > 0 ? data.toolSuccess / data.toolTotal : 1;
   const avgTurns = data.turns.length
     ? data.turns.reduce((a, b) => a + b, 0) / data.turns.length
     : 0;
@@ -695,10 +765,19 @@ function scoreEfficiency(data: RepoSessionData): CategoryScore {
   let score = 0;
   let detail = "";
 
-  if (successRate >= 0.9) { score = 15; detail = `${Math.round(successRate * 100)}% tool success rate`; }
-  else if (successRate >= 0.8) { score = 10; detail = `${Math.round(successRate * 100)}% tool success rate`; }
-  else if (successRate >= 0.7) { score = 7; detail = `${Math.round(successRate * 100)}% tool success rate`; }
-  else { score = 4; detail = `${Math.round(successRate * 100)}% tool success rate`; }
+  if (successRate >= 0.9) {
+    score = 15;
+    detail = `${Math.round(successRate * 100)}% tool success rate`;
+  } else if (successRate >= 0.8) {
+    score = 10;
+    detail = `${Math.round(successRate * 100)}% tool success rate`;
+  } else if (successRate >= 0.7) {
+    score = 7;
+    detail = `${Math.round(successRate * 100)}% tool success rate`;
+  } else {
+    score = 4;
+    detail = `${Math.round(successRate * 100)}% tool success rate`;
+  }
 
   // Bonus for concise sessions
   if (avgTurns > 0 && avgTurns < 15) {
@@ -711,7 +790,10 @@ function scoreEfficiency(data: RepoSessionData): CategoryScore {
   return { score, maxScore: 20, label: "Efficiency", detail };
 }
 
-function scoreMcpUtilization(data: RepoSessionData, configuredServers: string[]): CategoryScore {
+function scoreMcpUtilization(
+  data: RepoSessionData,
+  configuredServers: string[]
+): CategoryScore {
   let score = 0;
   let detail = "";
 
@@ -731,10 +813,19 @@ function scoreMcpUtilization(data: RepoSessionData, configuredServers: string[])
       });
     });
     const ratio = used.length / configuredServers.length;
-    if (ratio >= 0.8) { score = 20; detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`; }
-    else if (ratio >= 0.5) { score = 15; detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`; }
-    else if (ratio > 0) { score = 10; detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`; }
-    else { score = 5; detail = `${configuredServers.length} MCP servers configured but none used`; }
+    if (ratio >= 0.8) {
+      score = 20;
+      detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`;
+    } else if (ratio >= 0.5) {
+      score = 15;
+      detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`;
+    } else if (ratio > 0) {
+      score = 10;
+      detail = `Using ${used.length}/${configuredServers.length} configured MCP servers`;
+    } else {
+      score = 5;
+      detail = `${configuredServers.length} MCP servers configured but none used`;
+    }
   }
 
   return { score, maxScore: 20, label: "MCP Utilization", detail };
@@ -749,10 +840,19 @@ function scoreEngagement(data: RepoSessionData): CategoryScore {
   let score = 0;
   let detail = "";
 
-  if (avgMin >= 5 && avgMin <= 30) { score = 15; detail = `Avg session: ${Math.round(avgMin)}min (ideal)`; }
-  else if (avgMin > 30) { score = 10; detail = `Avg session: ${Math.round(avgMin)}min (long)`; }
-  else if (avgMin > 0) { score = 7; detail = `Avg session: ${Math.round(avgMin)}min (brief)`; }
-  else { score = 3; detail = "No session duration data"; }
+  if (avgMin >= 5 && avgMin <= 30) {
+    score = 15;
+    detail = `Avg session: ${Math.round(avgMin)}min (ideal)`;
+  } else if (avgMin > 30) {
+    score = 10;
+    detail = `Avg session: ${Math.round(avgMin)}min (long)`;
+  } else if (avgMin > 0) {
+    score = 7;
+    detail = `Avg session: ${Math.round(avgMin)}min (brief)`;
+  } else {
+    score = 3;
+    detail = "No session duration data";
+  }
 
   // Bonus for consistency
   const days = data.sessionDays.size;
@@ -769,28 +869,45 @@ function scoreEngagement(data: RepoSessionData): CategoryScore {
   return { score, maxScore: 20, label: "Engagement", detail };
 }
 
-function generateTips(categories: RepoScore["categories"], data: RepoSessionData, configuredServers: string[]): string[] {
+function generateTips(
+  categories: RepoScore["categories"],
+  data: RepoSessionData,
+  configuredServers: string[]
+): string[] {
   const tips: string[] = [];
 
   if (categories.promptQuality.score < 15) {
     const avgLen = data.msgLengths.length
-      ? Math.round(data.msgLengths.reduce((a, b) => a + b, 0) / data.msgLengths.length)
+      ? Math.round(
+          data.msgLengths.reduce((a, b) => a + b, 0) / data.msgLengths.length
+        )
       : 0;
-    tips.push(`Your prompts average ${avgLen} chars — try adding more context, expected behavior, and constraints to reduce back-and-forth.`);
+    tips.push(
+      `Your prompts average ${avgLen} chars — try adding more context, expected behavior, and constraints to reduce back-and-forth.`
+    );
   }
 
   if (categories.toolUtilization.score < 15) {
     const used = [...data.toolsUsed];
-    const suggestions = ["grep", "glob", "edit", "task", "view"].filter((t) => !used.includes(t));
+    const suggestions = ["grep", "glob", "edit", "task", "view"].filter(
+      (t) => !used.includes(t)
+    );
     if (suggestions.length > 0) {
-      tips.push(`Try using ${suggestions.slice(0, 3).join(", ")} — these tools can speed up your workflow.`);
+      tips.push(
+        `Try using ${suggestions.slice(0, 3).join(", ")} — these tools can speed up your workflow.`
+      );
     }
   }
 
   if (categories.efficiency.score < 15) {
-    const successRate = data.toolTotal > 0 ? Math.round((data.toolSuccess / data.toolTotal) * 100) : 100;
+    const successRate =
+      data.toolTotal > 0
+        ? Math.round((data.toolSuccess / data.toolTotal) * 100)
+        : 100;
     if (successRate < 85) {
-      tips.push(`Your tool success rate is ${successRate}% — review failing commands and provide clearer instructions.`);
+      tips.push(
+        `Your tool success rate is ${successRate}% — review failing commands and provide clearer instructions.`
+      );
     }
   }
 
@@ -806,32 +923,47 @@ function generateTips(categories: RepoScore["categories"], data: RepoSessionData
       });
     });
     if (unused.length > 0) {
-      tips.push(`You have unused MCP servers: ${unused.join(", ")}. Try leveraging them in your prompts.`);
+      tips.push(
+        `You have unused MCP servers: ${unused.join(", ")}. Try leveraging them in your prompts.`
+      );
     }
   } else if (configuredServers.length === 0) {
-    tips.push("Consider adding MCP servers to your project for enhanced capabilities (e.g., database access, API integrations).");
+    tips.push(
+      "Consider adding MCP servers to your project for enhanced capabilities (e.g., database access, API integrations)."
+    );
   }
 
   if (categories.engagement.score < 15) {
     const avgDur = data.durations.length
-      ? data.durations.reduce((a, b) => a + b, 0) / data.durations.length / 60000
+      ? data.durations.reduce((a, b) => a + b, 0) /
+        data.durations.length /
+        60000
       : 0;
     if (avgDur < 5) {
-      tips.push("Your sessions are very brief — try tackling larger tasks with Copilot for more impactful results.");
+      tips.push(
+        "Your sessions are very brief — try tackling larger tasks with Copilot for more impactful results."
+      );
     }
     if (data.sessionDays.size < 3) {
-      tips.push("Use Copilot more regularly to build momentum and improve your workflow.");
+      tips.push(
+        "Use Copilot more regularly to build momentum and improve your workflow."
+      );
     }
   }
 
   if (tips.length === 0) {
-    tips.push("Great job! You're using Copilot CLI effectively. Keep it up! 🎉");
+    tips.push(
+      "Great job! You're using Copilot CLI effectively. Keep it up! 🎉"
+    );
   }
 
   return tips;
 }
 
-export function getRepoScore(repoPath: string, allSessions?: SessionMeta[]): RepoScore {
+export function getRepoScore(
+  repoPath: string,
+  allSessions?: SessionMeta[]
+): RepoScore {
   const data = collectRepoData(repoPath, allSessions);
   const configuredServers = scanMcpConfig(repoPath);
 
@@ -843,7 +975,10 @@ export function getRepoScore(repoPath: string, allSessions?: SessionMeta[]): Rep
     engagement: scoreEngagement(data),
   };
 
-  const totalScore = Object.values(categories).reduce((sum, c) => sum + c.score, 0);
+  const totalScore = Object.values(categories).reduce(
+    (sum, c) => sum + c.score,
+    0
+  );
   const tips = generateTips(categories, data, configuredServers);
 
   return {
@@ -941,7 +1076,10 @@ export function getVSCodeScore(): RepoScore {
     engagement: scoreEngagement(data),
   };
 
-  const totalScore = Object.values(categories).reduce((sum, c) => sum + c.score, 0);
+  const totalScore = Object.values(categories).reduce(
+    (sum, c) => sum + c.score,
+    0
+  );
   const tips = generateTips(categories, data, configuredServers);
 
   return {

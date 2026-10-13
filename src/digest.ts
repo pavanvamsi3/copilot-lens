@@ -38,36 +38,71 @@ function weekBounds(offset = 0): { start: Date; end: Date; label: string } {
   const dow = now.getUTCDay(); // 0=Sun
   const toMonday = dow === 0 ? 6 : dow - 1;
   const mon = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - toMonday - offset * 7)
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - toMonday - offset * 7
+    )
   );
   const sun = new Date(mon);
   sun.setUTCDate(mon.getUTCDate() + 6);
   const end = new Date(sun);
   end.setUTCHours(23, 59, 59, 999);
 
-  const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const M = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const label = `Week of ${M[mon.getUTCMonth()]} ${mon.getUTCDate()} – ${M[sun.getUTCMonth()]} ${sun.getUTCDate()}, ${sun.getUTCFullYear()}`;
   return { start: mon, end, label };
 }
 
 function monthBounds(offset = 0): { start: Date; end: Date; label: string } {
   const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+  const d = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1)
+  );
   const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-  const M = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const end = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 23, 59, 59, 999)
+  );
+  const M = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
   return { start, end, label: `${M[d.getUTCMonth()]} ${d.getUTCFullYear()}` };
 }
 
 function getBounds(period: DigestPeriod) {
-  if (period === "week")      return { cur: weekBounds(0),  prior: weekBounds(1) };
-  if (period === "last-week") return { cur: weekBounds(1),  prior: weekBounds(2) };
-  return                             { cur: monthBounds(0), prior: monthBounds(1) };
+  if (period === "week") return { cur: weekBounds(0), prior: weekBounds(1) };
+  if (period === "last-week")
+    return { cur: weekBounds(1), prior: weekBounds(2) };
+  return { cur: monthBounds(0), prior: monthBounds(1) };
 }
 
 function fmtHour(h: number): string {
-  if (h === 0)  return "12 – 1 AM";
-  if (h < 12)   return `${h} – ${h + 1} AM`;
+  if (h === 0) return "12 – 1 AM";
+  if (h < 12) return `${h} – ${h + 1} AM`;
   if (h === 12) return "12 – 1 PM";
   return `${h - 12} – ${h - 11} PM`;
 }
@@ -89,8 +124,12 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
     return t >= prior.start.getTime() && t <= prior.end.getTime();
   });
 
-  const activeDays = new Set(inRange.map((s) => s.createdAt.slice(0, 10)).filter(Boolean)).size;
-  const totalDays = Math.round((cur.end.getTime() - cur.start.getTime()) / 86400000);
+  const activeDays = new Set(
+    inRange.map((s) => s.createdAt.slice(0, 10)).filter(Boolean)
+  ).size;
+  const totalDays = Math.round(
+    (cur.end.getTime() - cur.start.getTime()) / 86400000
+  );
 
   const repoCount: Record<string, number> = {};
   const hourCount: Record<number, number> = {};
@@ -134,7 +173,9 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
                 if (tool) toolCount[tool] = (toolCount[tool] || 0) + 1;
               }
               if (ev.type === "assistant.turn_start") turns++;
-            } catch { /* skip malformed lines */ }
+            } catch {
+              /* skip malformed lines */
+            }
           }
 
           if (tsList.length >= 2) {
@@ -146,7 +187,9 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
             if (evDur > 0) dur = evDur;
           }
         }
-      } catch { /* skip unreadable sessions */ }
+      } catch {
+        /* skip unreadable sessions */
+      }
     }
 
     totalDurationMs += dur;
@@ -178,18 +221,24 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
 
   const mostActiveRepo =
     Object.keys(repoCount).length > 0
-      ? path.basename(Object.entries(repoCount).sort((a, b) => b[1] - a[1])[0][0])
+      ? path.basename(
+          Object.entries(repoCount).sort((a, b) => b[1] - a[1])[0][0]
+        )
       : null;
 
   const peakHour =
     Object.keys(hourCount).length > 0
-      ? fmtHour(parseInt(Object.entries(hourCount).sort((a, b) => b[1] - a[1])[0][0]))
+      ? fmtHour(
+          parseInt(Object.entries(hourCount).sort((a, b) => b[1] - a[1])[0][0])
+        )
       : null;
 
   let topTool: string | null = null;
   let topToolCalls = 0;
   if (Object.keys(toolCount).length > 0) {
-    const [name, count] = Object.entries(toolCount).sort((a, b) => b[1] - a[1])[0];
+    const [name, count] = Object.entries(toolCount).sort(
+      (a, b) => b[1] - a[1]
+    )[0];
     topTool = name.charAt(0).toUpperCase() + name.slice(1);
     topToolCalls = count;
   }
@@ -213,7 +262,8 @@ export function getDigest(period: DigestPeriod = "week"): DigestData {
     topTool,
     topToolCalls,
     topModel,
-    longestSession: longestSession && longestSession.durationMs > 0 ? longestSession : null,
+    longestSession:
+      longestSession && longestSession.durationMs > 0 ? longestSession : null,
     priorSessions: inPrior.length,
     priorTokens: priorTokens > 0 ? priorTokens : null,
   };

@@ -1,8 +1,43 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { cachedCall, clearCache, _cacheInternals } from "../cache";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  cachedCall,
+  clearCache,
+  getCacheTtlMs,
+  _cacheInternals,
+} from "../cache";
 
 beforeEach(() => {
   clearCache();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("configured cache lifetime", () => {
+  it.each([
+    undefined,
+    "",
+    " ",
+    "-1",
+    "0.5",
+    "NaN",
+    "Infinity",
+    "5000ms",
+    "9007199254740992",
+  ])("uses the 30-second default for %s", (value) => {
+    vi.stubEnv("COPILOT_LENS_CACHE_TTL_MS", value);
+    expect(getCacheTtlMs()).toBe(30_000);
+  });
+
+  it.each([
+    ["5000", 5000],
+    [" 5000 ", 5000],
+    ["0", 0],
+  ])("uses the configured lifetime %s", (value, expected) => {
+    vi.stubEnv("COPILOT_LENS_CACHE_TTL_MS", value);
+    expect(getCacheTtlMs()).toBe(expected);
+  });
 });
 
 describe("cachedCall", () => {
