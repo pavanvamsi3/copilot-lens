@@ -65,14 +65,22 @@ export class SearchIndex {
   private signature = "";
   private skippedWarning = "";
 
-  // A cheap fingerprint of the session set. Changes when sessions are added,
-  // removed, or updated, so the index can detect when it has gone stale.
+  // Include each session's identity, update time, and searchable metadata.
+  // Sorting avoids rebuilding when only the session enumeration order changes.
   private computeSignature(sessions: SessionMeta[]): string {
-    let latest = "";
-    for (const s of sessions) {
-      if (s.updatedAt > latest) latest = s.updatedAt;
-    }
-    return `${sessions.length}:${latest}`;
+    return JSON.stringify(
+      sessions
+        .map((meta) =>
+          JSON.stringify([
+            meta.source,
+            meta.id,
+            meta.updatedAt,
+            meta.title || meta.id,
+            meta.cwd || "",
+          ])
+        )
+        .sort()
+    );
   }
 
   buildIndex(sessions: SessionMeta[]): void {
