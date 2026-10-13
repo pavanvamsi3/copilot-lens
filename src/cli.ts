@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 export function meetsNodeRequirement(versionString: string): boolean {
-  const [major] = versionString.split('.').map(Number);
+  const [major] = versionString.split(".").map(Number);
   return major >= 20;
 }
 

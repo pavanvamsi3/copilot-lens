@@ -2,7 +2,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { randomUUID } from "crypto";
-import type { SessionMeta, SessionDetail, SessionEvent, SessionStatus } from "./sessions";
+import type {
+  SessionMeta,
+  SessionDetail,
+  SessionEvent,
+  SessionStatus,
+} from "./sessions";
 import { cachedCall } from "./cache";
 import { isValidSessionId } from "./validation";
 
@@ -72,7 +77,9 @@ function readAllLines(filePath: string): ClaudeCodeEvent[] {
   }
 }
 
-function extractTextContent(content: string | ContentBlock[] | undefined): string {
+function extractTextContent(
+  content: string | ContentBlock[] | undefined
+): string {
   if (!content) return "";
   if (typeof content === "string") return content;
   return content
@@ -81,12 +88,16 @@ function extractTextContent(content: string | ContentBlock[] | undefined): strin
     .join("");
 }
 
-function extractToolUseBlocks(content: string | ContentBlock[] | undefined): ContentBlock[] {
+function extractToolUseBlocks(
+  content: string | ContentBlock[] | undefined
+): ContentBlock[] {
   if (!content || typeof content === "string") return [];
   return content.filter((b) => b.type === "tool_use");
 }
 
-function extractThinkingBlocks(content: string | ContentBlock[] | undefined): string[] {
+function extractThinkingBlocks(
+  content: string | ContentBlock[] | undefined
+): string[] {
   if (!content || typeof content === "string") return [];
   return content
     .filter((b) => b.type === "thinking" && b.thinking)
@@ -205,7 +216,11 @@ function findSessionFile(sessionId: string): string | null {
   try {
     for (const subdir of fs.readdirSync(projectsDir, { withFileTypes: true })) {
       if (!subdir.isDirectory()) continue;
-      const candidate = path.join(projectsDir, subdir.name, `${sessionId}.jsonl`);
+      const candidate = path.join(
+        projectsDir,
+        subdir.name,
+        `${sessionId}.jsonl`
+      );
       if (fs.existsSync(candidate)) return candidate;
     }
   } catch {}
@@ -354,7 +369,11 @@ export interface ClaudeCodeAnalyticsEntry {
 const CACHE_TTL = 30_000;
 
 export function getClaudeCodeAnalytics(): ClaudeCodeAnalyticsEntry[] {
-  return cachedCall("getClaudeCodeAnalytics", CACHE_TTL, _computeClaudeCodeAnalytics);
+  return cachedCall(
+    "getClaudeCodeAnalytics",
+    CACHE_TTL,
+    _computeClaudeCodeAnalytics
+  );
 }
 
 function _computeClaudeCodeAnalytics(): ClaudeCodeAnalyticsEntry[] {
