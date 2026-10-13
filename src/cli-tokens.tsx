@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { render, Text, Box, Newline } from "ink";
-import { getTokenUsage, TokenUsageAnalytics, TokenSourceFilter } from "./token-usage";
+import {
+  getTokenUsage,
+  TokenUsageAnalytics,
+  TokenSourceFilter,
+} from "./token-usage";
 
 // ── Formatting helpers ──────────────────────────────────────────────
 
@@ -26,7 +30,20 @@ function bar(value: number, max: number, width: number): string {
 }
 
 function shortDate(iso: string): string {
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const d = new Date(iso);
   return `${months[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, " ")}`;
 }
@@ -41,7 +58,9 @@ function sourceLabel(source: TokenSourceFilter): string {
 function Header({ source }: { source: TokenSourceFilter }) {
   return (
     <Box>
-      <Text bold color="cyan">Token Usage</Text>
+      <Text bold color="cyan">
+        Token Usage
+      </Text>
       <Text dimColor>{"  " + sourceLabel(source)}</Text>
     </Box>
   );
@@ -55,19 +74,19 @@ function Totals({ data }: { data: TokenUsageAnalytics }) {
     <Box flexDirection="column" marginTop={1}>
       <Text>
         <Text bold>{pad(fmt(t.total_tokens), w)}</Text>
-        <Text dimColor>  total tokens</Text>
+        <Text dimColor> total tokens</Text>
       </Text>
       <Text>
         <Text>{pad(fmt(t.prompt_tokens), w)}</Text>
-        <Text dimColor>  prompt</Text>
+        <Text dimColor> prompt</Text>
       </Text>
       <Text>
         <Text>{pad(fmt(t.completion_tokens), w)}</Text>
-        <Text dimColor>  completion</Text>
+        <Text dimColor> completion</Text>
       </Text>
       <Text>
         <Text>{pad(fmt(t.cached_tokens), w)}</Text>
-        <Text dimColor>  cached </Text>
+        <Text dimColor> cached </Text>
         <Text dimColor>({(t.cache_hit_rate * 100).toFixed(1)}%)</Text>
       </Text>
       <Newline />
@@ -90,17 +109,19 @@ function Models({ data }: { data: TokenUsageAnalytics }) {
 
   const total = data.totals.total_tokens;
   const maxName = Math.max(...entries.map(([name]) => name.length));
-  const maxTokens = Math.max(...entries.map(([, s]) => fmt(s.total_tokens).length));
+  const maxTokens = Math.max(
+    ...entries.map(([, s]) => fmt(s.total_tokens).length)
+  );
 
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Models</Text>
       {entries.map(([name, stats]) => (
         <Text key={name}>
-          <Text>  {name.padEnd(maxName)}</Text>
-          <Text dimColor>  </Text>
+          <Text> {name.padEnd(maxName)}</Text>
+          <Text dimColor> </Text>
           <Text>{pad(fmt(stats.total_tokens), maxTokens)}</Text>
-          <Text dimColor>  {pct(stats.total_tokens, total).padStart(6)}</Text>
+          <Text dimColor> {pct(stats.total_tokens, total).padStart(6)}</Text>
         </Text>
       ))}
     </Box>
@@ -120,9 +141,11 @@ function Daily({ data }: { data: TokenUsageAnalytics }) {
       <Text bold>Daily</Text>
       {days.map((d) => (
         <Text key={d.period}>
-          <Text dimColor>  {shortDate(d.period)}  </Text>
-          <Text color="cyan">{bar(d.total_tokens, maxTokens, barWidth).padEnd(barWidth)}</Text>
-          <Text>  {pad(fmt(d.total_tokens), maxFmt)}</Text>
+          <Text dimColor> {shortDate(d.period)} </Text>
+          <Text color="cyan">
+            {bar(d.total_tokens, maxTokens, barWidth).padEnd(barWidth)}
+          </Text>
+          <Text> {pad(fmt(d.total_tokens), maxFmt)}</Text>
         </Text>
       ))}
     </Box>

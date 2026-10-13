@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { cachedCall } from "./cache";
+import { cachedCall, getCacheTtlMs } from "./cache";
 
 export type TokenSource = "copilot-cli" | "claude-code";
 export type TokenSourceFilter = "all" | TokenSource;
@@ -26,12 +26,15 @@ export interface PeriodBucket {
   completion_tokens: number;
   total_tokens: number;
   top_model: string;
-  models: Record<string, {
-    prompt_tokens: number;
-    cached_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  }>;
+  models: Record<
+    string,
+    {
+      prompt_tokens: number;
+      cached_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    }
+  >;
 }
 
 export interface TokenUsageAnalytics {
@@ -46,20 +49,28 @@ export interface TokenUsageAnalytics {
     avg_per_day: number;
     top_model: string | null;
   };
-  byModel: Record<string, {
-    calls: number;
-    prompt_tokens: number;
-    cached_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  }>;
+  byModel: Record<
+    string,
+    {
+      calls: number;
+      prompt_tokens: number;
+      cached_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    }
+  >;
   daily: PeriodBucket[];
   weekly: PeriodBucket[];
   monthly: PeriodBucket[];
   logsScanned: number;
   logsDir: string;
   source: TokenSourceFilter;
-  sources: Array<{ source: TokenSource; logsDir: string; logsScanned: number; calls: number }>;
+  sources: Array<{
+    source: TokenSource;
+    logsDir: string;
+    logsScanned: number;
+    calls: number;
+  }>;
 }
 
 // Matches ISO-8601 timestamps at the beginning of log lines, e.g. "2026-06-10T22:36:57.123Z ".
@@ -71,11 +82,13 @@ const RESPONSE_LINE_RE =
   /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) \[DEBUG\] response \(Request-ID ([^)]+)\):\s*$/;
 
 // Matches log lines indicating that the raw data payload starts on the next line.
-const DATA_LINE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z \[DEBUG\] data:\s*$/;
+const DATA_LINE_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z \[DEBUG\] data:\s*$/;
 
 // Matches the line where JSON data starts (which is always an opening brace '{').
 // Captures the brace '{' (group 1) to confirm JSON start.
-const JSON_OPEN_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z \[DEBUG\] (\{)\s*$/;
+const JSON_OPEN_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z \[DEBUG\] (\{)\s*$/;
 
 // Fallback pattern used when parsing JSON fails.
 // Locates the `"model": "..."` field in raw log lines and captures the model name (group 1).
@@ -174,7 +187,8 @@ export function parseLogContent(content: string): TokenCall[] {
     model = normalizeModelName(model || "unknown");
 
     const cached =
-      usage.prompt_tokens_details && typeof usage.prompt_tokens_details.cached_tokens === "number"
+      usage.prompt_tokens_details &&
+      typeof usage.prompt_tokens_details.cached_tokens === "number"
         ? usage.prompt_tokens_details.cached_tokens
         : 0;
 
@@ -216,11 +230,15 @@ function isoDay(ts: string): string {
 function isoWeek(ts: string): string {
   const d = new Date(ts);
   // ISO week: Thursday-anchored year/week (uses UTC).
-  const tmp = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const tmp = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
   const dayNum = tmp.getUTCDay() || 7;
   tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  const weekNo = Math.ceil(
+    ((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
+  );
   return `${tmp.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
@@ -228,7 +246,9 @@ function isoMonth(ts: string): string {
   return ts.slice(0, 7);
 }
 
-function emptyBucket(period: string): PeriodBucket & { _models: Record<string, number> } {
+function emptyBucket(
+  period: string
+): PeriodBucket & { _models: Record<string, number> } {
   return {
     period,
     calls: 0,
@@ -242,7 +262,10 @@ function emptyBucket(period: string): PeriodBucket & { _models: Record<string, n
   };
 }
 
-function bucketize(calls: TokenCall[], keyFn: (c: TokenCall) => string): PeriodBucket[] {
+function bucketize(
+  calls: TokenCall[],
+  keyFn: (c: TokenCall) => string
+): PeriodBucket[] {
   const map = new Map<string, ReturnType<typeof emptyBucket>>();
   for (const c of calls) {
     const k = keyFn(c);
@@ -356,7 +379,11 @@ function listClaudeCodeJsonlFiles(dir: string): string[] {
   return out;
 }
 
-function collectCopilotCli(): { calls: TokenCall[]; logsScanned: number; logsDir: string } {
+function collectCopilotCli(): {
+  calls: TokenCall[];
+  logsScanned: number;
+  logsDir: string;
+} {
   const dir = getLogsDir();
   const files = listLogFiles(dir);
   const calls: TokenCall[] = [];
@@ -371,7 +398,11 @@ function collectCopilotCli(): { calls: TokenCall[]; logsScanned: number; logsDir
   return { calls, logsScanned: files.length, logsDir: dir };
 }
 
-function collectClaudeCode(): { calls: TokenCall[]; logsScanned: number; logsDir: string } {
+function collectClaudeCode(): {
+  calls: TokenCall[];
+  logsScanned: number;
+  logsDir: string;
+} {
   const dir = getClaudeCodeProjectsDir();
   const files = listClaudeCodeJsonlFiles(dir);
   const calls: TokenCall[] = [];
@@ -388,7 +419,11 @@ function collectClaudeCode(): { calls: TokenCall[]; logsScanned: number; logsDir
   return { calls, logsScanned: files.length, logsDir: dir };
 }
 
-export function aggregate(calls: TokenCall[], logsScanned: number, logsDir: string): TokenUsageAnalytics {
+export function aggregate(
+  calls: TokenCall[],
+  logsScanned: number,
+  logsDir: string
+): TokenUsageAnalytics {
   const byModel: TokenUsageAnalytics["byModel"] = {};
   let prompt = 0;
   let cached = 0;
@@ -454,14 +489,26 @@ export function aggregate(calls: TokenCall[], logsScanned: number, logsDir: stri
   };
 }
 
-export function getTokenUsage(source: TokenSourceFilter = "all"): TokenUsageAnalytics {
-  return cachedCall(`tokenUsage:${source}`, 30_000, () => {
+export function getTokenUsage(
+  source: TokenSourceFilter = "all"
+): TokenUsageAnalytics {
+  return cachedCall(`tokenUsage:${source}`, getCacheTtlMs(), () => {
     const cli = collectCopilotCli();
     const cc = collectClaudeCode();
 
     const sourcesSummary: TokenUsageAnalytics["sources"] = [
-      { source: "copilot-cli", logsDir: cli.logsDir, logsScanned: cli.logsScanned, calls: cli.calls.length },
-      { source: "claude-code", logsDir: cc.logsDir, logsScanned: cc.logsScanned, calls: cc.calls.length },
+      {
+        source: "copilot-cli",
+        logsDir: cli.logsDir,
+        logsScanned: cli.logsScanned,
+        calls: cli.calls.length,
+      },
+      {
+        source: "claude-code",
+        logsDir: cc.logsDir,
+        logsScanned: cc.logsScanned,
+        calls: cc.calls.length,
+      },
     ];
 
     let selected: TokenCall[];

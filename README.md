@@ -26,6 +26,23 @@ copilot-lens tokens           # Token usage in the terminal (Ink TUI)
 copilot-lens tokens --json    # Machine-readable output
 ```
 
+## Configuration
+
+Set `COPILOT_LENS_CACHE_TTL_MS` before starting Copilot Lens to tune the session-list, analytics, and token-usage cache lifetime. It accepts a non-negative integer in milliseconds and defaults to `30000` (30 seconds). Unset, empty, or invalid values use that default; `0` disables caching.
+
+For example, use a five-second cache lifetime:
+
+```bash
+COPILOT_LENS_CACHE_TTL_MS=5000 copilot-lens --open
+```
+
+In PowerShell:
+
+```powershell
+$env:COPILOT_LENS_CACHE_TTL_MS = "5000"
+copilot-lens --open
+```
+
 ## Features
 
 - **Search**: full-text across every session, with source/date/directory filters
@@ -55,12 +72,12 @@ copilot-lens tokens --json    # Machine-readable output
 
 ## Where the data comes from
 
-| Source | Path |
-|--------|------|
-| Copilot CLI sessions | `~/.copilot/session-state/` |
-| Copilot CLI token logs | `~/.copilot/logs/process-*.log` |
-| VS Code Copilot Chat | `~/Library/Application Support/Code/` (macOS), `%APPDATA%/Code/` (Win), `~/.config/Code/` (Linux) |
-| Claude Code | `~/.claude/projects/` |
+| Source                 | Path                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| Copilot CLI sessions   | `~/.copilot/session-state/`                                                                       |
+| Copilot CLI token logs | `~/.copilot/logs/process-*.log`                                                                   |
+| VS Code Copilot Chat   | `~/Library/Application Support/Code/` (macOS), `%APPDATA%/Code/` (Win), `~/.config/Code/` (Linux) |
+| Claude Code            | `~/.claude/projects/`                                                                             |
 
 VS Code Insiders is supported. Pasted images are stripped; files over 200MB are skipped. Durations exclude gaps longer than 5 minutes so paused sessions aren't inflated.
 

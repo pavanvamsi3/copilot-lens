@@ -12,6 +12,7 @@ You are reviewing a pull request for the **copilot-lens** project — a local-fi
    - If no open PR is found, tell the user and stop.
 
 2. Fetch the PR metadata and diff:
+
    ```
    gh pr view <number> --json title,body,author,baseRefName,headRefName,files
    gh pr diff <number>
@@ -51,10 +52,13 @@ You are reviewing a pull request for the **copilot-lens** project — a local-fi
    - If the PR touches UI or visual behaviour, flag a missing screenshot in the PR description.
 
 4. Post inline comments for every finding:
+
    ```
    gh pr review <number> --comment --body "..."
    ```
+
    For findings tied to a specific line use:
+
    ```
    gh api repos/{owner}/{repo}/pulls/<number>/comments \
      -f body="<comment>" \

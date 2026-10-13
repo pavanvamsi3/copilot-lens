@@ -20,5 +20,5 @@ export default tseslint.config(
       "no-empty": ["error", { allowEmptyCatch: true }],
       "no-useless-assignment": "off",
     },
-  },
+  }
 );

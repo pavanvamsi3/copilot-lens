@@ -3,8 +3,13 @@ import * as path from "path";
 import * as os from "os";
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
-import type { SessionMeta, SessionDetail, SessionEvent, SessionStatus } from "./sessions";
-import { cachedCall } from "./cache";
+import type {
+  SessionMeta,
+  SessionDetail,
+  SessionEvent,
+  SessionStatus,
+} from "./sessions";
+import { cachedCall, getCacheTtlMs } from "./cache";
 import { isValidSessionId } from "./validation";
 
 // ============ Platform paths ============
@@ -18,7 +23,8 @@ function getVSCodeDataDirs(): string[] {
     if (process.platform === "darwin") {
       dirs.push(path.join(home, "Library", "Application Support", variant));
     } else if (process.platform === "win32") {
-      const appData = process.env.APPDATA || path.join(home, "AppData", "Roaming");
+      const appData =
+        process.env.APPDATA || path.join(home, "AppData", "Roaming");
       dirs.push(path.join(appData, variant));
     } else {
       dirs.push(path.join(home, ".config", variant));
@@ -45,12 +51,16 @@ function readSessionIndex(dataDir: string): VSCodeSessionIndex[] {
 
   try {
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    const row = db.prepare("SELECT value FROM ItemTable WHERE key = ?").get("chat.ChatSessionStore.index") as { value: unknown } | undefined;
+    const row = db
+      .prepare("SELECT value FROM ItemTable WHERE key = ?")
+      .get("chat.ChatSessionStore.index") as { value: unknown } | undefined;
     db.close();
 
     if (!row) return [];
     const rawValue = row.value;
-    const valueStr = Buffer.isBuffer(rawValue) ? rawValue.toString("utf8") : (rawValue as string);
+    const valueStr = Buffer.isBuffer(rawValue)
+      ? rawValue.toString("utf8")
+      : (rawValue as string);
     const data = JSON.parse(valueStr);
     const entries: Record<string, VSCodeSessionIndex> = data.entries || {};
     return Object.values(entries);
@@ -67,7 +77,13 @@ const MAX_TEXT_LENGTH = 10_000; // truncate huge pasted text
 function findSessionFile(dataDir: string, sessionId: string): string | null {
   if (!isValidSessionId(sessionId)) return null;
   const paths = [
-    path.join(dataDir, "User", "globalStorage", "emptyWindowChatSessions", `${sessionId}.json`),
+    path.join(
+      dataDir,
+      "User",
+      "globalStorage",
+      "emptyWindowChatSessions",
+      `${sessionId}.json`
+    ),
   ];
 
   // Also check workspaceStorage directories
@@ -76,7 +92,9 @@ function findSessionFile(dataDir: string, sessionId: string): string | null {
     try {
       for (const entry of fs.readdirSync(wsDir, { withFileTypes: true })) {
         if (entry.isDirectory()) {
-          paths.push(path.join(wsDir, entry.name, "chatSessions", `${sessionId}.json`));
+          paths.push(
+            path.join(wsDir, entry.name, "chatSessions", `${sessionId}.json`)
+          );
         }
       }
     } catch {}
@@ -114,13 +132,22 @@ function readSessionContent(filePath: string): any | null {
     if (data.requests) {
       for (const req of data.requests) {
         const msg = req.message;
-        if (msg && typeof msg.text === "string" && msg.text.length > MAX_TEXT_LENGTH) {
+        if (
+          msg &&
+          typeof msg.text === "string" &&
+          msg.text.length > MAX_TEXT_LENGTH
+        ) {
           msg.text = msg.text.slice(0, MAX_TEXT_LENGTH) + "\n...(truncated)";
         }
         if (msg?.parts) {
           for (const part of msg.parts) {
-            if (part && typeof part.text === "string" && part.text.length > MAX_TEXT_LENGTH) {
-              part.text = part.text.slice(0, MAX_TEXT_LENGTH) + "\n...(truncated)";
+            if (
+              part &&
+              typeof part.text === "string" &&
+              part.text.length > MAX_TEXT_LENGTH
+            ) {
+              part.text =
+                part.text.slice(0, MAX_TEXT_LENGTH) + "\n...(truncated)";
             }
           }
         }
@@ -179,7 +206,8 @@ function requestsToEvents(requests: any[]): SessionEvent[] {
       if (!part || typeof part !== "object") continue;
 
       if (part.kind === "toolInvocationSerialized") {
-        const toolName = part.originMessage || part.invocationMessage?.value || "unknown";
+        const toolName =
+          part.originMessage || part.invocationMessage?.value || "unknown";
         events.push({
           type: "tool.execution_start",
           id: part.toolCallId || "",
@@ -337,10 +365,12 @@ export interface VSCodeAnalyticsEntry {
   msgLengths: number[];
 }
 
-const CACHE_TTL = 30_000;
-
 export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
-  return cachedCall("getVSCodeAnalytics", CACHE_TTL, _computeVSCodeAnalytics);
+  return cachedCall(
+    "getVSCodeAnalytics",
+    getCacheTtlMs(),
+    _computeVSCodeAnalytics
+  );
 }
 
 function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
@@ -375,7 +405,9 @@ function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
         const model = req.modelId || "";
         if (model) {
           // Normalize model id: "copilot/claude-sonnet-4.5" → "claude-sonnet-4.5"
-          const shortModel = model.includes("/") ? model.split("/").pop()! : model;
+          const shortModel = model.includes("/")
+            ? model.split("/").pop()!
+            : model;
           modelUsage[shortModel] = (modelUsage[shortModel] || 0) + 1;
         }
 
@@ -383,7 +415,8 @@ function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
         const response = Array.isArray(req.response) ? req.response : [];
         for (const part of response) {
           if (part?.kind === "toolInvocationSerialized") {
-            const tool = part.originMessage || part.invocationMessage?.value || "unknown";
+            const tool =
+              part.originMessage || part.invocationMessage?.value || "unknown";
             toolUsage[tool] = (toolUsage[tool] || 0) + 1;
           }
         }
@@ -429,7 +462,10 @@ function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
  * "Searching for regex ..." → "search"
  * "Creating [](file:///...)" → "create_file"
  */
-export function normalizeVSCodeToolName(raw: string): { tool: string; mcpServer?: string } {
+export function normalizeVSCodeToolName(raw: string): {
+  tool: string;
+  mcpServer?: string;
+} {
   // MCP server pattern: "xxx (MCP Server)"
   // Matches tool name suffix "(MCP Server)" and captures the preceding tool/server name.
   const mcpMatch = raw.match(/^(.+?)\s*\(MCP Server\)$/);

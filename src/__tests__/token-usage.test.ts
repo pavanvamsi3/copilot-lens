@@ -51,10 +51,14 @@ const FALSE_POSITIVE = `2026-01-22T18:00:00.000Z [DEBUG] request config: {
 
 describe("normalizeModelName", () => {
   it("strips capi: prefix and option suffix", () => {
-    expect(normalizeModelName("capi:claude-opus-4.7:defaultReasoningEffort=medium")).toBe("claude-opus-4.7");
+    expect(
+      normalizeModelName("capi:claude-opus-4.7:defaultReasoningEffort=medium")
+    ).toBe("claude-opus-4.7");
   });
   it("strips Azure deployment prefix", () => {
-    expect(normalizeModelName("capi-noe-ptuc-h200-ib-gpt-5-mini-2025-08-07")).toBe("gpt-5-mini-2025-08-07");
+    expect(
+      normalizeModelName("capi-noe-ptuc-h200-ib-gpt-5-mini-2025-08-07")
+    ).toBe("gpt-5-mini-2025-08-07");
   });
   it("leaves clean model names unchanged", () => {
     expect(normalizeModelName("claude-opus-4.5")).toBe("claude-opus-4.5");

@@ -3,7 +3,11 @@ import { parseTokensArgs } from "../cli-tokens";
 
 describe("parseTokensArgs", () => {
   it("defaults to source=all, no json, no help", () => {
-    expect(parseTokensArgs([])).toEqual({ source: "all", json: false, help: false });
+    expect(parseTokensArgs([])).toEqual({
+      source: "all",
+      json: false,
+      help: false,
+    });
   });
 
   it("parses --source copilot-cli", () => {
