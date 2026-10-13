@@ -16,7 +16,7 @@ import {
   isClaudeCodeSession,
   getClaudeCodeAnalytics,
 } from "./claude-code-sessions";
-import { cachedCall } from "./cache";
+import { cachedCall, getCacheTtlMs } from "./cache";
 import { isValidSessionId } from "./validation";
 
 export type SessionStatus = "running" | "completed" | "error";
@@ -175,10 +175,8 @@ function listCliSessions(): SessionMeta[] {
   return sessions;
 }
 
-const CACHE_TTL = 30_000; // 30 seconds
-
 export function listSessions(): SessionMeta[] {
-  return cachedCall("listSessions", CACHE_TTL, () => {
+  return cachedCall("listSessions", getCacheTtlMs(), () => {
     const cli = listCliSessions();
     let vscode: SessionMeta[] = [];
     try {
@@ -312,7 +310,7 @@ export type AnalyticsSourceFilter = "all" | "cli" | "vscode" | "claude-code";
 export function getAnalytics(
   source: AnalyticsSourceFilter = "all"
 ): AnalyticsData {
-  return cachedCall(`getAnalytics:${source}`, CACHE_TTL, () =>
+  return cachedCall(`getAnalytics:${source}`, getCacheTtlMs(), () =>
     _computeAnalytics(source)
   );
 }

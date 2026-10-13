@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { cachedCall } from "./cache";
+import { cachedCall, getCacheTtlMs } from "./cache";
 
 export type TokenSource = "copilot-cli" | "claude-code";
 export type TokenSourceFilter = "all" | TokenSource;
@@ -492,7 +492,7 @@ export function aggregate(
 export function getTokenUsage(
   source: TokenSourceFilter = "all"
 ): TokenUsageAnalytics {
-  return cachedCall(`tokenUsage:${source}`, 30_000, () => {
+  return cachedCall(`tokenUsage:${source}`, getCacheTtlMs(), () => {
     const cli = collectCopilotCli();
     const cc = collectClaudeCode();
 

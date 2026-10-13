@@ -9,7 +9,7 @@ import type {
   SessionEvent,
   SessionStatus,
 } from "./sessions";
-import { cachedCall } from "./cache";
+import { cachedCall, getCacheTtlMs } from "./cache";
 import { isValidSessionId } from "./validation";
 
 // ============ Platform paths ============
@@ -365,10 +365,12 @@ export interface VSCodeAnalyticsEntry {
   msgLengths: number[];
 }
 
-const CACHE_TTL = 30_000;
-
 export function getVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
-  return cachedCall("getVSCodeAnalytics", CACHE_TTL, _computeVSCodeAnalytics);
+  return cachedCall(
+    "getVSCodeAnalytics",
+    getCacheTtlMs(),
+    _computeVSCodeAnalytics
+  );
 }
 
 function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {

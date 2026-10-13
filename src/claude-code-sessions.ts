@@ -8,7 +8,7 @@ import type {
   SessionEvent,
   SessionStatus,
 } from "./sessions";
-import { cachedCall } from "./cache";
+import { cachedCall, getCacheTtlMs } from "./cache";
 import { isValidSessionId } from "./validation";
 
 // ============ Platform paths ============
@@ -366,12 +366,10 @@ export interface ClaudeCodeAnalyticsEntry {
   msgLengths: number[];
 }
 
-const CACHE_TTL = 30_000;
-
 export function getClaudeCodeAnalytics(): ClaudeCodeAnalyticsEntry[] {
   return cachedCall(
     "getClaudeCodeAnalytics",
-    CACHE_TTL,
+    getCacheTtlMs(),
     _computeClaudeCodeAnalytics
   );
 }
