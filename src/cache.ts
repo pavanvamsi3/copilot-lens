@@ -13,7 +13,9 @@ export function getCacheTtlMs(): number {
   const value = process.env.COPILOT_LENS_CACHE_TTL_MS?.trim();
   if (!value) return DEFAULT_CACHE_TTL_MS;
   const ttlMs = Number(value);
-  return Number.isSafeInteger(ttlMs) && ttlMs >= 0 ? ttlMs : DEFAULT_CACHE_TTL_MS;
+  return Number.isSafeInteger(ttlMs) && ttlMs >= 0
+    ? ttlMs
+    : DEFAULT_CACHE_TTL_MS;
 }
 
 function evictOldestEntry(): void {

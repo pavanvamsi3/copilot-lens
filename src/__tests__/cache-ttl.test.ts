@@ -7,7 +7,7 @@ import { clearCache } from "../cache";
 
 // Keep every source empty and prevent access to developer session data.
 vi.mock("fs", async (importOriginal) => ({
-  ...await importOriginal<typeof import("fs")>(),
+  ...(await importOriginal<typeof import("fs")>()),
   existsSync: vi.fn(() => false),
 }));
 
@@ -32,14 +32,17 @@ afterEach(() => {
 });
 
 describe("dashboard cache lifetime", () => {
-  it.each(cachedReaders)("expires %s after the configured 5 seconds", (_name, read) => {
-    vi.stubEnv("COPILOT_LENS_CACHE_TTL_MS", "5000");
-    const first = read();
-    vi.advanceTimersByTime(4999);
-    expect(read()).toBe(first);
-    vi.advanceTimersByTime(1);
-    expect(read()).not.toBe(first);
-  });
+  it.each(cachedReaders)(
+    "expires %s after the configured 5 seconds",
+    (_name, read) => {
+      vi.stubEnv("COPILOT_LENS_CACHE_TTL_MS", "5000");
+      const first = read();
+      vi.advanceTimersByTime(4999);
+      expect(read()).toBe(first);
+      vi.advanceTimersByTime(1);
+      expect(read()).not.toBe(first);
+    }
+  );
 
   it("keeps the existing 30-second lifetime when unset", () => {
     vi.stubEnv("COPILOT_LENS_CACHE_TTL_MS", undefined);
