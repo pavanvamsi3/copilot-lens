@@ -13,7 +13,7 @@ export interface ExportArgs {
   minTurns: number;
   minTokens?: number;
   format: ExportFormat;
-  output?: string;    // -o / --output file path; stdout when undefined
+  output?: string; // -o / --output file path; stdout when undefined
   includeTools: boolean;
   help: boolean;
 }
@@ -31,17 +31,30 @@ export function parseExportArgs(argv: string[]): ExportArgs {
     const a = argv[i];
     const next = argv[i + 1];
 
-    if (a === "--help" || a === "-h") { args.help = true; continue; }
+    if (a === "--help" || a === "-h") {
+      args.help = true;
+      continue;
+    }
     if ((a === "--source" || a === "-s") && next) {
-      const validSources: ExportSource[] = ["all", "cli", "vscode", "claude-code"];
-      args.source = validSources.includes(next as ExportSource) ? (next as ExportSource) : "all";
+      const validSources: ExportSource[] = [
+        "all",
+        "cli",
+        "vscode",
+        "claude-code",
+      ];
+      args.source = validSources.includes(next as ExportSource)
+        ? (next as ExportSource)
+        : "all";
       i++;
     } else if (a === "--from" && next) {
-      args.from = next; i++;
+      args.from = next;
+      i++;
     } else if (a === "--to" && next) {
-      args.to = next; i++;
+      args.to = next;
+      i++;
     } else if (a === "--repo" && next) {
-      args.repo = next; i++;
+      args.repo = next;
+      i++;
     } else if ((a === "--min-turns" || a === "--min_turns") && next) {
       const n = parseInt(next, 10);
       if (!isNaN(n) && n >= 0) args.minTurns = n;
@@ -52,10 +65,13 @@ export function parseExportArgs(argv: string[]): ExportArgs {
       i++;
     } else if ((a === "--format" || a === "-f") && next) {
       const validFormats: ExportFormat[] = ["openai", "sharegpt"];
-      args.format = validFormats.includes(next as ExportFormat) ? (next as ExportFormat) : "openai";
+      args.format = validFormats.includes(next as ExportFormat)
+        ? (next as ExportFormat)
+        : "openai";
       i++;
     } else if ((a === "-o" || a === "--output") && next) {
-      args.output = next; i++;
+      args.output = next;
+      i++;
     } else if (a === "--include-tools") {
       args.includeTools = true;
     }
@@ -118,8 +134,12 @@ export function runExportCLI(argv: string[]): void {
     const statsLine =
       `Exported ${result.exportedSessions} session${result.exportedSessions !== 1 ? "s" : ""}` +
       ` (of ${result.totalSessions} total)` +
-      (result.skippedTurns ? ` — ${result.skippedTurns} skipped (min-turns)` : "") +
-      (result.skippedTokens ? ` — ${result.skippedTokens} skipped (min-tokens)` : "") +
+      (result.skippedTurns
+        ? ` — ${result.skippedTurns} skipped (min-turns)`
+        : "") +
+      (result.skippedTokens
+        ? ` — ${result.skippedTokens} skipped (min-tokens)`
+        : "") +
       ` → ${args.output}`;
     process.stderr.write(statsLine + "\n");
   } else {

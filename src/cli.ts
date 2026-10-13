@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+import { getDashboardUrl } from "./cli-url";
+
 export function meetsNodeRequirement(versionString: string): boolean {
-  const [major] = versionString.split('.').map(Number);
+  const [major] = versionString.split(".").map(Number);
   return major >= 20;
 }
 
@@ -13,18 +15,25 @@ if (!meetsNodeRequirement(process.versions.node)) {
   process.exit(1);
 }
 
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // Avoid running the CLI side-effects when imported by Vitest
 if (process.env.VITEST !== "true") {
-  process.on("uncaughtException", (err) => {
-    console.error("Uncaught error:", err.message);
+  process.on("uncaughtException", (error: unknown) => {
+    console.error("Uncaught error:", formatErrorMessage(error));
   });
-  process.on("unhandledRejection", (err: any) => {
-    console.error("Unhandled rejection:", err?.message || err);
+  process.on("unhandledRejection", (err: unknown) => {
+    console.error("Unhandled rejection:", formatErrorMessage(err));
   });
 
   const args = process.argv.slice(2);
 
-  if (args[0] === "tokens") {
+  if (args[0] === "--version" || args[0] === "-v") {
+    const { version }: { version: string } = require("../package.json");
+    process.stdout.write(`${version}\n`);
+  } else if (args[0] === "tokens") {
     const { runTokensTUI } = require("./cli-tokens");
     runTokensTUI(args.slice(1));
   } else if (args[0] === "export") {
@@ -40,6 +49,7 @@ if (process.env.VITEST !== "true") {
     export      Bulk-export sessions as NDJSON for SFT / fine-tuning
 
   Options:
+    --version   Print the installed version (alias: -v)
     --port <n>  Port for the web dashboard (default: 3000)
     --host <h>  Host for the web dashboard (default: localhost)
     --open      Open the dashboard in your browser
@@ -50,14 +60,17 @@ if (process.env.VITEST !== "true") {
   } else {
     const { createApp } = require("./server");
 
-    function getArg(name: string, fallback: string): string {
-      const idx = args.indexOf(name);
-      return idx !== -1 && args[idx + 1] ? args[idx + 1] : fallback;
-    }
+    const { parseDashboardArgs } = require("./cli-args");
+    let host: string;
+    let port: number;
+    let shouldOpen: boolean;
 
-    const port = parseInt(getArg("--port", "3000"), 10);
-    const host = getArg("--host", "localhost");
-    const shouldOpen = args.includes("--open");
+    try {
+      ({ host, port, shouldOpen } = parseDashboardArgs(args));
+    } catch (error: unknown) {
+      console.error(formatErrorMessage(error));
+      process.exit(1);
+    }
 
     const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
     if (!LOOPBACK_HOSTS.has(host)) {
@@ -69,7 +82,7 @@ if (process.env.VITEST !== "true") {
     const app = createApp({ host });
 
     app.listen(port, host, async () => {
-      const url = `http://${host}:${port}`;
+      const url = getDashboardUrl(host, port);
       console.log(`\n  👓 Copilot Lens is running at ${url}\n`);
 
       if (shouldOpen) {
@@ -81,7 +94,8 @@ if (process.env.VITEST !== "true") {
         } else if (process.platform === "darwin") {
           execFile("open", [url]);
         } else {
-          execFile("xdg-open", [url]);
+          const { openLinuxBrowser } = await import("./cli-browser");
+          openLinuxBrowser(url);
         }
       }
     });

@@ -7,11 +7,11 @@ export type ExportSource = "cli" | "vscode" | "claude-code" | "all";
 
 export interface ExportOptions {
   source?: ExportSource;
-  from?: string;       // ISO date, inclusive
-  to?: string;         // ISO date, inclusive
-  repo?: string;       // substring match on gitRoot or cwd
-  minTurns?: number;   // minimum conversation turns (user messages)
-  minTokens?: number;  // minimum token count (skipped when data unavailable)
+  from?: string; // ISO date, inclusive
+  to?: string; // ISO date, inclusive
+  repo?: string; // substring match on gitRoot or cwd
+  minTurns?: number; // minimum conversation turns (user messages)
+  minTokens?: number; // minimum token count (skipped when data unavailable)
   format?: ExportFormat;
   includeTools?: boolean; // include labeled tool traces as assistant text (default: false)
 }
@@ -45,7 +45,7 @@ export interface ShareGPTRecord {
 }
 
 export interface SessionQuality {
-  score: number;          // 0–100
+  score: number; // 0–100
   turn_count: number;
   has_errors: boolean;
   duration_ms: number;
@@ -62,8 +62,14 @@ export function computeQuality(
   //   turns:    up to 50 pts — log scale, caps at 20 turns
   //   duration: up to 30 pts — log scale, caps at 30 min
   //   no errors: 20 pts bonus
-  const turnScore = Math.min(50, Math.round((Math.log1p(turnCount) / Math.log1p(20)) * 50));
-  const durScore = Math.min(30, Math.round((Math.log1p(durationMs / 60_000) / Math.log1p(30)) * 30));
+  const turnScore = Math.min(
+    50,
+    Math.round((Math.log1p(turnCount) / Math.log1p(20)) * 50)
+  );
+  const durScore = Math.min(
+    30,
+    Math.round((Math.log1p(durationMs / 60_000) / Math.log1p(30)) * 30)
+  );
   const errPenalty = hasErrors ? 0 : 20;
   return {
     score: Math.min(100, turnScore + durScore + errPenalty),
@@ -75,7 +81,10 @@ export function computeQuality(
 
 // ─── Filtering ────────────────────────────────────────────────────────────────
 
-export function filterSessions(sessions: SessionMeta[], opts: ExportOptions): SessionMeta[] {
+export function filterSessions(
+  sessions: SessionMeta[],
+  opts: ExportOptions
+): SessionMeta[] {
   let result = [...sessions];
 
   if (opts.source && opts.source !== "all") {
@@ -91,7 +100,9 @@ export function filterSessions(sessions: SessionMeta[], opts: ExportOptions): Se
     // "to" is end-of-day inclusive
     const to = new Date(opts.to);
     to.setHours(23, 59, 59, 999);
-    result = result.filter((s) => new Date(s.updatedAt).getTime() <= to.getTime());
+    result = result.filter(
+      (s) => new Date(s.updatedAt).getTime() <= to.getTime()
+    );
   }
 
   if (opts.repo) {
@@ -115,19 +126,28 @@ function extractMessages(
   if (!session) return [];
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
   for (const e of session.events) {
-    if (e.type === "tool.execution_start" || e.type === "tool.execution_complete") {
+    if (
+      e.type === "tool.execution_start" ||
+      e.type === "tool.execution_complete"
+    ) {
       if (includeTools) {
         // Text traces work in both export formats without inventing missing
         // function-call IDs or claiming that these records are native tool calls.
-        messages.push({ role: "assistant", content: "[tool event] " + JSON.stringify({ type: e.type, data: e.data }) });
+        messages.push({
+          role: "assistant",
+          content:
+            "[tool event] " + JSON.stringify({ type: e.type, data: e.data }),
+        });
       }
       continue;
     }
     if (e.type === "assistant.thinking") continue;
-    const content = typeof e.data?.content === "string" ? e.data.content.trim() : "";
+    const content =
+      typeof e.data?.content === "string" ? e.data.content.trim() : "";
     if (!content) continue;
     if (e.type === "user.message") messages.push({ role: "user", content });
-    else if (e.type === "assistant.message") messages.push({ role: "assistant", content });
+    else if (e.type === "assistant.message")
+      messages.push({ role: "assistant", content });
   }
   return messages;
 }
@@ -235,4 +255,9 @@ export function bulkExport(opts: ExportOptions): ExportResult {
 }
 
 // Exported for testing
-export const _testing = { filterSessions, computeQuality, formatAsOpenAI, formatAsShareGPT };
+export const _testing = {
+  filterSessions,
+  computeQuality,
+  formatAsOpenAI,
+  formatAsShareGPT,
+};

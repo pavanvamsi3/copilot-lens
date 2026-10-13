@@ -1,10 +1,23 @@
 import express from "express";
 import path from "path";
-import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, type AnalyticsSourceFilter } from "./sessions";
+import { Readable, pipeline } from "stream";
+import {
+  listSessions,
+  getSession,
+  getAnalytics,
+  listReposWithScores,
+  getRepoScore,
+  getVSCodeScore,
+  type AnalyticsSourceFilter,
+} from "./sessions";
 import { clearCache } from "./cache";
 import { SearchIndex } from "./search";
-import { getTokenUsage, type TokenSourceFilter } from "./token-usage";
-import { bulkExport, type ExportSource, type ExportFormat } from "./export";
+import {
+  getTokenUsage,
+  getTokenUsageCsv,
+  type TokenSourceFilter,
+} from "./token-usage";
+import { bulkExport, type ExportFormat, type ExportSource } from "./export";
 
 export interface AppOptions {
   // The host the server binds to. Used to build the allowed-Host list so a
@@ -41,21 +54,58 @@ function hostGuard(configuredHost?: string): express.RequestHandler {
   };
 }
 
+function parseSearchInteger(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number = Number.MAX_SAFE_INTEGER
+): number | null {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max
+    ? parsed
+    : null;
+}
+
 export function createApp(options: AppOptions = {}) {
   const app = express();
   app.use(hostGuard(options.host));
 
   const searchIndex = new SearchIndex();
 
+  // Read the package version once when the app is created, not per request.
+  const { version: appVersion } = require("../package.json") as {
+    version: string;
+  };
+
+  // API: Health check
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ status: "ok", version: appVersion });
+  });
+
   // Serve static frontend files
+
   app.use(express.static(path.join(__dirname, "..", "public")));
 
   // API: Full-text search
   app.get("/api/search", async (req, res) => {
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-      const source = typeof req.query.source === "string" ? req.query.source : "all";
-      const limit = parseInt(req.query.limit as string) || 20;
+      const source =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const limit = parseSearchInteger(req.query.limit, 20, 1, 100);
+      const offset = parseSearchInteger(req.query.offset, 0, 0);
+      if (limit === null) {
+        return res
+          .status(400)
+          .json({ error: "limit must be an integer between 1 and 100" });
+      }
+      if (offset === null) {
+        return res
+          .status(400)
+          .json({ error: "offset must be a non-negative safe integer" });
+      }
 
       if (!q) return res.json([]);
 
@@ -64,6 +114,8 @@ export function createApp(options: AppOptions = {}) {
 
       const results = searchIndex.search(q, {
         limit,
+        caseSensitive: req.query.caseSensitive === "true",
+        offset,
         source: source as "cli" | "vscode" | "all",
       });
 
@@ -106,12 +158,15 @@ export function createApp(options: AppOptions = {}) {
         res.status(404).json({ error: "Session not found" });
         return;
       }
-      const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+      const messages: Array<{ role: "user" | "assistant"; content: string }> =
+        [];
       for (const e of session.events) {
-        const content = typeof e.data?.content === "string" ? e.data.content.trim() : "";
+        const content =
+          typeof e.data?.content === "string" ? e.data.content.trim() : "";
         if (!content) continue;
         if (e.type === "user.message") messages.push({ role: "user", content });
-        else if (e.type === "assistant.message") messages.push({ role: "assistant", content });
+        else if (e.type === "assistant.message")
+          messages.push({ role: "assistant", content });
       }
       const line = JSON.stringify({
         session_id: session.id,
@@ -133,9 +188,19 @@ export function createApp(options: AppOptions = {}) {
   // API: Analytics
   app.get("/api/analytics", (req, res) => {
     try {
-      const validSources: AnalyticsSourceFilter[] = ["all", "cli", "vscode", "claude-code"];
-      const raw = typeof req.query.source === "string" ? req.query.source : "all";
-      const source: AnalyticsSourceFilter = validSources.includes(raw as AnalyticsSourceFilter) ? (raw as AnalyticsSourceFilter) : "all";
+      const validSources: AnalyticsSourceFilter[] = [
+        "all",
+        "cli",
+        "vscode",
+        "claude-code",
+      ];
+      const raw =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const source: AnalyticsSourceFilter = validSources.includes(
+        raw as AnalyticsSourceFilter
+      )
+        ? (raw as AnalyticsSourceFilter)
+        : "all";
       const analytics = getAnalytics(source);
       res.json(analytics);
     } catch (err: any) {
@@ -172,57 +237,117 @@ export function createApp(options: AppOptions = {}) {
   // API: Token usage (parsed from ~/.copilot/logs and ~/.claude/projects)
   app.get("/api/token-usage", (req, res) => {
     try {
-      const validSources: TokenSourceFilter[] = ["all", "copilot-cli", "claude-code"];
-      const raw = typeof req.query.source === "string" ? req.query.source : "all";
-      const source: TokenSourceFilter = validSources.includes(raw as TokenSourceFilter) ? (raw as TokenSourceFilter) : "all";
-      res.json(getTokenUsage(source));
+      const validSources: TokenSourceFilter[] = [
+        "all",
+        "copilot-cli",
+        "claude-code",
+      ];
+      const raw =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const source: TokenSourceFilter = validSources.includes(
+        raw as TokenSourceFilter
+      )
+        ? (raw as TokenSourceFilter)
+        : "all";
+      if (req.query.format === "csv") {
+        const rows = getTokenUsageCsv(source);
+        res.attachment("token-usage.csv").type("text/csv; charset=utf-8");
+        pipeline(Readable.from(rows, { objectMode: false }), res, (error) => {
+          if (error && !res.destroyed) res.destroy(error);
+        });
+      } else {
+        res.json(getTokenUsage(source));
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // API: Bulk export — NDJSON stream, one record per session
-  // ?source=all|cli|vscode|claude-code
-  // ?from=YYYY-MM-DD  ?to=YYYY-MM-DD
-  // ?repo=<substring>
-  // ?min_turns=N  ?min_tokens=N
-  // ?format=openai|sharegpt
-  // ?include_tools=1
+  // API: Bulk-export sessions as NDJSON for fine-tuning datasets.
   app.get("/api/export", (req, res) => {
     try {
-      const validSources: ExportSource[] = ["all", "cli", "vscode", "claude-code"];
-      const rawSource = typeof req.query.source === "string" ? req.query.source : "all";
-      const source: ExportSource = validSources.includes(rawSource as ExportSource)
-        ? (rawSource as ExportSource)
-        : "all";
-
+      const validSources: ExportSource[] = [
+        "all",
+        "cli",
+        "vscode",
+        "claude-code",
+      ];
       const validFormats: ExportFormat[] = ["openai", "sharegpt"];
-      const rawFormat = typeof req.query.format === "string" ? req.query.format : "openai";
-      const format: ExportFormat = validFormats.includes(rawFormat as ExportFormat)
-        ? (rawFormat as ExportFormat)
-        : "openai";
+      const source =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const format =
+        typeof req.query.format === "string" ? req.query.format : "openai";
+      if (!validSources.includes(source as ExportSource)) {
+        return res
+          .status(400)
+          .json({ error: "source must be all, cli, vscode, or claude-code" });
+      }
+      if (!validFormats.includes(format as ExportFormat)) {
+        return res
+          .status(400)
+          .json({ error: "format must be openai or sharegpt" });
+      }
 
-      const from = typeof req.query.from === "string" ? req.query.from : undefined;
+      const parseNonNegativeInteger = (
+        value: unknown,
+        fallback: number | undefined
+      ) => {
+        if (value === undefined) return fallback;
+        if (typeof value !== "string" || !/^\\d+$/.test(value)) return null;
+        const parsed = Number(value);
+        return Number.isSafeInteger(parsed) ? parsed : null;
+      };
+      const minTurns = parseNonNegativeInteger(req.query.min_turns, 1);
+      const minTokens = parseNonNegativeInteger(
+        req.query.min_tokens,
+        undefined
+      );
+      if (minTurns === null || minTokens === null) {
+        return res.status(400).json({
+          error: "min_turns and min_tokens must be non-negative safe integers",
+        });
+      }
+
+      const from =
+        typeof req.query.from === "string" ? req.query.from : undefined;
       const to = typeof req.query.to === "string" ? req.query.to : undefined;
-      const repo = typeof req.query.repo === "string" ? req.query.repo : undefined;
-      const minTurns = req.query.min_turns ? parseInt(req.query.min_turns as string) : 1;
-      const minTokens = req.query.min_tokens ? parseInt(req.query.min_tokens as string) : undefined;
-      const includeTools = req.query.include_tools === "1" || req.query.include_tools === "true";
+      const isDate = (value: string) => {
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+        const parsed = new Date(`${value}T00:00:00.000Z`);
+        return (
+          Number.isFinite(parsed.getTime()) &&
+          parsed.toISOString().slice(0, 10) === value
+        );
+      };
+      if ((from && !isDate(from)) || (to && !isDate(to))) {
+        return res
+          .status(400)
+          .json({ error: "from and to must be valid YYYY-MM-DD dates" });
+      }
 
-      const result = bulkExport({ source, from, to, repo, minTurns, minTokens, format, includeTools });
+      const repo =
+        typeof req.query.repo === "string" ? req.query.repo : undefined;
+      const result = bulkExport({
+        source: source as ExportSource,
+        format: format as ExportFormat,
+        from,
+        to,
+        repo,
+        minTurns,
+        ...(minTokens === undefined ? {} : { minTokens }),
+        includeTools:
+          req.query.include_tools === "1" || req.query.include_tools === "true",
+      });
 
       res.setHeader("Content-Type", "application/x-ndjson");
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="copilot-lens-export-${format}.jsonl"`
       );
-      // Emit summary as first comment line, then data lines
       res.write(
         `// exported=${result.exportedSessions} total=${result.totalSessions} skipped_turns=${result.skippedTurns} skipped_tokens=${result.skippedTokens}\n`
       );
-      for (const line of result.lines) {
-        res.write(line + "\n");
-      }
+      for (const line of result.lines) res.write(line + "\n");
       res.end();
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -1,5 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { filterSessions, computeQuality, formatAsOpenAI, formatAsShareGPT, bulkExport } from "../export";
+import { describe, it, expect } from "vitest";
+import {
+  filterSessions,
+  computeQuality,
+  formatAsOpenAI,
+  formatAsShareGPT,
+} from "../export";
 import { parseExportArgs } from "../cli-export";
 import type { SessionMeta, SessionDetail } from "../sessions";
 
@@ -23,10 +28,30 @@ function makeDetail(overrides: Partial<SessionDetail> = {}): SessionDetail {
   return {
     ...makeMeta(),
     events: [
-      { type: "user.message",      id: "e1", timestamp: "2025-03-01T10:00:00Z", data: { content: "Hello Claude" } },
-      { type: "assistant.message", id: "e2", timestamp: "2025-03-01T10:00:05Z", data: { content: "Hi! How can I help?" } },
-      { type: "user.message",      id: "e3", timestamp: "2025-03-01T10:01:00Z", data: { content: "Fix the bug" } },
-      { type: "assistant.message", id: "e4", timestamp: "2025-03-01T10:01:30Z", data: { content: "Done, I fixed it." } },
+      {
+        type: "user.message",
+        id: "e1",
+        timestamp: "2025-03-01T10:00:00Z",
+        data: { content: "Hello Claude" },
+      },
+      {
+        type: "assistant.message",
+        id: "e2",
+        timestamp: "2025-03-01T10:00:05Z",
+        data: { content: "Hi! How can I help?" },
+      },
+      {
+        type: "user.message",
+        id: "e3",
+        timestamp: "2025-03-01T10:01:00Z",
+        data: { content: "Fix the bug" },
+      },
+      {
+        type: "assistant.message",
+        id: "e4",
+        timestamp: "2025-03-01T10:01:30Z",
+        data: { content: "Done, I fixed it." },
+      },
     ],
     hasSnapshots: false,
     eventCounts: { "user.message": 2, "assistant.message": 2 },
@@ -40,10 +65,31 @@ function makeDetail(overrides: Partial<SessionDetail> = {}): SessionDetail {
 
 describe("filterSessions", () => {
   const sessions = [
-    makeMeta({ id: "s1", source: "cli",          updatedAt: "2025-01-15T00:00:00Z", gitRoot: "/repos/alpha" }),
-    makeMeta({ id: "s2", source: "vscode",        updatedAt: "2025-03-10T00:00:00Z", gitRoot: "/repos/beta" }),
-    makeMeta({ id: "s3", source: "claude-code",   updatedAt: "2025-06-01T00:00:00Z", gitRoot: "/repos/alpha" }),
-    makeMeta({ id: "s4", source: "claude-code",   updatedAt: "2025-08-20T00:00:00Z", cwd: "/work/gamma", gitRoot: undefined }),
+    makeMeta({
+      id: "s1",
+      source: "cli",
+      updatedAt: "2025-01-15T00:00:00Z",
+      gitRoot: "/repos/alpha",
+    }),
+    makeMeta({
+      id: "s2",
+      source: "vscode",
+      updatedAt: "2025-03-10T00:00:00Z",
+      gitRoot: "/repos/beta",
+    }),
+    makeMeta({
+      id: "s3",
+      source: "claude-code",
+      updatedAt: "2025-06-01T00:00:00Z",
+      gitRoot: "/repos/alpha",
+    }),
+    makeMeta({
+      id: "s4",
+      source: "claude-code",
+      updatedAt: "2025-08-20T00:00:00Z",
+      cwd: "/work/gamma",
+      gitRoot: undefined,
+    }),
   ];
 
   it("returns all sessions when no filters set", () => {
@@ -70,7 +116,10 @@ describe("filterSessions", () => {
   });
 
   it("filters by from+to range", () => {
-    const result = filterSessions(sessions, { from: "2025-03-01", to: "2025-07-01" });
+    const result = filterSessions(sessions, {
+      from: "2025-03-01",
+      to: "2025-07-01",
+    });
     expect(result.map((s) => s.id)).toEqual(["s2", "s3"]);
   });
 
@@ -90,7 +139,11 @@ describe("filterSessions", () => {
   });
 
   it("combines source + date + repo filters", () => {
-    const result = filterSessions(sessions, { source: "claude-code", from: "2025-06-01", repo: "alpha" });
+    const result = filterSessions(sessions, {
+      source: "claude-code",
+      from: "2025-06-01",
+      repo: "alpha",
+    });
     expect(result.map((s) => s.id)).toEqual(["s3"]);
   });
 });
@@ -99,7 +152,12 @@ describe("filterSessions", () => {
 
 describe("computeQuality", () => {
   it("score is 0–100", () => {
-    for (const [t, e, d] of [[0, true, 0], [5, false, 300_000], [20, false, 1_800_000], [100, false, 99_999_999]] as const) {
+    for (const [t, e, d] of [
+      [0, true, 0],
+      [5, false, 300_000],
+      [20, false, 1_800_000],
+      [100, false, 99_999_999],
+    ] as const) {
       const q = computeQuality(t, e, d);
       expect(q.score).toBeGreaterThanOrEqual(0);
       expect(q.score).toBeLessThanOrEqual(100);
@@ -119,8 +177,8 @@ describe("computeQuality", () => {
   });
 
   it("longer session scores higher (duration component)", () => {
-    const short = computeQuality(3, false, 60_000);    // 1 min
-    const long  = computeQuality(3, false, 1_800_000); // 30 min
+    const short = computeQuality(3, false, 60_000); // 1 min
+    const long = computeQuality(3, false, 1_800_000); // 30 min
     expect(long.score).toBeGreaterThan(short.score);
   });
 
@@ -155,9 +213,24 @@ describe("formatAsOpenAI", () => {
   it("strips tool.execution_start by default", () => {
     const detail = makeDetail({
       events: [
-        { type: "user.message",          id: "e1", timestamp: "", data: { content: "go" } },
-        { type: "tool.execution_start",  id: "e2", timestamp: "", data: { content: "tool ran" } },
-        { type: "assistant.message",     id: "e3", timestamp: "", data: { content: "done" } },
+        {
+          type: "user.message",
+          id: "e1",
+          timestamp: "",
+          data: { content: "go" },
+        },
+        {
+          type: "tool.execution_start",
+          id: "e2",
+          timestamp: "",
+          data: { content: "tool ran" },
+        },
+        {
+          type: "assistant.message",
+          id: "e3",
+          timestamp: "",
+          data: { content: "done" },
+        },
       ],
     });
     const r = formatAsOpenAI(detail, {});
@@ -168,21 +241,46 @@ describe("formatAsOpenAI", () => {
   it("includes tool events when includeTools=true", () => {
     const detail = makeDetail({
       events: [
-        { type: "user.message",          id: "e1", timestamp: "", data: { content: "go" } },
-        { type: "tool.execution_start",  id: "e2", timestamp: "", data: { content: "tool ran" } },
-        { type: "assistant.message",     id: "e3", timestamp: "", data: { content: "done" } },
+        {
+          type: "user.message",
+          id: "e1",
+          timestamp: "",
+          data: { content: "go" },
+        },
+        {
+          type: "tool.execution_start",
+          id: "e2",
+          timestamp: "",
+          data: { content: "tool ran" },
+        },
+        {
+          type: "assistant.message",
+          id: "e3",
+          timestamp: "",
+          data: { content: "done" },
+        },
       ],
     });
     const r = formatAsOpenAI(detail, { includeTools: true });
     expect(JSON.stringify(r.messages)).toContain("tool ran");
-    expect(r.messages.filter(m => m.role === "user")).toHaveLength(1);
+    expect(r.messages.filter((m) => m.role === "user")).toHaveLength(1);
   });
 
   it("strips thinking blocks", () => {
     const detail = makeDetail({
       events: [
-        { type: "assistant.thinking",  id: "e1", timestamp: "", data: { content: "my thought" } },
-        { type: "assistant.message",   id: "e2", timestamp: "", data: { content: "my reply" } },
+        {
+          type: "assistant.thinking",
+          id: "e1",
+          timestamp: "",
+          data: { content: "my thought" },
+        },
+        {
+          type: "assistant.message",
+          id: "e2",
+          timestamp: "",
+          data: { content: "my reply" },
+        },
       ],
     });
     const r = formatAsOpenAI(detail, {});
@@ -193,9 +291,24 @@ describe("formatAsOpenAI", () => {
   it("skips events with empty content", () => {
     const detail = makeDetail({
       events: [
-        { type: "user.message",      id: "e1", timestamp: "", data: { content: "" } },
-        { type: "assistant.message", id: "e2", timestamp: "", data: { content: "   " } },
-        { type: "user.message",      id: "e3", timestamp: "", data: { content: "real" } },
+        {
+          type: "user.message",
+          id: "e1",
+          timestamp: "",
+          data: { content: "" },
+        },
+        {
+          type: "assistant.message",
+          id: "e2",
+          timestamp: "",
+          data: { content: "   " },
+        },
+        {
+          type: "user.message",
+          id: "e3",
+          timestamp: "",
+          data: { content: "real" },
+        },
       ],
     });
     const r = formatAsOpenAI(detail, {});
@@ -299,11 +412,16 @@ describe("parseExportArgs", () => {
 
   it("combined flags", () => {
     const a = parseExportArgs([
-      "--source", "claude-code",
-      "--from", "2025-06-01",
-      "--min-turns", "3",
-      "--format", "sharegpt",
-      "-o", "sft.jsonl",
+      "--source",
+      "claude-code",
+      "--from",
+      "2025-06-01",
+      "--min-turns",
+      "3",
+      "--format",
+      "sharegpt",
+      "-o",
+      "sft.jsonl",
     ]);
     expect(a.source).toBe("claude-code");
     expect(a.from).toBe("2025-06-01");
@@ -313,36 +431,86 @@ describe("parseExportArgs", () => {
   });
 });
 
-
 describe("tool export contract regressions", () => {
-  const detail = makeDetail({ events: [
-    { type: "user.message", id: "u", timestamp: "", data: { content: "go" } },
-    { type: "tool.execution_start", id: "t", timestamp: "", data: { content: "unique-tool-payload", tool: "bash" } },
-    { type: "assistant.message", id: "a", timestamp: "", data: { content: "done" } },
-  ] });
+  const detail = makeDetail({
+    events: [
+      { type: "user.message", id: "u", timestamp: "", data: { content: "go" } },
+      {
+        type: "tool.execution_start",
+        id: "t",
+        timestamp: "",
+        data: { content: "unique-tool-payload", tool: "bash" },
+      },
+      {
+        type: "assistant.message",
+        id: "a",
+        timestamp: "",
+        data: { content: "done" },
+      },
+    ],
+  });
   it("ShareGPT includes tool information when explicitly requested", () => {
-    expect(JSON.stringify(formatAsShareGPT(detail, { includeTools: true }).conversations)).toContain("unique-tool-payload");
+    expect(
+      JSON.stringify(
+        formatAsShareGPT(detail, { includeTools: true }).conversations
+      )
+    ).toContain("unique-tool-payload");
   });
   it("both formats exclude tools by default", () => {
-    expect(JSON.stringify(formatAsOpenAI(detail, {}).messages)).not.toContain("unique-tool-payload");
-    expect(JSON.stringify(formatAsShareGPT(detail, {}).conversations)).not.toContain("unique-tool-payload");
+    expect(JSON.stringify(formatAsOpenAI(detail, {}).messages)).not.toContain(
+      "unique-tool-payload"
+    );
+    expect(
+      JSON.stringify(formatAsShareGPT(detail, {}).conversations)
+    ).not.toContain("unique-tool-payload");
   });
 });
 
-
 it("exports tool arguments/results in order without changing conversation turn counts", () => {
-  const detail = makeDetail({ events: [
-    { type: "user.message", id: "u", timestamp: "", data: { content: "run" } },
-    { type: "tool.execution_start", id: "t", timestamp: "", data: { tool: "bash", arguments: { command: "pwd" } } },
-    { type: "tool.execution_complete", id: "r", timestamp: "", data: { output: "/project", success: true } },
-    { type: "assistant.message", id: "a", timestamp: "", data: { content: "done" } },
-  ] });
+  const detail = makeDetail({
+    events: [
+      {
+        type: "user.message",
+        id: "u",
+        timestamp: "",
+        data: { content: "run" },
+      },
+      {
+        type: "tool.execution_start",
+        id: "t",
+        timestamp: "",
+        data: { tool: "bash", arguments: { command: "pwd" } },
+      },
+      {
+        type: "tool.execution_complete",
+        id: "r",
+        timestamp: "",
+        data: { output: "/project", success: true },
+      },
+      {
+        type: "assistant.message",
+        id: "a",
+        timestamp: "",
+        data: { content: "done" },
+      },
+    ],
+  });
   const record = formatAsOpenAI(detail, { includeTools: true });
   expect(record.messages).toHaveLength(4);
   expect(record.messages[1].role).toBe("assistant");
-  expect(JSON.parse(record.messages[1].content.slice("[tool event] ".length))).toEqual({ type: "tool.execution_start", data: { tool: "bash", arguments: { command: "pwd" } } });
+  expect(
+    JSON.parse(record.messages[1].content.slice("[tool event] ".length))
+  ).toEqual({
+    type: "tool.execution_start",
+    data: { tool: "bash", arguments: { command: "pwd" } },
+  });
   expect(record.messages[2].content).toContain("/project");
   expect(record.session_quality.turn_count).toBe(1);
-  expect(formatAsShareGPT(detail, { includeTools: true }).conversations[2]).toEqual({ from: "gpt", value: record.messages[2].content });
-  expect(formatAsOpenAI(detail, {}).messages.map(m => m.content)).toEqual(["run", "done"]);
+  expect(
+    formatAsShareGPT(detail, { includeTools: true }).conversations[2]
+  ).toEqual({ from: "gpt", value: record.messages[2].content });
+  expect(formatAsOpenAI(detail, {}).messages.map((m) => m.content)).toEqual([
+    "run",
+    "done",
+  ]);
 });
