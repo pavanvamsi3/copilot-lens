@@ -45,6 +45,7 @@ if (process.env.VITEST !== "true") {
 
   Commands:
     (default)   Start the web dashboard
+    serve       Start the web dashboard
     tokens      Show token usage in the terminal (Ink TUI)
     export      Bulk-export sessions as NDJSON for SFT / fine-tuning
 
@@ -53,6 +54,7 @@ if (process.env.VITEST !== "true") {
     --port <n>  Port for the web dashboard (default: 3000)
     --host <h>  Host for the web dashboard (default: localhost)
     --open      Open the dashboard in your browser
+    --no-open   Suppress browser launch, overriding --open
 
   Run "copilot-lens tokens --help" for tokens command options.
   Run "copilot-lens export --help" for export command options.
