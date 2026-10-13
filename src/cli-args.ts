@@ -41,6 +41,6 @@ export function parseDashboardArgs(args: string[]): DashboardArgs {
   return {
     port,
     host: getArg(args, "--host", "localhost"),
-    shouldOpen: args.includes("--open"),
+    shouldOpen: args.includes("--open") && !args.includes("--no-open"),
   };
 }
