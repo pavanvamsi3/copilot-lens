@@ -98,6 +98,7 @@ nav {
 .nav-btn.active {
   color: var(--text);
   border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .refresh-btn {

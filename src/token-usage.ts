@@ -6,6 +6,23 @@ import { cachedCall, getCacheTtlMs } from "./cache";
 export type TokenSource = "copilot-cli" | "claude-code";
 export type TokenSourceFilter = "all" | TokenSource;
 
+// Approximate standard API USD rates per million tokens, checked 2026-10-13.
+// https://platform.claude.com/docs/en/about-claude/pricing
+// https://developers.openai.com/api/docs/models/gpt-4o
+// This excludes cache-write premiums, service tiers, and long-context surcharges.
+const MODEL_PRICING = new Map<
+  string,
+  { input: number; cached: number; output: number }
+>([
+  ["claude-sonnet-4", { input: 3, cached: 0.3, output: 15 }],
+  ["gpt-4o", { input: 2.5, cached: 1.25, output: 10 }],
+]);
+const PRICED_MODEL_ALIASES = new Map([
+  ["claude-sonnet-4-20250514", "claude-sonnet-4"],
+  ["gpt-4o-2024-08-06", "gpt-4o"],
+  ["gpt-4o-2024-11-20", "gpt-4o"],
+]);
+
 export interface TokenCall {
   timestamp: string;
   request_id: string;
@@ -48,6 +65,7 @@ export interface TokenUsageAnalytics {
     active_days: number;
     avg_per_day: number;
     top_model: string | null;
+    estimatedCostUSD: number | null;
   };
   byModel: Record<
     string,
@@ -257,8 +275,8 @@ function emptyBucket(
     completion_tokens: 0,
     total_tokens: 0,
     top_model: "",
-    models: {},
-    _models: {},
+    models: Object.create(null),
+    _models: Object.create(null),
   };
 }
 
@@ -389,6 +407,8 @@ function collectCopilotCli(): {
   const calls: TokenCall[] = [];
   for (const f of files) {
     try {
+      const stat = fs.statSync(f);
+      if (stat.size > 200 * 1024 * 1024) continue; // 200MB cap
       const content = fs.readFileSync(f, "utf-8");
       for (const c of parseLogContent(content)) calls.push(c);
     } catch {
@@ -424,7 +444,7 @@ export function aggregate(
   logsScanned: number,
   logsDir: string
 ): TokenUsageAnalytics {
-  const byModel: TokenUsageAnalytics["byModel"] = {};
+  const byModel: TokenUsageAnalytics["byModel"] = Object.create(null);
   let prompt = 0;
   let cached = 0;
   let completion = 0;
@@ -459,10 +479,25 @@ export function aggregate(
 
   let topModel: string | null = null;
   let topModelTokens = -1;
+  let estimatedCostUSD: number | null = 0;
   for (const [name, stats] of Object.entries(byModel)) {
     if (stats.total_tokens > topModelTokens) {
       topModelTokens = stats.total_tokens;
       topModel = name;
+    }
+    if (estimatedCostUSD !== null) {
+      const normalized = normalizeModelName(name).toLowerCase();
+      const rates = MODEL_PRICING.get(
+        PRICED_MODEL_ALIASES.get(normalized) ?? normalized
+      );
+      estimatedCostUSD = rates
+        ? estimatedCostUSD +
+          (Math.max(0, stats.prompt_tokens - stats.cached_tokens) *
+            rates.input +
+            stats.cached_tokens * rates.cached +
+            stats.completion_tokens * rates.output) /
+            1_000_000
+        : null;
     }
   }
 
@@ -477,6 +512,7 @@ export function aggregate(
       active_days: activeDays,
       avg_per_day: avgPerDay,
       top_model: topModel,
+      estimatedCostUSD,
     },
     byModel,
     daily,
@@ -489,9 +525,10 @@ export function aggregate(
   };
 }
 
-export function getTokenUsage(
-  source: TokenSourceFilter = "all"
-): TokenUsageAnalytics {
+function getTokenUsageData(source: TokenSourceFilter = "all"): {
+  analytics: TokenUsageAnalytics;
+  calls: TokenCall[];
+} {
   return cachedCall(`tokenUsage:${source}`, getCacheTtlMs(), () => {
     const cli = collectCopilotCli();
     const cc = collectClaudeCode();
@@ -532,6 +569,41 @@ export function getTokenUsage(
     const agg = aggregate(selected, logsScanned, logsDir);
     agg.source = source;
     agg.sources = sourcesSummary;
-    return agg;
+    return { analytics: agg, calls: selected };
   });
+}
+
+export function getTokenUsage(
+  source: TokenSourceFilter = "all"
+): TokenUsageAnalytics {
+  return getTokenUsageData(source).analytics;
+}
+
+function csvCell(value: string | number): string {
+  if (typeof value === "number") return String(value);
+  const text = /^\s*[=+\-@]/.test(value) ? "'" + value : value;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function* tokenCallsCsv(calls: TokenCall[]): Generator<string> {
+  yield "timestamp,model,source,prompt_tokens,completion_tokens,cached_tokens,total_tokens\r\n";
+  for (const call of calls) {
+    yield [
+      call.timestamp,
+      call.model,
+      call.source,
+      call.prompt_tokens,
+      call.completion_tokens,
+      call.cached_tokens,
+      call.total_tokens,
+    ]
+      .map(csvCell)
+      .join(",") + "\r\n";
+  }
+}
+
+export function getTokenUsageCsv(
+  source: TokenSourceFilter = "all"
+): Iterable<string> {
+  return tokenCallsCsv(getTokenUsageData(source).calls);
 }

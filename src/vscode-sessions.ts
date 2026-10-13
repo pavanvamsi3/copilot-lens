@@ -51,10 +51,14 @@ function readSessionIndex(dataDir: string): VSCodeSessionIndex[] {
 
   try {
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    const row = db
-      .prepare("SELECT value FROM ItemTable WHERE key = ?")
-      .get("chat.ChatSessionStore.index") as { value: unknown } | undefined;
-    db.close();
+    let row: { value: unknown } | undefined;
+    try {
+      row = db
+        .prepare("SELECT value FROM ItemTable WHERE key = ?")
+        .get("chat.ChatSessionStore.index") as { value: unknown } | undefined;
+    } finally {
+      db.close();
+    }
 
     if (!row) return [];
     const rawValue = row.value;
@@ -64,7 +68,19 @@ function readSessionIndex(dataDir: string): VSCodeSessionIndex[] {
     const data = JSON.parse(valueStr);
     const entries: Record<string, VSCodeSessionIndex> = data.entries || {};
     return Object.values(entries);
-  } catch {
+  } catch (error) {
+    const code =
+      error !== null && typeof error === "object" && "code" in error
+        ? error.code
+        : undefined;
+    if (
+      code === "EBUSY" ||
+      (typeof code === "string" && /^SQLITE_(BUSY|LOCKED)(?:_|$)/.test(code))
+    ) {
+      console.warn(
+        "[copilot-lens] VS Code database is locked — close VS Code or wait a moment and retry"
+      );
+    }
     return [];
   }
 }
