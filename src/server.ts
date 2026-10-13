@@ -115,7 +115,7 @@ export function createApp(options: AppOptions = {}) {
         limit,
         caseSensitive: req.query.caseSensitive === "true",
         offset,
-        source: source as "cli" | "vscode" | "all",
+        source: source as "cli" | "vscode" | "claude-code" | "cursor" | "all",
       });
 
       res.json(results);
@@ -192,6 +192,7 @@ export function createApp(options: AppOptions = {}) {
         "cli",
         "vscode",
         "claude-code",
+        "cursor",
       ];
       const raw =
         typeof req.query.source === "string" ? req.query.source : "all";

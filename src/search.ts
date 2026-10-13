@@ -2,7 +2,7 @@ import { SessionMeta, getSession } from "./sessions";
 
 export interface SearchEntry {
   id: string;
-  source: "cli" | "vscode" | "claude-code";
+  source: "cli" | "vscode" | "claude-code" | "cursor";
   title: string;
   cwd: string;
   date: string; // ISO string — updatedAt from SessionMeta
@@ -18,7 +18,7 @@ export interface SearchResult {
 export interface SearchOptions {
   limit?: number; // default 20
   offset?: number; // default 0, applied after ranking and source filtering
-  source?: "cli" | "vscode" | "claude-code" | "all"; // default 'all'
+  source?: "cli" | "vscode" | "claude-code" | "cursor" | "all"; // default 'all'
   caseSensitive?: boolean; // default false
 }
 
