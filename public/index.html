@@ -18,7 +18,7 @@
       <button class="nav-btn" data-page="insights">Insights</button>
       <button class="nav-btn" data-page="docs">Docs</button>
     </nav>
-    <button class="refresh-btn" id="refreshBtn" title="Refresh data">⟳ Refresh</button>
+    <button class="refresh-btn" id="refreshBtn" title="Refresh data"><span class="refresh-arrow">⟳</span> Refresh</button>
     <button class="refresh-btn" id="themeToggle" title="Toggle light/dark mode">☀️</button>
   </header>
 
@@ -58,6 +58,7 @@
         <div class="list-pane">
           <div class="search-bar-wrap">
             <span class="search-icon">🔍</span>
+            <span class="search-spinner" id="searchSpinner"></span>
             <input
               type="text"
               id="searchInput"

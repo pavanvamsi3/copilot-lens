@@ -1,5 +1,7 @@
 # Copilot Lens 👓
 
+[![CI](https://github.com/pavanvamsi3/copilot-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/pavanvamsi3/copilot-lens/actions/workflows/ci.yml)
+
 **Your Copilot history has answers. Now you can actually find them.**
 
 A local memory layer for AI coding assistants. Search and browse everything you've ever discussed with Copilot CLI, VS Code Copilot Chat, or Claude Code. All on your machine. No cloud, no sign-in.

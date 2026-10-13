@@ -13,4 +13,7 @@ Thumbs.db
 # Coverage
 coverage/
 
-.claude/
+.claude/projects/
+.claude/settings.local.json
+.claude/CLAUDE.local.md
+.claude/todos
