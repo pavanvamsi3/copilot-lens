@@ -10,6 +10,8 @@ A local memory layer for AI coding assistants. Search and browse everything you'
 
 ## Install
 
+Copilot Lens requires Node.js 20 or later.
+
 ```bash
 npx copilot-lens --open
 ```
@@ -135,6 +137,7 @@ VS Code Insiders is supported. Pasted images are stripped; files over 200MB are 
 ```bash
 git clone https://github.com/pavanvamsi3/copilot-lens.git
 cd copilot-lens
+nvm install        # Installs and activates the Node.js version from .nvmrc
 npm install
 npm run dev        # tsx, no build step
 npm run build
