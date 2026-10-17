@@ -62,7 +62,7 @@ integers. Invalid or repeated pagination parameters return HTTP 400 with an
 - **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
 - **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
 - **Effectiveness Score**: 0 to 100 score per repo with improvement tips
-- **Export**: single-session OpenAI-style chat JSONL, suitable as SFT data
+- **Export**: single-session OpenAI-style chat JSONL, suitable as SFT data, or a human-readable Markdown transcript with full messages and session metadata
 
 For case-sensitive API queries, use `/api/search?q=HTTPServer&caseSensitive=true`.
 This preserves case when matching query tokens against message content, titles,

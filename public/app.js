@@ -302,6 +302,82 @@ function renderSessions() {
   });
 }
 
+function escapeMarkdownInline(value) {
+  return String(value ?? "—")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/([\\`*_{}\[\]<>|])/g, "\\$1");
+}
+
+function buildSessionMarkdown(session) {
+  const models = new Set();
+  for (const event of session.events) {
+    if (
+      event.type === "session.start" ||
+      event.type === "assistant.turn_start" ||
+      event.type === "assistant.message"
+    ) {
+      if (event.data?.model) models.add(event.data.model);
+    } else if (event.type === "session.model_change" && event.data?.newModel) {
+      models.add(event.data.newModel);
+    } else if (
+      event.type === "session.info" &&
+      event.data?.infoType === "model"
+    ) {
+      const match = (event.data.message || "").match(
+        /Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i
+      );
+      if (match) models.add(match[1]);
+    }
+  }
+  const date = new Date(session.createdAt);
+  const duration =
+    Number.isFinite(session.duration) && session.duration >= 0
+      ? formatDuration(session.duration)
+      : "—";
+  const messages = session.events
+    .filter(
+      (event) =>
+        (event.type === "user.message" || event.type === "assistant.message") &&
+        typeof event.data?.content === "string" &&
+        event.data.content.trim()
+    )
+    .map((event) => {
+      const content = event.data.content.replace(/\r\n?/g, "\n");
+      return event.type === "user.message"
+        ? "> **User:** " + content.split("\n").join("\n> ")
+        : "**Assistant:**\n\n" + content;
+    });
+  return (
+    [
+      `# Session: ${escapeMarkdownInline(session.id)}`,
+      `**Date:** ${Number.isNaN(date.getTime()) ? "—" : date.toISOString()} | **Model:** ${escapeMarkdownInline([...models].join(", ") || "—")} | **Duration:** ${duration}`,
+      "---",
+      messages.length
+        ? messages.join("\n\n---\n\n")
+        : "No messages in this session.",
+    ].join("\n\n") + "\n"
+  );
+}
+
+function downloadSessionMarkdown(session) {
+  const blob = new Blob([buildSessionMarkdown(session)], {
+    type: "text/markdown;charset=utf-8",
+  });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  const id = String(session.id).replace(/[^a-zA-Z0-9_-]/g, "_") || "unknown";
+  link.download = `session-${id}.md`;
+  try {
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    // Let the browser start the download before releasing the object URL.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+}
+
 // Open session detail — side panel
 async function openDetail(id, source) {
   clearSelectedCard();
@@ -415,7 +491,10 @@ function renderDetail(s) {
     <div class="detail-header">
       <div class="detail-title-row">
         <h2>${escapeHtml(s.title || shortDir(s.cwd) || s.id)}</h2>
-        <a class="export-btn" href="/api/sessions/${encodeURIComponent(s.id)}/export" download title="Download this conversation as OpenAI-style chat JSONL (training format)">⬇ Export JSONL</a>
+        <div class="detail-export-actions">
+          <a class="export-btn" href="/api/sessions/${encodeURIComponent(s.id)}/export" download title="Download this conversation as OpenAI-style chat JSONL (training format)">⬇ Export JSONL</a>
+          <button class="export-btn" id="exportMarkdownBtn" type="button" title="Download the full user and assistant transcript">⬇ Export as Markdown</button>
+        </div>
       </div>
       <div class="detail-meta">
         <div><span>Source:</span> <strong class="badge ${s.source === "vscode" ? "badge-vscode" : s.source === "claude-code" ? "badge-claude" : "badge-cli"}">${s.source === "vscode" ? "VS Code" : s.source === "claude-code" ? "Claude Code" : "Copilot CLI"}</strong></div>
@@ -427,6 +506,8 @@ function renderDetail(s) {
         <div><span>Status:</span> <strong class="badge badge-${s.status}">${s.status === "running" ? "● Running" : s.status === "error" ? "✕ Error" : "✓ Completed"}</strong></div>
       </div>
     </div>
+
+    <p id="markdownExportStatus" class="error-message" role="status" hidden></p>
 
     <div class="event-counts" style="margin-bottom:16px">
       ${Object.entries(s.eventCounts)
@@ -470,6 +551,41 @@ function renderDetail(s) {
 
     ${s.planContent ? `<div class="detail-panel" id="panel-plan"><div class="plan-content">${escapeHtml(s.planContent)}</div></div>` : ""}
   `;
+
+  detailContent
+    .querySelector("#exportMarkdownBtn")
+    .addEventListener("click", async (event) => {
+      const status = detailContent.querySelector("#markdownExportStatus");
+      const button = event.currentTarget;
+      status.hidden = true;
+      status.textContent = "";
+      button.disabled = true;
+      try {
+        let exportSession = s;
+        if (s.source === "vscode") {
+          try {
+            const response = await fetch(
+              `/api/sessions/${encodeURIComponent(s.id)}/export-source`
+            );
+            if (!response.ok) {
+              throw new Error(
+                `Could not load full transcript (${response.status})`
+              );
+            }
+            exportSession = await response.json();
+          } catch (error) {
+            status.textContent = `Exported the loaded transcript; full VS Code text could not be reloaded (${error.message}). Long prompts may be truncated.`;
+            status.hidden = false;
+          }
+        }
+        downloadSessionMarkdown(exportSession);
+      } catch (error) {
+        status.textContent = `Export failed: ${error.message}`;
+        status.hidden = false;
+      } finally {
+        button.disabled = false;
+      }
+    });
 
   // Tab switching
   detailContent.querySelectorAll(".detail-tab").forEach((tab) => {

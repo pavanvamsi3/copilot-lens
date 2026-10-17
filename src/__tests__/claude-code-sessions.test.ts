@@ -359,6 +359,44 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
     expect(toolEvents[1].data.tool).toBe("read");
   });
 
+  it("preserves the model on an assistant turn without text content", () => {
+    writeSession("sess-model-only", [
+      makeEvent({
+        type: "assistant",
+        uuid: "assistant-event",
+        isSidechain: false,
+        sessionId: "sess-model-only",
+        cwd: "/proj",
+        timestamp: "2024-01-15T10:00:05Z",
+        message: {
+          model: "claude-sonnet-4-6",
+          content: [
+            { type: "thinking", thinking: "still working" },
+            {
+              type: "tool_use",
+              id: "tool-1",
+              name: "bash",
+              input: { cmd: "ls" },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const detail = getClaudeCodeSession("sess-model-only");
+    const turnStart = detail!.events.find(
+      (event) => event.type === "assistant.turn_start"
+    );
+
+    expect(turnStart).toMatchObject({
+      id: "turn-assistant-event",
+      data: { model: "claude-sonnet-4-6" },
+    });
+    expect(
+      detail!.events.some((event) => event.type === "assistant.message")
+    ).toBe(false);
+  });
+
   it("getClaudeCodeSession skips isSidechain events", () => {
     writeSession("sess-4", [
       makeEvent({

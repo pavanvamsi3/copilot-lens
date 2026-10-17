@@ -148,11 +148,29 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 
+  // API: Load an untruncated session for client-side transcript exports.
+  app.get("/api/sessions/:id/export-source", (req, res) => {
+    try {
+      const session = getSession(req.params.id, {
+        preserveFullVSCodeText: true,
+      });
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      res.json(session);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API: Export a session as OpenAI-style chat JSONL (one line per conversation).
   // Suitable as SFT training data.
   app.get("/api/sessions/:id/export", (req, res) => {
     try {
-      const session = getSession(req.params.id);
+      const session = getSession(req.params.id, {
+        preserveFullVSCodeText: true,
+      });
       if (!session) {
         res.status(404).json({ error: "Session not found" });
         return;

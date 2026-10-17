@@ -553,6 +553,7 @@ select:focus {
 
 .detail-title-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -562,6 +563,14 @@ select:focus {
 .detail-title-row h2 {
   margin-bottom: 0;
   flex: 1;
+  min-width: 0;
+}
+
+.detail-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
 }
 
 .export-btn {
@@ -571,13 +580,16 @@ select:focus {
   color: var(--text-dim);
   border-radius: var(--radius);
   font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
   transition: all 0.15s;
   flex-shrink: 0;
 }
 
-.export-btn:hover {
+.export-btn:hover,
+.export-btn:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
 }
