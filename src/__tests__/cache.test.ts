@@ -11,6 +11,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
 });
 
@@ -71,6 +72,24 @@ describe("cachedCall", () => {
     const result = cachedCall("expire-test", 1000, fn);
     expect(result).toBe(2); // fn called again
     expect(callCount).toBe(2);
+  });
+
+  it.each([
+    ["keeps an entry valid one millisecond before the TTL", 999, 1],
+    ["expires an entry exactly at the TTL", 1000, 2],
+    ["expires an entry one millisecond after the TTL", 1001, 2],
+  ])("%s", (_description, elapsedMs, expectedValue) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+
+    let callCount = 0;
+    const fn = () => ++callCount;
+    expect(cachedCall("boundary", 1000, fn)).toBe(1);
+
+    vi.advanceTimersByTime(elapsedMs);
+
+    expect(cachedCall("boundary", 1000, fn)).toBe(expectedValue);
+    expect(callCount).toBe(expectedValue);
   });
 
   it("uses separate keys for different caches", () => {
