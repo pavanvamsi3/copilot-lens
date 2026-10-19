@@ -10,6 +10,8 @@ A local memory layer for AI coding assistants. Search and browse everything you'
 
 ## Install
 
+Copilot Lens requires Node.js 20 or later.
+
 ```bash
 npx copilot-lens --open
 ```
@@ -55,6 +57,13 @@ to `0` and accepts non-negative safe integers. Query values must be decimal
 integers. Invalid or repeated pagination parameters return HTTP 400 with an
 `error` message. Offsets beyond the last match return an empty array.
 
+Add `includeTotal=true` to receive `{ "results": [...], "totalMatches": N }`.
+The total counts all query/source/case-sensitive matches before `offset` and
+`limit` are applied, so an offset beyond the last match can have empty results
+with a positive total. Individual result objects keep their existing shape.
+Requests without this option retain the array response. The dashboard requests
+the total and displays how many matching results are currently shown.
+
 ## Features
 
 - **Search**: full-text across every session, with source/date/directory filters
@@ -62,7 +71,7 @@ integers. Invalid or repeated pagination parameters return HTTP 400 with an
 - **Analytics**: eight charts covering daily activity, hour-of-day, tools, models, top directories, time per branch/repo, and MCP servers
 - **Tokens**: real API-reported token usage parsed from local logs, with daily/weekly/monthly views, model breakdown, and an estimated upstream API cost
 - **Effectiveness Score**: 0 to 100 score per repo with improvement tips
-- **Export**: single-session or bulk NDJSON export in OpenAI or ShareGPT format with date/source/repo/turn filters and a per-session quality score — ready for SFT with TRL, Axolotl, or OpenAI fine-tuning API
+- **Export**: single-session or bulk NDJSON export in OpenAI or ShareGPT format with date/source/repo/turn filters and a per-session quality score (ready for SFT with TRL, Axolotl, or OpenAI fine-tuning API), plus all session metadata as JSON for a local backup
 
 For case-sensitive API queries, use `/api/search?q=HTTPServer&caseSensitive=true`.
 This preserves case when matching query tokens against message content, titles,
@@ -109,6 +118,15 @@ premiums, long-context surcharges, service tiers, and other fees are excluded,
 so this is an approximate API reference cost, not a Copilot bill. The dashboard
 has a separate, broader pricing table and can show a partially priced estimate.
 
+### Sessions metadata backup
+
+Use **Export All (JSON)** on the Sessions page to download `sessions.json`.
+The file contains all parsed session metadata across sources, including IDs,
+titles, working directories, timestamps, and status, regardless of the current
+display filters. Conversation messages remain available through the existing
+per-session JSONL export. The metadata download is also available at
+`GET /api/sessions/export`.
+
 ### Token usage CSV export
 
 Download `/api/token-usage?format=csv` to analyse individual calls in a spreadsheet.
@@ -135,6 +153,7 @@ VS Code Insiders is supported. Pasted images are stripped; files over 200MB are 
 ```bash
 git clone https://github.com/pavanvamsi3/copilot-lens.git
 cd copilot-lens
+nvm install        # Installs and activates the Node.js version from .nvmrc
 npm install
 npm run dev        # tsx, no build step
 npm run build

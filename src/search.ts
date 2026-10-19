@@ -15,6 +15,11 @@ export interface SearchResult {
   highlights: string[]; // up to 3 snippets, ±60 chars around match, trimmed to word boundaries
 }
 
+export interface SearchPage {
+  results: SearchResult[];
+  totalMatches: number;
+}
+
 export interface SearchOptions {
   limit?: number; // default 20
   offset?: number; // default 0, applied after ranking and source filtering
@@ -65,14 +70,22 @@ export class SearchIndex {
   private signature = "";
   private skippedWarning = "";
 
-  // A cheap fingerprint of the session set. Changes when sessions are added,
-  // removed, or updated, so the index can detect when it has gone stale.
+  // Include each session's identity, update time, and searchable metadata.
+  // Sorting avoids rebuilding when only the session enumeration order changes.
   private computeSignature(sessions: SessionMeta[]): string {
-    let latest = "";
-    for (const s of sessions) {
-      if (s.updatedAt > latest) latest = s.updatedAt;
-    }
-    return `${sessions.length}:${latest}`;
+    return JSON.stringify(
+      sessions
+        .map((meta) =>
+          JSON.stringify([
+            meta.source,
+            meta.id,
+            meta.updatedAt,
+            meta.title || meta.id,
+            meta.cwd || "",
+          ])
+        )
+        .sort()
+    );
   }
 
   buildIndex(sessions: SessionMeta[]): void {
@@ -142,20 +155,24 @@ export class SearchIndex {
   }
 
   search(query: string, options?: SearchOptions): SearchResult[] {
-    if (!query || !query.trim()) return [];
+    return this.searchPage(query, options).results;
+  }
+
+  searchPage(query: string, options?: SearchOptions): SearchPage {
+    if (!query || !query.trim()) return { results: [], totalMatches: 0 };
 
     // Lazy build: only build if entries is empty
     if (this.entries.length === 0) {
       if (this.storedSessions) {
         this.buildIndex(this.storedSessions);
       } else {
-        return [];
+        return { results: [], totalMatches: 0 };
       }
     }
 
     const caseSensitive = options?.caseSensitive ?? false;
     const tokens = tokenize(query, caseSensitive);
-    if (tokens.length === 0) return [];
+    if (tokens.length === 0) return { results: [], totalMatches: 0 };
 
     const limit = options?.limit ?? 20;
     const offset = options?.offset ?? 0;
@@ -211,7 +228,10 @@ export class SearchIndex {
     }
 
     results.sort((a, b) => b.score - a.score);
-    return results.slice(offset, offset + limit);
+    return {
+      results: results.slice(offset, offset + limit),
+      totalMatches: results.length,
+    };
   }
 
   private extractHighlights(

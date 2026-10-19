@@ -892,6 +892,42 @@ async function loadSessions() {
   }
 }
 
+// Download all session metadata without changing the displayed sessions.
+async function exportAllSessions() {
+  const button = document.getElementById("exportSessionsBtn");
+  const status = document.getElementById("sessionExportStatus");
+  button.disabled = true;
+  status.hidden = true;
+  status.textContent = "";
+  try {
+    const response = await fetch("/api/sessions/export");
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status}`);
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sessions.json";
+    link.hidden = true;
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+  } catch (error) {
+    status.textContent = `Export failed: ${error.message}`;
+    status.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document
+  .getElementById("exportSessionsBtn")
+  .addEventListener("click", exportAllSessions);
+
 // Search kbd visibility
 function updateSearchKbd() {
   if (!searchKbd) return;
@@ -1131,13 +1167,17 @@ async function runSearch(q) {
   if (searchWrap) searchWrap.classList.add("loading");
   try {
     const res = await fetch(
-      `/api/search?q=${encodeURIComponent(q)}&source=all&limit=20`
+      `/api/search?q=${encodeURIComponent(q)}&source=all&limit=20&includeTotal=true`
     );
-    const results = await res.json();
+    const page = await res.json();
+    if (!res.ok) {
+      throw new Error(page.error || `Search request failed (${res.status})`);
+    }
     isSearchActive = true;
-    renderSearchResults(results);
+    renderSearchResults(page.results, page.totalMatches);
   } catch (err) {
     isSearchActive = true;
+    sessionCount.textContent = "Search failed";
     sessionList.innerHTML = `<div class="error-message">Search failed: ${escapeHtml(err.message)}</div>`;
   } finally {
     if (searchWrap) searchWrap.classList.remove("loading");
@@ -1149,7 +1189,7 @@ function clearSearch() {
   renderSessions();
 }
 
-function renderSearchResults(results) {
+function renderSearchResults(results, totalMatches = results?.length ?? 0) {
   const query = searchInput.value.trim();
   if (!results || results.length === 0) {
     sessionCount.textContent = "No results found";
@@ -1162,7 +1202,10 @@ function renderSearchResults(results) {
     return;
   }
 
-  sessionCount.textContent = `${results.length} result${results.length !== 1 ? "s" : ""} found`;
+  sessionCount.textContent =
+    totalMatches > results.length
+      ? `${results.length} of ${totalMatches} results shown`
+      : `${results.length} result${results.length !== 1 ? "s" : ""} found`;
 
   sessionList.innerHTML = results
     .map(({ entry, highlights }) => {

@@ -281,6 +281,27 @@ select:focus {
   margin-bottom: 12px;
 }
 
+.sessions-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sessions-toolbar .session-count {
+  margin-bottom: 0;
+}
+
+.sessions-toolbar .export-btn {
+  cursor: pointer;
+}
+
+.sessions-toolbar .export-btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 /* Session List */
 .session-list {
   display: flex;

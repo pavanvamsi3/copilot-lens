@@ -144,7 +144,24 @@
                 <option value="all">All Directories</option>
               </select>
             </div>
-            <div id="sessionCount" class="session-count"></div>
+            <div class="sessions-toolbar">
+              <div id="sessionCount" class="session-count"></div>
+              <button
+                id="exportSessionsBtn"
+                class="export-btn"
+                type="button"
+                title="Download all session metadata, including sessions outside the current filters"
+              >
+                ⬇ Export All (JSON)
+              </button>
+            </div>
+            <div
+              id="sessionExportStatus"
+              class="error-message"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></div>
             <div id="sessionList" class="session-list"></div>
           </div>
           <div class="detail-pane" id="detailPane">

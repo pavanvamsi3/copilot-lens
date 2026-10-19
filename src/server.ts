@@ -94,6 +94,7 @@ export function createApp(options: AppOptions = {}) {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const source =
         typeof req.query.source === "string" ? req.query.source : "all";
+      const includeTotal = req.query.includeTotal === "true";
       const limit = parseSearchInteger(req.query.limit, 20, 1, 100);
       const offset = parseSearchInteger(req.query.offset, 0, 0);
       if (limit === null) {
@@ -107,19 +108,21 @@ export function createApp(options: AppOptions = {}) {
           .json({ error: "offset must be a non-negative safe integer" });
       }
 
-      if (!q) return res.json([]);
+      if (!q) {
+        return res.json(includeTotal ? { results: [], totalMatches: 0 } : []);
+      }
 
       const sessions = listSessions();
       searchIndex.buildIndex(sessions);
 
-      const results = searchIndex.search(q, {
+      const page = searchIndex.searchPage(q, {
         limit,
         caseSensitive: req.query.caseSensitive === "true",
         offset,
         source: source as "cli" | "vscode" | "all",
       });
 
-      res.json(results);
+      res.json(includeTotal ? page : page.results);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -129,6 +132,18 @@ export function createApp(options: AppOptions = {}) {
   app.get("/api/sessions", (_req, res) => {
     try {
       const sessions = listSessions();
+      res.json(sessions);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: Download all session metadata independently of dashboard filters.
+  // Register before /:id so "export" is not treated as a session identifier.
+  app.get("/api/sessions/export", (_req, res) => {
+    try {
+      const sessions = listSessions();
+      res.attachment("sessions.json");
       res.json(sessions);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
