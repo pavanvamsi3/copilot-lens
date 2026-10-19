@@ -8,12 +8,20 @@ import {
 } from "../semantic-search";
 import type { SearchEntry } from "../search";
 
-const { tokenizeForVector, textFromEntry, magnitude, cosineSimilarity } = _testing;
+const { tokenizeForVector, textFromEntry, magnitude, cosineSimilarity } =
+  _testing;
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
 function makeEntry(id: string, title: string, content: string[]): SearchEntry {
-  return { id, source: "cli", title, cwd: "/project", date: "2024-01-01", content };
+  return {
+    id,
+    source: "cli",
+    title,
+    cwd: "/project",
+    date: "2024-01-01",
+    content,
+  };
 }
 
 // ─── tokenizeForVector ──────────────────────────────────────────────────────
@@ -186,7 +194,9 @@ describe("buildVector", () => {
     const queryVec = buildVector("typescript errors", corpus);
     const v1 = buildVector(textFromEntry(entries[0]), corpus);
     const v2 = buildVector(textFromEntry(entries[1]), corpus);
-    expect(cosineSimilarity(queryVec, v1)).toBeGreaterThan(cosineSimilarity(queryVec, v2));
+    expect(cosineSimilarity(queryVec, v1)).toBeGreaterThan(
+      cosineSimilarity(queryVec, v2)
+    );
   });
 });
 
@@ -195,7 +205,10 @@ describe("buildVector", () => {
 describe("SemanticIndex", () => {
   let index: SemanticIndex;
   const entries: SearchEntry[] = [
-    makeEntry("s1", "TypeScript compiler", ["fix type errors", "interface mismatch"]),
+    makeEntry("s1", "TypeScript compiler", [
+      "fix type errors",
+      "interface mismatch",
+    ]),
     makeEntry("s2", "React components", ["useState hook", "prop types"]),
     makeEntry("s3", "database queries", ["SQL join", "index optimization"]),
   ];
@@ -290,31 +303,58 @@ describe("blendResults", () => {
   const e3 = makeEntry("s3", "database", []);
 
   it("result in both lists gets matchType=hybrid", () => {
-    const kw = [{ entry: e1, score: 10, highlights: ["ts"], matchType: "keyword" as const }];
-    const sem = [{ entry: e1, score: 0.8, highlights: [], matchType: "semantic" as const }];
+    const kw = [
+      {
+        entry: e1,
+        score: 10,
+        highlights: ["ts"],
+        matchType: "keyword" as const,
+      },
+    ];
+    const sem = [
+      { entry: e1, score: 0.8, highlights: [], matchType: "semantic" as const },
+    ];
     const out = blendResults(kw, sem, 10);
     const r = out.find((r) => r.entry.id === "s1");
     expect(r?.matchType).toBe("hybrid");
   });
 
   it("result only in keyword list keeps keyword matchType", () => {
-    const kw = [{ entry: e1, score: 10, highlights: ["ts"], matchType: "keyword" as const }];
-    const sem = [{ entry: e2, score: 0.8, highlights: [], matchType: "semantic" as const }];
+    const kw = [
+      {
+        entry: e1,
+        score: 10,
+        highlights: ["ts"],
+        matchType: "keyword" as const,
+      },
+    ];
+    const sem = [
+      { entry: e2, score: 0.8, highlights: [], matchType: "semantic" as const },
+    ];
     const out = blendResults(kw, sem, 10);
     const r = out.find((r) => r.entry.id === "s1");
     expect(r?.matchType).toBe("keyword");
   });
 
   it("result only in semantic list keeps semantic matchType", () => {
-    const kw = [{ entry: e1, score: 10, highlights: [], matchType: "keyword" as const }];
-    const sem = [{ entry: e2, score: 0.8, highlights: [], matchType: "semantic" as const }];
+    const kw = [
+      { entry: e1, score: 10, highlights: [], matchType: "keyword" as const },
+    ];
+    const sem = [
+      { entry: e2, score: 0.8, highlights: [], matchType: "semantic" as const },
+    ];
     const out = blendResults(kw, sem, 10);
     const r = out.find((r) => r.entry.id === "s2");
     expect(r?.matchType).toBe("semantic");
   });
 
   it("respects limit", () => {
-    const kw = [e1, e2, e3].map((e, i) => ({ entry: e, score: 10 - i, highlights: [], matchType: "keyword" as const }));
+    const kw = [e1, e2, e3].map((e, i) => ({
+      entry: e,
+      score: 10 - i,
+      highlights: [],
+      matchType: "keyword" as const,
+    }));
     const sem: typeof kw = [];
     expect(blendResults(kw, sem, 2).length).toBe(2);
   });
@@ -334,14 +374,18 @@ describe("blendResults", () => {
   });
 
   it("handles empty keyword list", () => {
-    const sem = [{ entry: e1, score: 0.8, highlights: [], matchType: "semantic" as const }];
+    const sem = [
+      { entry: e1, score: 0.8, highlights: [], matchType: "semantic" as const },
+    ];
     const out = blendResults([], sem, 10);
     expect(out.length).toBe(1);
     expect(out[0].matchType).toBe("semantic");
   });
 
   it("handles empty semantic list", () => {
-    const kw = [{ entry: e1, score: 5, highlights: [], matchType: "keyword" as const }];
+    const kw = [
+      { entry: e1, score: 5, highlights: [], matchType: "keyword" as const },
+    ];
     const out = blendResults(kw, [], 10);
     expect(out.length).toBe(1);
     expect(out[0].matchType).toBe("keyword");
@@ -356,16 +400,16 @@ describe("semantic index refresh regressions", () => {
   it("indexes added sessions and drops deleted sessions on refresh", () => {
     const index = new SemanticIndex();
     index.build([makeEntry("old", "orchard", [])]);
-    expect(index.search("orchard").map(r => r.entry.id)).toEqual(["old"]);
+    expect(index.search("orchard").map((r) => r.entry.id)).toEqual(["old"]);
     index.build([makeEntry("new", "telescope", [])]);
-    expect(index.search("telescope").map(r => r.entry.id)).toEqual(["new"]);
+    expect(index.search("telescope").map((r) => r.entry.id)).toEqual(["new"]);
     expect(index.search("orchard")).toEqual([]);
   });
   it("updates changed content even when the session count and IDs are unchanged", () => {
     const index = new SemanticIndex();
     index.build([makeEntry("same", "orchard", [])]);
     index.build([makeEntry("same", "telescope", [])]);
-    expect(index.search("telescope").map(r => r.entry.id)).toEqual(["same"]);
+    expect(index.search("telescope").map((r) => r.entry.id)).toEqual(["same"]);
     expect(index.search("orchard")).toEqual([]);
   });
   it("clears search results when all sessions are removed", () => {

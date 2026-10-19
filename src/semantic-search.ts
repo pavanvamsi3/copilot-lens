@@ -83,7 +83,8 @@ export function buildVector(text: string, corpus: TfIdfCorpus): Float32Array {
 
 // ============ SemanticIndex ============
 
-export type SemanticSourceFilter = "cli" | "vscode" | "claude-code" | "cursor" | "all";
+export type SemanticSourceFilter =
+  "cli" | "vscode" | "claude-code" | "cursor" | "all";
 
 export interface SemanticSearchOptions {
   limit?: number;
@@ -106,7 +107,10 @@ export class SemanticIndex {
     this.entries = entries;
     this.corpus = buildCorpus(entries);
     for (const entry of entries) {
-      this.docVectors.set(entry.id, buildVector(textFromEntry(entry), this.corpus));
+      this.docVectors.set(
+        entry.id,
+        buildVector(textFromEntry(entry), this.corpus)
+      );
     }
   }
 

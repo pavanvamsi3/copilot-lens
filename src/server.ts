@@ -1,10 +1,23 @@
 import express from "express";
 import path from "path";
-import { listSessions, getSession, getAnalytics, listReposWithScores, getRepoScore, getVSCodeScore, type AnalyticsSourceFilter } from "./sessions";
+import { Readable, pipeline } from "stream";
+import {
+  listSessions,
+  getSession,
+  getAnalytics,
+  listReposWithScores,
+  getRepoScore,
+  getVSCodeScore,
+  type AnalyticsSourceFilter,
+} from "./sessions";
 import { clearCache } from "./cache";
-import { SearchIndex, type SearchMode } from "./search";
+import { SearchIndex, type SearchMode, type SearchOptions } from "./search";
 import { SemanticIndex, blendResults } from "./semantic-search";
-import { getTokenUsage, type TokenSourceFilter } from "./token-usage";
+import {
+  getTokenUsage,
+  getTokenUsageCsv,
+  type TokenSourceFilter,
+} from "./token-usage";
 
 export interface AppOptions {
   // The host the server binds to. Used to build the allowed-Host list so a
@@ -41,6 +54,20 @@ function hostGuard(configuredHost?: string): express.RequestHandler {
   };
 }
 
+function parseSearchInteger(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number = Number.MAX_SAFE_INTEGER
+): number | null {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max
+    ? parsed
+    : null;
+}
+
 export function createApp(options: AppOptions = {}) {
   const app = express();
   app.use(hostGuard(options.host));
@@ -48,7 +75,18 @@ export function createApp(options: AppOptions = {}) {
   const searchIndex = new SearchIndex();
   const semanticIndex = new SemanticIndex();
 
+  // Read the package version once when the app is created, not per request.
+  const { version: appVersion } = require("../package.json") as {
+    version: string;
+  };
+
+  // API: Health check
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ status: "ok", version: appVersion });
+  });
+
   // Serve static frontend files
+
   app.use(express.static(path.join(__dirname, "..", "public")));
 
   // API: Full-text / semantic / hybrid search
@@ -59,33 +97,63 @@ export function createApp(options: AppOptions = {}) {
   app.get("/api/search", async (req, res) => {
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-      const source = typeof req.query.source === "string" ? req.query.source : "all";
-      const limit = parseInt(req.query.limit as string) || 20;
-      const rawMode = typeof req.query.mode === "string" ? req.query.mode : "keyword";
-      const mode: SearchMode = (rawMode === "semantic" || rawMode === "hybrid") ? rawMode : "keyword";
+      const source =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const includeTotal = req.query.includeTotal === "true";
+      const limit = parseSearchInteger(req.query.limit, 20, 1, 100);
+      const offset = parseSearchInteger(req.query.offset, 0, 0);
+      if (limit === null) {
+        return res
+          .status(400)
+          .json({ error: "limit must be an integer between 1 and 100" });
+      }
+      if (offset === null) {
+        return res
+          .status(400)
+          .json({ error: "offset must be a non-negative safe integer" });
+      }
+      const rawMode =
+        typeof req.query.mode === "string" ? req.query.mode : "keyword";
+      const mode: SearchMode =
+        rawMode === "semantic" || rawMode === "hybrid" ? rawMode : "keyword";
 
-      if (!q) return res.json([]);
+      if (!q) {
+        return res.json(includeTotal ? { results: [], totalMatches: 0 } : []);
+      }
 
       const sessions = listSessions();
       searchIndex.buildIndex(sessions);
 
-      const sourceOpt = source as "cli" | "vscode" | "claude-code" | "cursor" | "all";
+      const sourceOpt = source as SearchOptions["source"];
 
       if (mode === "keyword") {
-        return res.json(searchIndex.search(q, { limit, source: sourceOpt }));
+        const page = searchIndex.searchPage(q, {
+          limit,
+          caseSensitive: req.query.caseSensitive === "true",
+          offset,
+          source: sourceOpt,
+        });
+        return res.json(includeTotal ? page : page.results);
       }
 
-      // semantic or hybrid — build the semantic index lazily from keyword entries
+      // semantic or hybrid: build the semantic index lazily from keyword
+      // entries, rank every match, then apply offset/limit so pagination and
+      // totalMatches behave as they do for keyword search.
       semanticIndex.build(searchIndex.getEntries());
-
-      if (mode === "semantic") {
-        return res.json(semanticIndex.search(q, { limit, source: sourceOpt }));
-      }
-
-      // hybrid: blend keyword (60%) + semantic (40%)
-      const kwResults = searchIndex.search(q, { limit: limit * 2, source: sourceOpt });
-      const semResults = semanticIndex.search(q, { limit: limit * 2, source: sourceOpt });
-      return res.json(blendResults(kwResults, semResults, limit));
+      const all = Number.MAX_SAFE_INTEGER;
+      const ranked =
+        mode === "semantic"
+          ? semanticIndex.search(q, { limit: all, source: sourceOpt })
+          : // hybrid: blend keyword (60%) + semantic (40%)
+            blendResults(
+              searchIndex.search(q, { limit: all, source: sourceOpt }),
+              semanticIndex.search(q, { limit: all, source: sourceOpt }),
+              all
+            );
+      const results = ranked.slice(offset, offset + limit);
+      return res.json(
+        includeTotal ? { results, totalMatches: ranked.length } : results
+      );
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -95,6 +163,18 @@ export function createApp(options: AppOptions = {}) {
   app.get("/api/sessions", (_req, res) => {
     try {
       const sessions = listSessions();
+      res.json(sessions);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: Download all session metadata independently of dashboard filters.
+  // Register before /:id so "export" is not treated as a session identifier.
+  app.get("/api/sessions/export", (_req, res) => {
+    try {
+      const sessions = listSessions();
+      res.attachment("sessions.json");
       res.json(sessions);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -124,12 +204,15 @@ export function createApp(options: AppOptions = {}) {
         res.status(404).json({ error: "Session not found" });
         return;
       }
-      const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+      const messages: Array<{ role: "user" | "assistant"; content: string }> =
+        [];
       for (const e of session.events) {
-        const content = typeof e.data?.content === "string" ? e.data.content.trim() : "";
+        const content =
+          typeof e.data?.content === "string" ? e.data.content.trim() : "";
         if (!content) continue;
         if (e.type === "user.message") messages.push({ role: "user", content });
-        else if (e.type === "assistant.message") messages.push({ role: "assistant", content });
+        else if (e.type === "assistant.message")
+          messages.push({ role: "assistant", content });
       }
       const line = JSON.stringify({
         session_id: session.id,
@@ -151,9 +234,19 @@ export function createApp(options: AppOptions = {}) {
   // API: Analytics
   app.get("/api/analytics", (req, res) => {
     try {
-      const validSources: AnalyticsSourceFilter[] = ["all", "cli", "vscode", "claude-code"];
-      const raw = typeof req.query.source === "string" ? req.query.source : "all";
-      const source: AnalyticsSourceFilter = validSources.includes(raw as AnalyticsSourceFilter) ? (raw as AnalyticsSourceFilter) : "all";
+      const validSources: AnalyticsSourceFilter[] = [
+        "all",
+        "cli",
+        "vscode",
+        "claude-code",
+      ];
+      const raw =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const source: AnalyticsSourceFilter = validSources.includes(
+        raw as AnalyticsSourceFilter
+      )
+        ? (raw as AnalyticsSourceFilter)
+        : "all";
       const analytics = getAnalytics(source);
       res.json(analytics);
     } catch (err: any) {
@@ -190,10 +283,27 @@ export function createApp(options: AppOptions = {}) {
   // API: Token usage (parsed from ~/.copilot/logs and ~/.claude/projects)
   app.get("/api/token-usage", (req, res) => {
     try {
-      const validSources: TokenSourceFilter[] = ["all", "copilot-cli", "claude-code"];
-      const raw = typeof req.query.source === "string" ? req.query.source : "all";
-      const source: TokenSourceFilter = validSources.includes(raw as TokenSourceFilter) ? (raw as TokenSourceFilter) : "all";
-      res.json(getTokenUsage(source));
+      const validSources: TokenSourceFilter[] = [
+        "all",
+        "copilot-cli",
+        "claude-code",
+      ];
+      const raw =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const source: TokenSourceFilter = validSources.includes(
+        raw as TokenSourceFilter
+      )
+        ? (raw as TokenSourceFilter)
+        : "all";
+      if (req.query.format === "csv") {
+        const rows = getTokenUsageCsv(source);
+        res.attachment("token-usage.csv").type("text/csv; charset=utf-8");
+        pipeline(Readable.from(rows, { objectMode: false }), res, (error) => {
+          if (error && !res.destroyed) res.destroy(error);
+        });
+      } else {
+        res.json(getTokenUsage(source));
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
