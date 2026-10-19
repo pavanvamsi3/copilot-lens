@@ -60,3 +60,29 @@ describe("GET /api/health", () => {
     }
   );
 });
+
+describe("GET /api/export", () => {
+  it.each([
+    ["source=invalid", "source must be all, cli, vscode, or claude-code"],
+    ["format=invalid", "format must be openai or sharegpt"],
+    [
+      "min_turns=-1",
+      "min_turns and min_tokens must be non-negative safe integers",
+    ],
+    ["from=2026-02-30", "from and to must be valid YYYY-MM-DD dates"],
+  ])("rejects invalid query parameters (%s)", async (query, error) => {
+    const server = await startTestServer();
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("Test server did not start correctly");
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${address.port}/api/export?${query}`
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error });
+    } finally {
+      await closeTestServer(server);
+    }
+  });
+});

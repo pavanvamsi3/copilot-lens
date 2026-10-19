@@ -17,6 +17,7 @@ import {
   getTokenUsageCsv,
   type TokenSourceFilter,
 } from "./token-usage";
+import { bulkExport, type ExportFormat, type ExportSource } from "./export";
 
 export interface AppOptions {
   // The host the server binds to. Used to build the allowed-Host list so a
@@ -272,6 +273,97 @@ export function createApp(options: AppOptions = {}) {
       } else {
         res.json(getTokenUsage(source));
       }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API: Bulk-export sessions as NDJSON for fine-tuning datasets.
+  app.get("/api/export", (req, res) => {
+    try {
+      const validSources: ExportSource[] = [
+        "all",
+        "cli",
+        "vscode",
+        "claude-code",
+      ];
+      const validFormats: ExportFormat[] = ["openai", "sharegpt"];
+      const source =
+        typeof req.query.source === "string" ? req.query.source : "all";
+      const format =
+        typeof req.query.format === "string" ? req.query.format : "openai";
+      if (!validSources.includes(source as ExportSource)) {
+        return res
+          .status(400)
+          .json({ error: "source must be all, cli, vscode, or claude-code" });
+      }
+      if (!validFormats.includes(format as ExportFormat)) {
+        return res
+          .status(400)
+          .json({ error: "format must be openai or sharegpt" });
+      }
+
+      const parseNonNegativeInteger = (
+        value: unknown,
+        fallback: number | undefined
+      ) => {
+        if (value === undefined) return fallback;
+        if (typeof value !== "string" || !/^\\d+$/.test(value)) return null;
+        const parsed = Number(value);
+        return Number.isSafeInteger(parsed) ? parsed : null;
+      };
+      const minTurns = parseNonNegativeInteger(req.query.min_turns, 1);
+      const minTokens = parseNonNegativeInteger(
+        req.query.min_tokens,
+        undefined
+      );
+      if (minTurns === null || minTokens === null) {
+        return res.status(400).json({
+          error: "min_turns and min_tokens must be non-negative safe integers",
+        });
+      }
+
+      const from =
+        typeof req.query.from === "string" ? req.query.from : undefined;
+      const to = typeof req.query.to === "string" ? req.query.to : undefined;
+      const isDate = (value: string) => {
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+        const parsed = new Date(`${value}T00:00:00.000Z`);
+        return (
+          Number.isFinite(parsed.getTime()) &&
+          parsed.toISOString().slice(0, 10) === value
+        );
+      };
+      if ((from && !isDate(from)) || (to && !isDate(to))) {
+        return res
+          .status(400)
+          .json({ error: "from and to must be valid YYYY-MM-DD dates" });
+      }
+
+      const repo =
+        typeof req.query.repo === "string" ? req.query.repo : undefined;
+      const result = bulkExport({
+        source: source as ExportSource,
+        format: format as ExportFormat,
+        from,
+        to,
+        repo,
+        minTurns,
+        ...(minTokens === undefined ? {} : { minTokens }),
+        includeTools:
+          req.query.include_tools === "1" || req.query.include_tools === "true",
+      });
+
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="copilot-lens-export-${format}.jsonl"`
+      );
+      res.write(
+        `// exported=${result.exportedSessions} total=${result.totalSessions} skipped_turns=${result.skippedTurns} skipped_tokens=${result.skippedTokens}\n`
+      );
+      for (const line of result.lines) res.write(line + "\n");
+      res.end();
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
