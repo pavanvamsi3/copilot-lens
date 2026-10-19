@@ -5,7 +5,7 @@ export interface SearchEntry {
   source: "cli" | "vscode" | "claude-code";
   title: string;
   cwd: string;
-  date: string;      // ISO string — updatedAt from SessionMeta
+  date: string; // ISO string — updatedAt from SessionMeta
   content: string[]; // array of extracted message strings
 }
 
@@ -15,25 +15,36 @@ export interface SearchResult {
   highlights: string[]; // up to 3 snippets, ±60 chars around match, trimmed to word boundaries
 }
 
+export interface SearchPage {
+  results: SearchResult[];
+  totalMatches: number;
+}
+
 export interface SearchOptions {
-  limit?: number;                        // default 20
-  source?: "cli" | "vscode" | "claude-code" | "all";    // default 'all'
+  limit?: number; // default 20
+  offset?: number; // default 0, applied after ranking and source filtering
+  source?: "cli" | "vscode" | "claude-code" | "all"; // default 'all'
+  caseSensitive?: boolean; // default false
 }
 
 function stripCodeBlocks(text: string): string {
-  // Matches markdown code blocks starting with ``` and ending with ```,
-  // including all content in between (using [\s\S]*? for non-greedy multi-line match),
-  // and replaces them with a single space.
-  return text.replace(/```[\s\S]*?```/g, " ");
+  // Markdown fences may close with an equal or longer run of the same
+  // delimiter. Inline spans require an exact run; do not pair with a
+  // substring of a longer delimiter and accidentally swallow surrounding prose.
+  return text
+    .replace(
+      /(?<!`)(`{3,})(?!`)[\s\S]*?(?<!`)\1`*(?!`)|(?<!~)(~{3,})(?!~)[\s\S]*?(?<!~)\2~*(?!~)/g,
+      " "
+    )
+    .replace(/(?<!`)(`{1,2})(?!`)[\s\S]*?(?<!`)\1(?!`)/g, " ");
 }
 
-export function tokenize(query: string): string[] {
-  return query
-    .toLowerCase()
-    // Splits the search query on one or more non-alphanumeric characters,
-    // converting the string into an array of lowercase tokens.
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 2);
+export function tokenize(query: string, caseSensitive = false): string[] {
+  const normalized = caseSensitive ? query : query.toLowerCase();
+  // Keep complete Unicode words in exact-case queries, including decomposed
+  // accents. Default queries retain the existing ASCII tokenization rules.
+  const delimiter = caseSensitive ? /[^\p{L}\p{N}\p{M}]+/u : /[^a-z0-9]+/;
+  return normalized.split(delimiter).filter((t) => t.length >= 2);
 }
 
 function trimToWordBoundary(text: string, start: number, end: number): string {
@@ -57,15 +68,24 @@ export class SearchIndex {
   private entries: SearchEntry[] = [];
   private storedSessions: SessionMeta[] | null = null;
   private signature = "";
+  private skippedWarning = "";
 
-  // A cheap fingerprint of the session set. Changes when sessions are added,
-  // removed, or updated, so the index can detect when it has gone stale.
+  // Include each session's identity, update time, and searchable metadata.
+  // Sorting avoids rebuilding when only the session enumeration order changes.
   private computeSignature(sessions: SessionMeta[]): string {
-    let latest = "";
-    for (const s of sessions) {
-      if (s.updatedAt > latest) latest = s.updatedAt;
-    }
-    return `${sessions.length}:${latest}`;
+    return JSON.stringify(
+      sessions
+        .map((meta) =>
+          JSON.stringify([
+            meta.source,
+            meta.id,
+            meta.updatedAt,
+            meta.title || meta.id,
+            meta.cwd || "",
+          ])
+        )
+        .sort()
+    );
   }
 
   buildIndex(sessions: SessionMeta[]): void {
@@ -80,10 +100,14 @@ export class SearchIndex {
 
   private _doBuild(sessions: SessionMeta[]): void {
     this.entries = [];
+    let skippedCount = 0;
     for (const meta of sessions) {
       try {
         const detail = getSession(meta.id);
-        if (!detail) continue;
+        if (!detail) {
+          skippedCount++;
+          continue;
+        }
 
         const content: string[] = [];
         for (const event of detail.events) {
@@ -107,27 +131,51 @@ export class SearchIndex {
           content,
         });
       } catch {
-        // skip silently
+        skippedCount++;
       }
     }
+    // An entirely unreadable session set is retried by search(). Avoid repeating
+    // the same diagnostic on every query while allowing those retries to recover.
+    const warning = skippedCount
+      ? JSON.stringify([
+          skippedCount,
+          sessions
+            .map((meta) =>
+              JSON.stringify([meta.source, meta.id, meta.updatedAt])
+            )
+            .sort(),
+        ])
+      : "";
+    if (warning && warning !== this.skippedWarning) {
+      console.warn(
+        `[copilot-lens] search: skipped ${skippedCount} session${skippedCount === 1 ? "" : "s"} that could not be loaded or parsed`
+      );
+    }
+    this.skippedWarning = warning;
   }
 
   search(query: string, options?: SearchOptions): SearchResult[] {
-    if (!query || !query.trim()) return [];
+    return this.searchPage(query, options).results;
+  }
+
+  searchPage(query: string, options?: SearchOptions): SearchPage {
+    if (!query || !query.trim()) return { results: [], totalMatches: 0 };
 
     // Lazy build: only build if entries is empty
     if (this.entries.length === 0) {
       if (this.storedSessions) {
         this.buildIndex(this.storedSessions);
       } else {
-        return [];
+        return { results: [], totalMatches: 0 };
       }
     }
 
-    const tokens = tokenize(query);
-    if (tokens.length === 0) return [];
+    const caseSensitive = options?.caseSensitive ?? false;
+    const tokens = tokenize(query, caseSensitive);
+    if (tokens.length === 0) return { results: [], totalMatches: 0 };
 
     const limit = options?.limit ?? 20;
+    const offset = options?.offset ?? 0;
     const sourceFilter = options?.source ?? "all";
 
     const results: SearchResult[] = [];
@@ -135,7 +183,12 @@ export class SearchIndex {
     for (const entry of this.entries) {
       if (sourceFilter !== "all" && entry.source !== sourceFilter) continue;
 
-      const joinedContent = entry.content.join(" ").toLowerCase();
+      const rawContent = entry.content.join(" ");
+      const joinedContent = caseSensitive
+        ? rawContent
+        : rawContent.toLowerCase();
+      const title = caseSensitive ? entry.title : entry.title.toLowerCase();
+      const cwd = caseSensitive ? entry.cwd : entry.cwd.toLowerCase();
       const wordCount = joinedContent.split(/\s+/).filter(Boolean).length || 1;
 
       let score = 0;
@@ -153,35 +206,45 @@ export class SearchIndex {
         }
 
         // Title bonus
-        if (entry.title.toLowerCase().includes(token)) {
+        if (title.includes(token)) {
           score += 0.5;
         }
 
         // cwd bonus
-        if (entry.cwd.toLowerCase().includes(token)) {
+        if (cwd.includes(token)) {
           score += 0.2;
         }
       }
 
       if (score <= 0) continue;
 
-      const rawContent = entry.content.join(" ");
-      const highlights = this.extractHighlights(rawContent, tokens);
+      const highlights = this.extractHighlights(
+        rawContent,
+        tokens,
+        caseSensitive
+      );
 
       results.push({ entry, score, highlights });
     }
 
     results.sort((a, b) => b.score - a.score);
-    return results.slice(0, limit);
+    return {
+      results: results.slice(offset, offset + limit),
+      totalMatches: results.length,
+    };
   }
 
-  private extractHighlights(rawContent: string, tokens: string[]): string[] {
-    const lower = rawContent.toLowerCase();
+  private extractHighlights(
+    rawContent: string,
+    tokens: string[],
+    caseSensitive: boolean
+  ): string[] {
+    const searchable = caseSensitive ? rawContent : rawContent.toLowerCase();
     const windows: Array<[number, number]> = [];
 
     for (const token of tokens) {
       let idx = 0;
-      while ((idx = lower.indexOf(token, idx)) !== -1) {
+      while ((idx = searchable.indexOf(token, idx)) !== -1) {
         const start = Math.max(0, idx - 60);
         const end = Math.min(rawContent.length, idx + 60);
         windows.push([start, end]);
@@ -222,6 +285,7 @@ export class SearchIndex {
   clear(): void {
     this.entries = [];
     this.signature = "";
+    this.skippedWarning = "";
     // storedSessions kept so search() can lazy-rebuild after clear()
   }
 }

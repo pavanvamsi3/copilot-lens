@@ -1,8 +1,44 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { cachedCall, clearCache, _cacheInternals } from "../cache";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  cachedCall,
+  clearCache,
+  getCacheTtlMs,
+  _cacheInternals,
+} from "../cache";
 
 beforeEach(() => {
   clearCache();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+});
+
+describe("configured cache lifetime", () => {
+  it.each([
+    undefined,
+    "",
+    " ",
+    "-1",
+    "0.5",
+    "NaN",
+    "Infinity",
+    "5000ms",
+    "9007199254740992",
+  ])("uses the 30-second default for %s", (value) => {
+    vi.stubEnv("COPILOT_LENS_CACHE_TTL_MS", value);
+    expect(getCacheTtlMs()).toBe(30_000);
+  });
+
+  it.each([
+    ["5000", 5000],
+    [" 5000 ", 5000],
+    ["0", 0],
+  ])("uses the configured lifetime %s", (value, expected) => {
+    vi.stubEnv("COPILOT_LENS_CACHE_TTL_MS", value);
+    expect(getCacheTtlMs()).toBe(expected);
+  });
 });
 
 describe("cachedCall", () => {
@@ -36,6 +72,24 @@ describe("cachedCall", () => {
     const result = cachedCall("expire-test", 1000, fn);
     expect(result).toBe(2); // fn called again
     expect(callCount).toBe(2);
+  });
+
+  it.each([
+    ["keeps an entry valid one millisecond before the TTL", 999, 1],
+    ["expires an entry exactly at the TTL", 1000, 2],
+    ["expires an entry one millisecond after the TTL", 1001, 2],
+  ])("%s", (_description, elapsedMs, expectedValue) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+
+    let callCount = 0;
+    const fn = () => ++callCount;
+    expect(cachedCall("boundary", 1000, fn)).toBe(1);
+
+    vi.advanceTimersByTime(elapsedMs);
+
+    expect(cachedCall("boundary", 1000, fn)).toBe(expectedValue);
+    expect(callCount).toBe(expectedValue);
   });
 
   it("uses separate keys for different caches", () => {

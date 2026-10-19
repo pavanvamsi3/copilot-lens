@@ -180,18 +180,34 @@ describe("analytics aggregation logic", () => {
   });
 
   it("calculates tool success rate", () => {
-    const toolSuccessRate: Record<string, { success: number; failure: number }> = {};
+    const toolSuccessRate: Record<
+      string,
+      { success: number; failure: number }
+    > = {};
     const events = [
-      { type: "tool.execution_complete", data: { tool: "bash", success: true } },
-      { type: "tool.execution_complete", data: { tool: "bash", success: true } },
-      { type: "tool.execution_complete", data: { tool: "bash", success: false } },
-      { type: "tool.execution_complete", data: { tool: "edit", success: true } },
+      {
+        type: "tool.execution_complete",
+        data: { tool: "bash", success: true },
+      },
+      {
+        type: "tool.execution_complete",
+        data: { tool: "bash", success: true },
+      },
+      {
+        type: "tool.execution_complete",
+        data: { tool: "bash", success: false },
+      },
+      {
+        type: "tool.execution_complete",
+        data: { tool: "edit", success: true },
+      },
     ];
 
     for (const event of events) {
       if (event.type === "tool.execution_complete") {
         const tool = event.data.tool;
-        if (!toolSuccessRate[tool]) toolSuccessRate[tool] = { success: 0, failure: 0 };
+        if (!toolSuccessRate[tool])
+          toolSuccessRate[tool] = { success: 0, failure: 0 };
         if (event.data.success) toolSuccessRate[tool].success++;
         else toolSuccessRate[tool].failure++;
       }
@@ -210,7 +226,8 @@ describe("analytics aggregation logic", () => {
     ];
 
     for (const ts of timestamps) {
-      const hour = new Date(ts).getUTCHours().toString().padStart(2, "0") + ":00";
+      const hour =
+        new Date(ts).getUTCHours().toString().padStart(2, "0") + ":00";
       hourOfDay[hour] = (hourOfDay[hour] || 0) + 1;
     }
 

@@ -7,7 +7,14 @@ import * as os from "os";
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bm-test-"));
 process.env.COPILOT_LENS_DB_DIR = tmpDir;
 
-import { listBookmarks, getBookmark, upsertBookmark, deleteBookmark, getBookmarkMap, listAllTags } from "../bookmarks";
+import {
+  listBookmarks,
+  getBookmark,
+  upsertBookmark,
+  deleteBookmark,
+  getBookmarkMap,
+  listAllTags,
+} from "../bookmarks";
 
 afterEach(() => {
   // Wipe the DB after each test so they don't interfere
@@ -19,7 +26,11 @@ afterEach(() => {
 
 describe("upsertBookmark", () => {
   it("creates a new bookmark with tags and note", () => {
-    const bm = upsertBookmark("session-1", ["bug", "typescript"], "important session");
+    const bm = upsertBookmark(
+      "session-1",
+      ["bug", "typescript"],
+      "important session"
+    );
     expect(bm.sessionId).toBe("session-1");
     expect(bm.tags).toEqual(["bug", "typescript"]);
     expect(bm.note).toBe("important session");
@@ -166,6 +177,8 @@ describe("persistence", () => {
   it("delete removes from listBookmarks", () => {
     upsertBookmark("persist-2", [], "");
     deleteBookmark("persist-2");
-    expect(listBookmarks().find((b) => b.sessionId === "persist-2")).toBeUndefined();
+    expect(
+      listBookmarks().find((b) => b.sessionId === "persist-2")
+    ).toBeUndefined();
   });
 });
