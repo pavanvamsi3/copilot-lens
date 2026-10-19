@@ -131,6 +131,22 @@ describe("search total matches", () => {
     expect((await page()).results).toEqual(legacy);
   });
 
+  it.each(["semantic", "hybrid"])(
+    "paginates and totals %s results like keyword search",
+    async (mode) => {
+      const all = await page("needle", `&mode=${mode}&limit=100`);
+      expect(all.totalMatches).toBe(all.results.length);
+      expect(all.totalMatches).toBeGreaterThan(5);
+      const second = await page("needle", `&mode=${mode}&offset=2&limit=3`);
+      expect(second.totalMatches).toBe(all.totalMatches);
+      expect(second.results).toEqual(all.results.slice(2, 5));
+      const legacy = await (
+        await fetch(`${baseUrl}/api/search?q=needle&mode=${mode}&limit=3`)
+      ).json();
+      expect(legacy).toEqual(all.results.slice(0, 3));
+    }
+  );
+
   it.each([false, true])(
     "runs the dashboard against the real API (request fails: %s)",
     async (fails) => {
@@ -166,6 +182,7 @@ describe("search total matches", () => {
         sessionCount,
         sessionList,
         searchInput: { value: "needle" },
+        searchMode: "keyword",
         isSearchActive: false,
         document: { querySelector: () => ({ classList }) },
         fetch: (url: string) => {

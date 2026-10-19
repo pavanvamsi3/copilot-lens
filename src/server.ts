@@ -11,7 +11,8 @@ import {
   type AnalyticsSourceFilter,
 } from "./sessions";
 import { clearCache } from "./cache";
-import { SearchIndex } from "./search";
+import { SearchIndex, type SearchMode, type SearchOptions } from "./search";
+import { SemanticIndex, blendResults } from "./semantic-search";
 import {
   getTokenUsage,
   getTokenUsageCsv,
@@ -72,6 +73,7 @@ export function createApp(options: AppOptions = {}) {
   app.use(hostGuard(options.host));
 
   const searchIndex = new SearchIndex();
+  const semanticIndex = new SemanticIndex();
 
   // Read the package version once when the app is created, not per request.
   const { version: appVersion } = require("../package.json") as {
@@ -87,7 +89,11 @@ export function createApp(options: AppOptions = {}) {
 
   app.use(express.static(path.join(__dirname, "..", "public")));
 
-  // API: Full-text search
+  // API: Full-text / semantic / hybrid search
+  // ?q=      — query string
+  // ?mode=   — "keyword" (default) | "semantic" | "hybrid"
+  // ?source= — "all" (default) | "cli" | "vscode" | "claude-code" | "cursor"
+  // ?limit=  — max results (default 20)
   app.get("/api/search", async (req, res) => {
     try {
       const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -106,6 +112,10 @@ export function createApp(options: AppOptions = {}) {
           .status(400)
           .json({ error: "offset must be a non-negative safe integer" });
       }
+      const rawMode =
+        typeof req.query.mode === "string" ? req.query.mode : "keyword";
+      const mode: SearchMode =
+        rawMode === "semantic" || rawMode === "hybrid" ? rawMode : "keyword";
 
       if (!q) {
         return res.json(includeTotal ? { results: [], totalMatches: 0 } : []);
@@ -114,14 +124,36 @@ export function createApp(options: AppOptions = {}) {
       const sessions = listSessions();
       searchIndex.buildIndex(sessions);
 
-      const page = searchIndex.searchPage(q, {
-        limit,
-        caseSensitive: req.query.caseSensitive === "true",
-        offset,
-        source: source as "cli" | "vscode" | "all",
-      });
+      const sourceOpt = source as SearchOptions["source"];
 
-      res.json(includeTotal ? page : page.results);
+      if (mode === "keyword") {
+        const page = searchIndex.searchPage(q, {
+          limit,
+          caseSensitive: req.query.caseSensitive === "true",
+          offset,
+          source: sourceOpt,
+        });
+        return res.json(includeTotal ? page : page.results);
+      }
+
+      // semantic or hybrid: build the semantic index lazily from keyword
+      // entries, rank every match, then apply offset/limit so pagination and
+      // totalMatches behave as they do for keyword search.
+      semanticIndex.build(searchIndex.getEntries());
+      const all = Number.MAX_SAFE_INTEGER;
+      const ranked =
+        mode === "semantic"
+          ? semanticIndex.search(q, { limit: all, source: sourceOpt })
+          : // hybrid: blend keyword (60%) + semantic (40%)
+            blendResults(
+              searchIndex.search(q, { limit: all, source: sourceOpt }),
+              semanticIndex.search(q, { limit: all, source: sourceOpt }),
+              all
+            );
+      const results = ranked.slice(offset, offset + limit);
+      return res.json(
+        includeTotal ? { results, totalMatches: ranked.length } : results
+      );
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -281,6 +313,7 @@ export function createApp(options: AppOptions = {}) {
   app.post("/api/cache/clear", (_req, res) => {
     clearCache();
     searchIndex.clear();
+    semanticIndex.clear();
     res.json({ ok: true });
   });
 
