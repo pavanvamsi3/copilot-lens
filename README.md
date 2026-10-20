@@ -140,12 +140,13 @@ the header row.
 
 ## Where the data comes from
 
-| Source                 | Path                                                                                              |
-| ---------------------- | ------------------------------------------------------------------------------------------------- |
-| Copilot CLI sessions   | `~/.copilot/session-state/`                                                                       |
-| Copilot CLI token logs | `~/.copilot/logs/process-*.log`                                                                   |
-| VS Code Copilot Chat   | `~/Library/Application Support/Code/` (macOS), `%APPDATA%/Code/` (Win), `~/.config/Code/` (Linux) |
-| Claude Code            | `~/.claude/projects/`                                                                             |
+| Source                 | Path                                                                                                                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Copilot CLI sessions   | `~/.copilot/session-state/`                                                                                                                                                                           |
+| Copilot CLI token logs | `~/.copilot/logs/process-*.log`                                                                                                                                                                       |
+| VS Code Copilot Chat   | `~/Library/Application Support/Code/` (macOS), `%APPDATA%/Code/` (Win), `~/.config/Code/` (Linux)                                                                                                     |
+| Claude Code            | `~/.claude/projects/`                                                                                                                                                                                 |
+| Cursor                 | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` (macOS), `%APPDATA%\\Cursor\\User\\globalStorage\\state.vscdb` (Win), `~/.config/Cursor/User/globalStorage/state.vscdb` (Linux) |
 
 VS Code Insiders is supported. Pasted images are stripped; files over 200MB are skipped. Durations exclude gaps longer than 5 minutes so paused sessions aren't inflated.
 

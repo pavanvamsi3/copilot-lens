@@ -426,6 +426,10 @@ select:focus {
   background: color-mix(in srgb, #f0883e 15%, var(--surface));
   color: #f0883e;
 }
+.badge-cursor {
+  background: color-mix(in srgb, #56d4dd 15%, var(--surface));
+  color: #56d4dd;
+}
 
 .top-badges {
   display: flex;
