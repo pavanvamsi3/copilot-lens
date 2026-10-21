@@ -200,14 +200,19 @@ export function listSessions(): SessionMeta[] {
   });
 }
 
-export function getSession(sessionId: string): SessionDetail | null {
+export function getSession(
+  sessionId: string,
+  options: { preserveFullVSCodeText?: boolean } = {}
+): SessionDetail | null {
   // Reject ids that could traverse outside the session directories.
   if (!isValidSessionId(sessionId)) return null;
 
   // Check VS Code sessions first (avoids filesystem miss for CLI)
   try {
     if (isVSCodeSession(sessionId)) {
-      return getVSCodeSession(sessionId);
+      return getVSCodeSession(sessionId, {
+        preserveFullText: options.preserveFullVSCodeText,
+      });
     }
   } catch {}
 

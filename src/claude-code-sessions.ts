@@ -273,6 +273,18 @@ export function getClaudeCodeSession(sessionId: string): SessionDetail | null {
       }
     } else if (event.type === "assistant") {
       const msgContent = event.message?.content;
+      const textContent = extractTextContent(msgContent);
+
+      // Preserve the recorded model even when an interrupted/tool-only turn
+      // has no assistant.message event for the Markdown export to inspect.
+      if (event.message?.model && !textContent) {
+        events.push({
+          type: "assistant.turn_start",
+          id: `turn-${id}`,
+          timestamp: ts,
+          data: { model: event.message.model },
+        });
+      }
 
       // Emit thinking blocks as assistant.thinking events
       for (const thought of extractThinkingBlocks(msgContent)) {
@@ -295,7 +307,6 @@ export function getClaudeCodeSession(sessionId: string): SessionDetail | null {
       }
 
       // Emit text content as assistant.message
-      const textContent = extractTextContent(msgContent);
       if (textContent) {
         events.push({
           type: "assistant.message",
