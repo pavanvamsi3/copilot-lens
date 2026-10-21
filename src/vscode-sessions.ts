@@ -191,11 +191,17 @@ function msToIso(ms: number | undefined): string {
   return new Date(ms).toISOString();
 }
 
+function normalizeModelId(modelId: unknown): string | undefined {
+  if (typeof modelId !== "string" || !modelId) return undefined;
+  return modelId.includes("/") ? modelId.split("/").pop() : modelId;
+}
+
 function requestsToEvents(requests: any[]): SessionEvent[] {
   const events: SessionEvent[] = [];
 
   for (const req of requests) {
     const ts = req.timestamp ? new Date(req.timestamp).toISOString() : "";
+    const model = normalizeModelId(req.modelId);
 
     // User message
     const userText = req.message?.text || "";
@@ -213,7 +219,7 @@ function requestsToEvents(requests: any[]): SessionEvent[] {
       type: "assistant.turn_start",
       id: `turn-${req.requestId || ""}`,
       timestamp: ts,
-      data: {},
+      data: model ? { model } : {},
     });
 
     // Tool invocations from response parts
@@ -270,7 +276,7 @@ function requestsToEvents(requests: any[]): SessionEvent[] {
         type: "assistant.message",
         id: req.responseId || `resp-${req.requestId || ""}`,
         timestamp: respTs,
-        data: { content: fullResponse },
+        data: { content: fullResponse, ...(model ? { model } : {}) },
       });
     }
   }
@@ -418,13 +424,9 @@ function _computeVSCodeAnalytics(): VSCodeAnalyticsEntry[] {
         if (msgText) msgLengths.push(msgText.length);
 
         // Model usage
-        const model = req.modelId || "";
+        const model = normalizeModelId(req.modelId);
         if (model) {
-          // Normalize model id: "copilot/claude-sonnet-4.5" → "claude-sonnet-4.5"
-          const shortModel = model.includes("/")
-            ? model.split("/").pop()!
-            : model;
-          modelUsage[shortModel] = (modelUsage[shortModel] || 0) + 1;
+          modelUsage[model] = (modelUsage[model] || 0) + 1;
         }
 
         // Tool usage from response parts

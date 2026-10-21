@@ -150,6 +150,44 @@ describe("requestsToEvents", () => {
     expect(assistantMsg!.data.content).toBe("Here is the explanation");
   });
 
+  it("preserves the normalized model id on assistant messages", () => {
+    const events = requestsToEvents([
+      {
+        requestId: "r3-model",
+        timestamp: 1700000000000,
+        modelId: "copilot/claude-sonnet-4-6",
+        message: { text: "Explain this" },
+        response: [{ value: "Here is the explanation" }],
+      },
+    ]);
+
+    const assistantMsg = events.find((e) => e.type === "assistant.message");
+    expect(assistantMsg!.data.model).toBe("claude-sonnet-4-6");
+  });
+
+  it("preserves the model for tool-only responses", () => {
+    const events = requestsToEvents([
+      {
+        requestId: "r3-tool-only",
+        timestamp: 1700000000000,
+        modelId: "copilot/gpt-5",
+        message: { text: "Run a tool" },
+        response: [
+          {
+            kind: "toolInvocationSerialized",
+            toolCallId: "tc-model",
+            originMessage: "bash (Terminal)",
+          },
+        ],
+      },
+    ]);
+
+    expect(events.find((e) => e.type === "assistant.message")).toBeUndefined();
+    expect(
+      events.find((e) => e.type === "assistant.turn_start")!.data.model
+    ).toBe("gpt-5");
+  });
+
   it("includes result text in assistant message", () => {
     const events = requestsToEvents([
       {

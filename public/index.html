@@ -157,14 +157,24 @@
             </div>
             <div class="sessions-toolbar">
               <div id="sessionCount" class="session-count"></div>
-              <button
-                id="exportSessionsBtn"
-                class="export-btn"
-                type="button"
-                title="Download all session metadata, including sessions outside the current filters"
-              >
-                ⬇ Export All (JSON)
-              </button>
+              <div class="session-export-actions">
+                <button
+                  id="exportSessionsCsvBtn"
+                  class="export-btn"
+                  type="button"
+                  title="Download the sessions matching the current filters as CSV"
+                >
+                  ⬇ Export Filtered (CSV)
+                </button>
+                <button
+                  id="exportSessionsBtn"
+                  class="export-btn"
+                  type="button"
+                  title="Download all session metadata, including sessions outside the current filters"
+                >
+                  ⬇ Export All (JSON)
+                </button>
+              </div>
             </div>
             <div
               id="sessionExportStatus"

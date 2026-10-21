@@ -359,6 +359,49 @@ describe("listClaudeCodeSessions / getClaudeCodeSession / isClaudeCodeSession", 
     expect(toolEvents[1].data.tool).toBe("read");
   });
 
+  it("preserves the model on textless assistant events", () => {
+    writeSession("sess-model-only", [
+      makeEvent({
+        type: "user",
+        isSidechain: false,
+        sessionId: "sess-model-only",
+        cwd: "/proj",
+        slug: "s",
+        message: { content: "run something" },
+      }),
+      makeEvent({
+        type: "assistant",
+        isSidechain: false,
+        sessionId: "sess-model-only",
+        message: {
+          model: "claude-opus-4-1",
+          content: [
+            { type: "thinking", thinking: "working" },
+            {
+              type: "tool_use",
+              id: "tool-model",
+              name: "bash",
+              input: { cmd: "ls" },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const detail = getClaudeCodeSession("sess-model-only")!;
+    expect(
+      detail.events.find((event) => event.type === "assistant.message")
+    ).toBeUndefined();
+    expect(
+      detail.events.find((event) => event.type === "assistant.thinking")!.data
+        .model
+    ).toBe("claude-opus-4-1");
+    expect(
+      detail.events.find((event) => event.type === "tool.execution_start")!.data
+        .model
+    ).toBe("claude-opus-4-1");
+  });
+
   it("getClaudeCodeSession skips isSidechain events", () => {
     writeSession("sess-4", [
       makeEvent({

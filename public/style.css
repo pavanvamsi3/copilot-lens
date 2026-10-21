@@ -302,6 +302,13 @@ select:focus {
   opacity: 0.6;
 }
 
+.session-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* Session List */
 .session-list {
   display: flex;

@@ -4,6 +4,14 @@ let analytics = null;
 let charts = {};
 let searchDebounce = null;
 let isSearchActive = false;
+let isSearchPending = false;
+let searchGeneration = 0;
+let searchResultSessions = [];
+let isSessionListLoading = false;
+let sessionLoadGeneration = 0;
+let hasSuccessfulSessionLoad = false;
+let isSessionSnapshotValid = false;
+let isSessionCsvExporting = false;
 let analyticsSource = "all";
 let bookmarks = {}; // sessionId → { tags, note, createdAt }
 let allTags = []; // known tag values for auto-suggest
@@ -1096,6 +1104,11 @@ function attachBookmarkSectionListeners(sessionId) {
 
 // Data loading
 async function loadSessions() {
+  const generation = ++sessionLoadGeneration;
+  isSessionListLoading = true;
+  hasSuccessfulSessionLoad = false;
+  isSessionSnapshotValid = false;
+  updateSessionCsvExportButton();
   // Show skeleton while loading
   sessionList.innerHTML = Array.from(
     { length: 4 },
@@ -1112,7 +1125,10 @@ async function loadSessions() {
       fetch("/api/sessions"),
       loadBookmarks(),
     ]);
-    sessions = await sessRes.json();
+    const loadedSessions = await sessRes.json();
+    if (generation !== sessionLoadGeneration) return;
+    sessions = loadedSessions;
+    hasSuccessfulSessionLoad = true;
     // Merge bookmark flags already present in session list response
     for (const s of sessions) {
       if (s.bookmarked && !bookmarks[s.id]) {
@@ -1125,9 +1141,48 @@ async function loadSessions() {
       }
     }
     updateDirFilter();
-    renderSessions();
+    const activeQuery = searchInput.value.trim();
+    if (isSearchActive && activeQuery) {
+      // The existing full-text result list belongs to the pre-refresh session
+      // snapshot. Replace it before making CSV export available again.
+      clearTimeout(searchDebounce);
+      searchDebounce = null;
+      const activeSearchGeneration = ++searchGeneration;
+      setSearchPending(true);
+      await runSearch(activeQuery, activeSearchGeneration);
+    } else if (isSearchActive) {
+      // The input was cleared while the debounced clearSearch() callback was
+      // still queued. Clear the old results synchronously so renderSessions()
+      // cannot keep the stale search snapshot visible or exportable.
+      clearTimeout(searchDebounce);
+      searchDebounce = null;
+      searchGeneration++;
+      clearSearch();
+    } else {
+      renderSessions();
+      setSessionSnapshotValid(true);
+    }
   } catch (err) {
-    sessionList.innerHTML = `<div class="error-message">Failed to load sessions: ${escapeHtml(err.message)}</div>`;
+    if (generation === sessionLoadGeneration) {
+      hasSuccessfulSessionLoad = false;
+      setSessionSnapshotValid(false);
+      sessionList.innerHTML = `<div class="error-message">Failed to load sessions: ${escapeHtml(err.message)}</div>`;
+    }
+  } finally {
+    if (generation === sessionLoadGeneration) {
+      isSessionListLoading = false;
+      // Clearing an active search while its post-load refresh is still in
+      // flight renders the successfully loaded unfiltered list, but
+      // clearSearch() cannot validate it until this loading flag is cleared.
+      if (
+        hasSuccessfulSessionLoad &&
+        !isSearchActive &&
+        !searchInput.value.trim()
+      ) {
+        isSessionSnapshotValid = true;
+      }
+      updateSessionCsvExportButton();
+    }
   }
 }
 
@@ -1163,9 +1218,208 @@ async function exportAllSessions() {
   }
 }
 
+function csvCell(value) {
+  const text = value == null ? "" : String(value);
+  // Spreadsheet apps may execute cells beginning with these characters as
+  // formulas. Keep user-controlled titles and directories inert on open.
+  const safe = /^\s*[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+function getSessionCsvModel(session) {
+  let model = typeof session.model === "string" ? session.model : "";
+  for (const event of session.events || []) {
+    if (event.type === "session.start" && event.data?.model) {
+      model = event.data.model;
+    } else if (event.type === "session.model_change" && event.data?.newModel) {
+      model = event.data.newModel;
+    } else if (
+      event.type === "session.info" &&
+      event.data?.infoType === "model"
+    ) {
+      const match = (event.data.message || "").match(
+        /Model changed to:\s*([^\s.]+(?:[-.][^\s.]+)*)/i
+      );
+      if (match) model = match[1];
+    }
+    if (event.data?.model) {
+      model = event.data.model;
+    }
+  }
+  return model;
+}
+
+function reduceSessionCsvRow(session = {}, fallback = {}) {
+  let toolCount = "";
+  if (Number.isFinite(session.toolCount)) {
+    toolCount = session.toolCount;
+  } else if (Number.isFinite(session.eventCounts?.["tool.execution_start"])) {
+    toolCount = session.eventCounts["tool.execution_start"];
+  } else if (Array.isArray(session.events)) {
+    toolCount = session.events.filter(
+      (event) => event.type === "tool.execution_start"
+    ).length;
+  }
+
+  return {
+    createdAt: session.createdAt || fallback.createdAt || "",
+    source: session.source || fallback.source || "",
+    model: getSessionCsvModel(session) || getSessionCsvModel(fallback),
+    status: session.status || fallback.status || "",
+    duration: Number.isFinite(session.duration)
+      ? session.duration
+      : Number.isFinite(fallback.duration)
+        ? fallback.duration
+        : null,
+    toolCount,
+    cwd: session.cwd || fallback.cwd || "",
+  };
+}
+
+function buildSessionsCsv(rows) {
+  const header = [
+    "Date",
+    "Source",
+    "Model",
+    "Status",
+    "Duration (min)",
+    "Tool Count",
+    "Directory",
+  ];
+  const lines = rows.map((session) => {
+    const row = reduceSessionCsvRow(session);
+    const duration = Number.isFinite(row.duration)
+      ? (row.duration / 60_000).toFixed(2)
+      : "";
+    return [
+      row.createdAt,
+      row.source,
+      row.model,
+      row.status,
+      duration,
+      row.toolCount,
+      row.cwd,
+    ]
+      .map(csvCell)
+      .join(",");
+  });
+  return [header.map(csvCell).join(","), ...lines].join("\r\n") + "\r\n";
+}
+
+async function loadSessionCsvDetails(filtered) {
+  // Keep requests bounded for large histories while preserving the filtered
+  // list's order in the finished CSV.
+  const rows = new Array(filtered.length);
+  let next = 0;
+  async function worker() {
+    while (next < filtered.length) {
+      const index = next++;
+      const session = filtered[index];
+      try {
+        const response = await fetch(
+          `/api/sessions/${encodeURIComponent(session.id)}`
+        );
+        const detail = response.ok ? await response.json() : null;
+        rows[index] = reduceSessionCsvRow(detail || {}, session);
+      } catch {
+        rows[index] = reduceSessionCsvRow({}, session);
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(8, filtered.length) }, () => worker())
+  );
+  return rows;
+}
+
+function updateSessionCsvExportButton() {
+  const button = document.getElementById("exportSessionsCsvBtn");
+  button.disabled =
+    isSessionListLoading ||
+    isSearchPending ||
+    !isSessionSnapshotValid ||
+    isSessionCsvExporting;
+}
+
+function setSessionSnapshotValid(valid) {
+  isSessionSnapshotValid = valid;
+  updateSessionCsvExportButton();
+}
+
+function setSearchPending(pending) {
+  isSearchPending = pending;
+  updateSessionCsvExportButton();
+}
+
+async function exportFilteredSessions() {
+  const status = document.getElementById("sessionExportStatus");
+  status.hidden = true;
+  status.textContent = "";
+  if (isSessionListLoading || isSearchPending) {
+    status.textContent = isSessionListLoading
+      ? "Wait for sessions to finish loading before exporting."
+      : "Wait for search results before exporting.";
+    status.hidden = false;
+    updateSessionCsvExportButton();
+    return;
+  }
+  if (!isSessionSnapshotValid) {
+    status.textContent =
+      "Reload sessions or clear the failed search before exporting.";
+    status.hidden = false;
+    updateSessionCsvExportButton();
+    return;
+  }
+  isSessionCsvExporting = true;
+  updateSessionCsvExportButton();
+  try {
+    const filtered = isSearchActive
+      ? searchResultSessions.map((entry) => {
+          const entrySource = entry.source || "cli";
+          const metadata = sessions.find(
+            (session) =>
+              session.id === entry.id &&
+              (session.source || "cli") === entrySource
+          );
+          return {
+            ...entry,
+            ...metadata,
+            createdAt:
+              metadata?.createdAt || entry.createdAt || entry.date || "",
+          };
+        })
+      : getFilteredSessions();
+    const rows = await loadSessionCsvDetails(filtered);
+    const blob = new Blob(["\ufeff", buildSessionsCsv(rows)], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sessions-filtered.csv";
+    link.hidden = true;
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+  } catch (error) {
+    status.textContent = `CSV export failed: ${error.message}`;
+    status.hidden = false;
+  } finally {
+    isSessionCsvExporting = false;
+    updateSessionCsvExportButton();
+  }
+}
+
 document
   .getElementById("exportSessionsBtn")
   .addEventListener("click", exportAllSessions);
+document
+  .getElementById("exportSessionsCsvBtn")
+  .addEventListener("click", exportFilteredSessions);
 
 // Search kbd visibility
 function updateSearchKbd() {
@@ -1178,11 +1432,14 @@ function updateSearchKbd() {
 // Search input (full-text search with debounce)
 searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounce);
+  const generation = ++searchGeneration;
   const q = searchInput.value.trim();
   searchClear.style.display = q ? "inline" : "none";
   updateSearchKbd();
+  setSessionSnapshotValid(false);
+  setSearchPending(!!q);
   searchDebounce = setTimeout(() => {
-    if (q) runSearch(q);
+    if (q) runSearch(q, generation);
     else clearSearch();
   }, 300);
 });
@@ -1191,6 +1448,8 @@ searchInput.addEventListener("focus", updateSearchKbd);
 searchInput.addEventListener("blur", updateSearchKbd);
 
 searchClear.addEventListener("click", () => {
+  clearTimeout(searchDebounce);
+  searchGeneration++;
   searchInput.value = "";
   searchClear.style.display = "none";
   updateSearchKbd();
@@ -1409,7 +1668,9 @@ function renderInsightsScore(data) {
 }
 
 // Full-text search
-async function runSearch(q) {
+async function runSearch(q, generation = null) {
+  const tracksCurrentSearch = typeof generation === "number";
+  if (tracksCurrentSearch && generation !== searchGeneration) return;
   const searchWrap = document.querySelector(".search-bar-wrap");
   if (searchWrap) searchWrap.classList.add("loading");
   try {
@@ -1417,26 +1678,44 @@ async function runSearch(q) {
       `/api/search?q=${encodeURIComponent(q)}&source=all&limit=20&includeTotal=true`
     );
     const page = await res.json();
+    if (tracksCurrentSearch && generation !== searchGeneration) return;
     if (!res.ok) {
       throw new Error(page.error || `Search request failed (${res.status})`);
     }
     isSearchActive = true;
     renderSearchResults(page.results, page.totalMatches);
+    if (typeof setSessionSnapshotValid === "function") {
+      setSessionSnapshotValid(true);
+    }
   } catch (err) {
+    if (tracksCurrentSearch && generation !== searchGeneration) return;
     isSearchActive = true;
+    searchResultSessions = [];
+    if (typeof setSessionSnapshotValid === "function") {
+      setSessionSnapshotValid(false);
+    }
     sessionCount.textContent = "Search failed";
     sessionList.innerHTML = `<div class="error-message">Search failed: ${escapeHtml(err.message)}</div>`;
   } finally {
-    if (searchWrap) searchWrap.classList.remove("loading");
+    if (!tracksCurrentSearch || generation === searchGeneration) {
+      if (searchWrap) searchWrap.classList.remove("loading");
+      if (typeof setSearchPending === "function") setSearchPending(false);
+    }
   }
 }
 
 function clearSearch() {
+  setSearchPending(false);
+  const searchWrap = document.querySelector(".search-bar-wrap");
+  if (searchWrap) searchWrap.classList.remove("loading");
   isSearchActive = false;
+  searchResultSessions = [];
   renderSessions();
+  setSessionSnapshotValid(hasSuccessfulSessionLoad && !isSessionListLoading);
 }
 
 function renderSearchResults(results, totalMatches = results?.length ?? 0) {
+  searchResultSessions = (results || []).map(({ entry }) => entry);
   const query = searchInput.value.trim();
   if (!results || results.length === 0) {
     sessionCount.textContent = "No results found";

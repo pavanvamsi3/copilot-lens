@@ -273,6 +273,7 @@ export function getClaudeCodeSession(sessionId: string): SessionDetail | null {
       }
     } else if (event.type === "assistant") {
       const msgContent = event.message?.content;
+      const model = event.message?.model;
 
       // Emit thinking blocks as assistant.thinking events
       for (const thought of extractThinkingBlocks(msgContent)) {
@@ -280,7 +281,7 @@ export function getClaudeCodeSession(sessionId: string): SessionDetail | null {
           type: "assistant.thinking",
           id: randomUUID(),
           timestamp: ts,
-          data: { content: thought },
+          data: { content: thought, ...(model ? { model } : {}) },
         });
       }
 
@@ -290,7 +291,11 @@ export function getClaudeCodeSession(sessionId: string): SessionDetail | null {
           type: "tool.execution_start",
           id: block.id || randomUUID(),
           timestamp: ts,
-          data: { tool: block.name || "unknown", input: block.input },
+          data: {
+            tool: block.name || "unknown",
+            input: block.input,
+            ...(model ? { model } : {}),
+          },
         });
       }
 
@@ -303,7 +308,7 @@ export function getClaudeCodeSession(sessionId: string): SessionDetail | null {
           timestamp: ts,
           data: {
             content: textContent,
-            model: event.message?.model,
+            model,
           },
         });
       }
